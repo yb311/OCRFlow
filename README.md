@@ -6,6 +6,10 @@ A native macOS app for batch OCR (Optical Character Recognition) powered by Appl
 ![Swift](https://img.shields.io/badge/swift-5.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+## Screenshots
+
+![OCRFlow main window](screenshots/main-empty.png)
+
 ## Features
 
 - **Batch processing** — drag and drop multiple images or entire folders at once
@@ -15,10 +19,6 @@ A native macOS app for batch OCR (Optical Character Recognition) powered by Appl
 - **Flexible export** — export all results as a single text file with configurable separators
 - **Fully offline** — no network access, no data leaves your machine
 - **macOS-native** — built with SwiftUI, feels right at home on macOS
-
-## Screenshots
-
-> _Add screenshots here_
 
 ## Requirements
 
@@ -37,7 +37,7 @@ A native macOS app for batch OCR (Optical Character Recognition) powered by Appl
 ### Option 2 — Build from Source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/OCRFlow.git
+git clone https://github.com/yb311/OCRFlow.git
 cd OCRFlow
 open OCRFlow.xcodeproj
 ```
