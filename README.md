@@ -8,7 +8,8 @@ A native macOS app for batch OCR (Optical Character Recognition) powered by Appl
 
 ## Screenshots
 
-![OCRFlow main window](screenshots/main-empty.png)
+![OCRFlow main window](screenshots/main.png)
+![OCRFlow settings](screenshots/settings.png)
 
 ## Features
 
