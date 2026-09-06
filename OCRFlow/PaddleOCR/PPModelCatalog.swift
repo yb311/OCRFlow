@@ -166,6 +166,12 @@ enum PPModelCatalog {
                   localName: VLModelVariant.quantized.mmprojFileName),
         ])
 
+    /// A small file used only to check whether a source answers at all.
+    /// `inference.yml` is a few kilobytes, and every mirror carries it.
+    static let probeAsset = Asset(repo: "korean_PP-OCRv5_mobile_rec_onnx",
+                                  remoteFile: "inference.yml",
+                                  localName: "probe.yml", kind: .dictionary)
+
     static var vlEntries: [Entry] { [layoutModel, vlQuantized, vlOfficial] }
 
     static var allEntries: [Entry] { [mediumTier] + vlEntries + languageRecognizers }

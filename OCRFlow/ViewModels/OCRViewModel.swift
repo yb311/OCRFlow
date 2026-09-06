@@ -61,9 +61,12 @@ struct OCRSettings: Codable, Equatable {
     var skipCompleted = true
     var exportSeparator: OCRViewModel.ExportSeparator = .emptyLine
     var exportIncludeFilename = true
+    var exportFormat: OCRViewModel.ExportFormat = .markdown
+    var exportLayout: OCRViewModel.ExportLayout = .combined
     var renderFigures = true
     var renderTables = true
     var exportFigures = true
+    var dropPageFurniture = true
 }
 
 extension OCRSettings {
@@ -91,9 +94,16 @@ extension OCRSettings {
         skipCompleted = value(.skipCompleted, fallback.skipCompleted)
         exportSeparator = value(.exportSeparator, fallback.exportSeparator)
         exportIncludeFilename = value(.exportIncludeFilename, fallback.exportIncludeFilename)
+        exportFormat = value(.exportFormat, fallback.exportFormat)
+        exportLayout = value(.exportLayout, fallback.exportLayout)
         renderFigures = value(.renderFigures, fallback.renderFigures)
         renderTables = value(.renderTables, fallback.renderTables)
         exportFigures = value(.exportFigures, fallback.exportFigures)
+        // The preference used to live inside the PaddleOCR-VL settings, back
+        // when only that engine produced layout blocks. A file written by such
+        // a build carries the user's choice there.
+        dropPageFurniture = (try? container.decode(Bool.self, forKey: .dropPageFurniture))
+            ?? vl.dropPageFurniture
     }
 }
 
@@ -231,9 +241,12 @@ final class OCRViewModel: ObservableObject {
                     skipCompleted: skipCompleted,
                     exportSeparator: exportSeparator,
                     exportIncludeFilename: exportIncludeFilename,
+                    exportFormat: exportFormat,
+                    exportLayout: exportLayout,
                     renderFigures: renderFigures,
                     renderTables: renderTables,
-                    exportFigures: exportFigures)
+                    exportFigures: exportFigures,
+                    dropPageFurniture: dropPageFurniture)
     }
 
     private func persistSettings() {
@@ -269,9 +282,12 @@ final class OCRViewModel: ObservableObject {
         skipCompleted = settings.skipCompleted
         exportSeparator = settings.exportSeparator
         exportIncludeFilename = settings.exportIncludeFilename
+        exportFormat = settings.exportFormat
+        exportLayout = settings.exportLayout
         renderFigures = settings.renderFigures
         renderTables = settings.renderTables
         exportFigures = settings.exportFigures
+        dropPageFurniture = settings.dropPageFurniture
     }
 
     func resetAllSettings() {
@@ -299,6 +315,12 @@ final class OCRViewModel: ObservableObject {
         }
         if ocrEngine == .paddleVL, !VLModelStore.isReady(for: vlConfig) {
             ocrEngine = .paddleOCR
+        }
+        // Reading order from the layout model needs the layout model. Falling
+        // back to the geometric estimate beats reading a page in detection
+        // order, which on a multi-column page is not an order at all.
+        if paddleConfig.readingOrder.needsLayoutModel, !VLModelStore.isLayoutModelInstalled {
+            paddleConfig.readingOrder = .columns
         }
     }
 
@@ -371,6 +393,52 @@ final class OCRViewModel: ObservableObject {
     /// 导出时包含文件名标题
     @Published var exportIncludeFilename = true { didSet { persistSettings() } }
 
+    /// What an export writes.
+    enum ExportFormat: String, CaseIterable, Identifiable, Codable {
+        case markdown
+        case plainText
+        /// Boxes, text and confidences — the same material the results pane
+        /// shows, in the shape another program can read. The engines produce a
+        /// structured page now, and a `.txt` throws all of it away.
+        case json
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .markdown:  return "Markdown"
+            case .plainText: return "纯文本"
+            case .json:      return "JSON（含坐标与置信度）"
+            }
+        }
+
+        var fileExtension: String {
+            switch self {
+            case .markdown:  return "md"
+            case .plainText: return "txt"
+            case .json:      return "json"
+            }
+        }
+    }
+
+    /// One file, or one file per image.
+    enum ExportLayout: String, CaseIterable, Identifiable, Codable {
+        case combined
+        case separate
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .combined: return "合并为一个文件"
+            case .separate: return "每个文件单独导出"
+            }
+        }
+    }
+
+    @Published var exportFormat: ExportFormat = .markdown { didSet { persistSettings() } }
+    @Published var exportLayout: ExportLayout = .combined { didSet { persistSettings() } }
+
     // MARK: - Result rendering settings
     /// Draw the figure and chart regions of the page in the Markdown pane,
     /// cropped from the source image, instead of a bare placeholder.
@@ -380,6 +448,32 @@ final class OCRViewModel: ObservableObject {
     /// Write the figures out next to an exported Markdown file and point the
     /// document at them.
     @Published var exportFigures = true { didSet { persistSettings() } }
+    /// Leave running headers, footers and page numbers out of the document.
+    ///
+    /// This is a decision about the *document*, not about the recognition:
+    /// those regions are always read and always drawn in the preview, so
+    /// flipping this rebuilds what is already on screen instead of asking for
+    /// another pass over the file.
+    @Published var dropPageFurniture = true {
+        didSet {
+            guard oldValue != dropPageFurniture else { return }
+            persistSettings()
+            rebuildDocuments()
+        }
+    }
+
+    /// Rebuilds the text and the Markdown of every result that still has the
+    /// blocks it was assembled from.
+    func rebuildDocuments() {
+        for index in items.indices where items[index].derivesFromBlocks {
+            let item = items[index]
+            let recognition = Recognition(lines: item.textLines, blocks: item.layoutBlocks,
+                                          blockSource: item.blockSource)
+            let assembled = Self.assemble(recognition, dropPageFurniture: dropPageFurniture)
+            items[index].ocrText = postProcess(assembled.text)
+            items[index].markdown = assembled.markdown
+        }
+    }
 
     // MARK: - Computed helpers
 
@@ -584,42 +678,168 @@ final class OCRViewModel: ObservableObject {
         }
         guard !targets.isEmpty else { return }
 
-        // PaddleOCR-VL's whole point is the structure it recovers, so when a
-        // document is available the export is Markdown; otherwise nothing has
-        // changed and it stays plain text.
-        let asMarkdown = targets.contains(where: \.hasMarkdown)
-        let ext = asMarkdown ? "md" : "txt"
+        let format = resolvedFormat(for: targets)
+        switch exportLayout {
+        case .combined: exportCombined(targets, format: format)
+        case .separate: exportSeparately(targets, format: format)
+        }
+    }
 
+    /// Markdown is only offered when something in the batch actually has any;
+    /// asking for it from a plain Apple Vision run would write a `.md` holding
+    /// nothing but the text that a `.txt` would have held.
+    private func resolvedFormat(for targets: [ImageItem]) -> ExportFormat {
+        guard exportFormat == .markdown, !targets.contains(where: \.hasMarkdown) else {
+            return exportFormat
+        }
+        return .plainText
+    }
+
+    private func exportCombined(_ targets: [ImageItem], format: ExportFormat) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = asMarkdown
-            ? [UTType(filenameExtension: "md") ?? .plainText]
-            : [.plainText]
+        panel.allowedContentTypes = [Self.contentType(for: format)]
         if targets.count == 1 {
             let stem = (targets[0].fileName as NSString).deletingPathExtension
-            panel.nameFieldStringValue = "\(stem)_OCR.\(ext)"
+            panel.nameFieldStringValue = "\(stem)_OCR.\(format.fileExtension)"
             panel.message = "导出「\(targets[0].fileName)」的识别结果"
         } else {
-            panel.nameFieldStringValue = "OCRFlow_Results.\(ext)"
-            panel.message = "导出 \(targets.count) 个文件的识别结果"
+            panel.nameFieldStringValue = "OCRFlow_Results.\(format.fileExtension)"
+            panel.message = "导出 \(targets.count) 个文件的识别结果（合并为一个文件）"
         }
         panel.prompt = "导出"
-        if panel.runModal() == .OK, let url = panel.url {
-            let sep = exportSeparator.separator
-            let text = targets
-                .map { item -> String in
-                    var body = asMarkdown && item.hasMarkdown ? item.markdown : item.ocrText
-                    if asMarkdown, item.hasMarkdown, exportFigures {
-                        body = Self.writingFigures(of: item, from: body, alongside: url)
-                    }
-                    guard exportIncludeFilename else { return body }
-                    // A Markdown file deserves a real heading rather than the
-                    // plain-text banner.
-                    return asMarkdown ? "# \(item.fileName)\n\n\(body)"
-                                      : "=== \(item.fileName) ===\n\(body)"
-                }
-                .joined(separator: sep)
-            try? text.write(to: url, atomically: true, encoding: .utf8)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        if format == .json {
+            let payload = targets.map { Self.exportPayload(for: $0) }
+            try? Self.jsonData(payload).write(to: url)
+            return
         }
+
+        let text = targets
+            .map { item -> String in
+                let body = self.body(of: item, format: format, alongside: url)
+                guard exportIncludeFilename else { return body }
+                return format == .markdown ? "# \(item.fileName)\n\n\(body)"
+                                           : "=== \(item.fileName) ===\n\(body)"
+            }
+            .joined(separator: exportSeparator.separator)
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    /// One file per image, into a folder the user picks. A batch of scans is
+    /// usually wanted as a batch of documents, not as one long one.
+    private func exportSeparately(_ targets: [ImageItem], format: ExportFormat) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "选择导出位置，\(targets.count) 个文件将各自保存为 .\(format.fileExtension)"
+        panel.prompt = "导出到此处"
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+
+        var used = Set<String>()
+        for item in targets {
+            let stem = (item.fileName as NSString).deletingPathExtension
+            var name = "\(stem)_OCR"
+            var suffix = 2
+            // Two source files can share a stem — `scan.png` and `scan.pdf` —
+            // and the second must not overwrite the first.
+            while !used.insert(name).inserted {
+                name = "\(stem)_OCR-\(suffix)"
+                suffix += 1
+            }
+            let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
+            if format == .json {
+                try? Self.jsonData([Self.exportPayload(for: item)]).write(to: url)
+            } else {
+                let body = self.body(of: item, format: format, alongside: url)
+                let text = exportIncludeFilename && format == .markdown
+                    ? "# \(item.fileName)\n\n\(body)"
+                    : body
+                try? text.write(to: url, atomically: true, encoding: .utf8)
+            }
+        }
+        NSWorkspace.shared.open(folder)
+    }
+
+    private func body(of item: ImageItem, format: ExportFormat, alongside file: URL) -> String {
+        switch format {
+        case .plainText, .json:
+            return item.ocrText
+        case .markdown:
+            guard item.hasMarkdown else { return item.ocrText }
+            guard exportFigures else { return item.markdown }
+            return Self.writingFigures(of: item, from: item.markdown, alongside: file)
+        }
+    }
+
+    private static func contentType(for format: ExportFormat) -> UTType {
+        switch format {
+        case .markdown:  return UTType(filenameExtension: "md") ?? .plainText
+        case .plainText: return .plainText
+        case .json:      return .json
+        }
+    }
+
+    // MARK: - JSON export
+
+    /// The structured result, in the shape the rest of the world can read:
+    /// every line with its box and confidence, every layout region with its
+    /// label and its place in the reading order.
+    private struct ExportedPage: Encodable {
+        struct Line: Encodable {
+            var text: String
+            var confidence: Double
+            /// Four corner points, clockwise from the top left, in image pixels.
+            var quad: [[Double]]
+        }
+        struct Region: Encodable {
+            var label: String
+            var readingOrder: Int
+            var score: Double
+            /// `[x, y, width, height]` in image pixels.
+            var box: [Double]
+            var text: String
+            var isPageFurniture: Bool
+        }
+        var file: String
+        var engine: String?
+        var width: Double
+        var height: Double
+        var text: String
+        var markdown: String?
+        var lines: [Line]
+        var regions: [Region]
+    }
+
+    private static func exportPayload(for item: ImageItem) -> ExportedPage {
+        let size = item.pixelSize
+        return ExportedPage(
+            file: item.fileName,
+            engine: item.engine?.rawValue,
+            width: size.width, height: size.height,
+            text: item.ocrText,
+            markdown: item.hasMarkdown ? item.markdown : nil,
+            lines: item.textLines.map { line in
+                ExportedPage.Line(text: line.text, confidence: line.confidence,
+                                  quad: line.quad.map { [Double($0.x), Double($0.y)] })
+            },
+            regions: item.layoutBlocks.map { block in
+                ExportedPage.Region(label: block.label.rawName,
+                                    readingOrder: block.readingOrder,
+                                    score: block.score,
+                                    box: [Double(block.rect.minX), Double(block.rect.minY),
+                                          Double(block.rect.width), Double(block.rect.height)],
+                                    text: block.text,
+                                    isPageFurniture: block.label.isPageFurniture)
+            })
+    }
+
+    private static func jsonData(_ pages: [ExportedPage]) -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return (try? encoder.encode(pages)) ?? Data()
     }
 
     /// Saves the figures a document points at into a folder beside the exported
@@ -756,11 +976,15 @@ final class OCRViewModel: ObservableObject {
                 return
             }
             var updated = items[i]
+            let assembled = Self.assemble(result, dropPageFurniture: dropPageFurniture)
             updated.status = .completed
-            updated.ocrText = postProcess(result.text)
+            updated.ocrText = postProcess(assembled.text)
+            updated.markdown = assembled.markdown
             updated.textLines = result.lines
-            updated.markdown = result.document?.markdown ?? ""
-            updated.layoutBlocks = result.document?.blocks ?? []
+            updated.layoutBlocks = result.blocks
+            updated.blockSource = result.blockSource
+            updated.derivesFromBlocks = result.derivesFromBlocks && !result.blocks.isEmpty
+            updated.engine = settings.engine
             updated.processingProgress = 1.0
             items[i] = updated          // single assignment → one objectWillChange
         } catch {
@@ -780,7 +1004,27 @@ final class OCRViewModel: ObservableObject {
 
     /// Text plus whatever structure the engine managed to produce: per-line
     /// boxes from PP-OCRv6, a Markdown document from PaddleOCR-VL.
-    typealias Recognition = (text: String, lines: [PPTextLine], document: VLDocument?)
+    /// What one file yielded.
+    ///
+    /// When `blocks` is non-empty the text and the Markdown are *derived* from
+    /// it rather than stored, which is what lets 「保留页眉页脚」 be flipped after
+    /// the fact instead of only before a run.
+    struct Recognition: Sendable {
+        var lines: [PPTextLine] = []
+        var blocks: [PPLayoutBlock] = []
+        /// Used when there are no blocks: Apple Vision, and PaddleOCR-VL's
+        /// whole-page pass.
+        var rawText: String = ""
+        var rawMarkdown: String = ""
+        /// Whether the block text is the VLM's markup-aware output or plain
+        /// OCR lines. The assembler needs to know: wrapping a PP-OCR formula
+        /// block in `$$` would claim a LaTeX transcription it never made.
+        var blockSource: PPTextSource = .plainOCR
+        /// False for a multi-page PDF, whose blocks only describe page one
+        /// while the text covers the whole file. Re-deriving from those blocks
+        /// would throw every page but the first away.
+        var derivesFromBlocks: Bool = true
+    }
 
     /// A snapshot of the state that affects recognition, read on the main
     /// actor before the work moves to a background task. Reading
@@ -791,11 +1035,15 @@ final class OCRViewModel: ObservableObject {
         var visionLanguages: [String]
         var paddleConfig: PPOCRConfig
         var vlConfig: VLConfig
+        /// Only used for a multi-page PDF, whose pages are assembled as they
+        /// are read because only page one's blocks are kept afterwards.
+        var dropPageFurniture: Bool
     }
 
     private func currentRecognitionSettings() -> RecognitionSettings {
         RecognitionSettings(engine: ocrEngine, visionLanguages: recognitionLanguages,
-                            paddleConfig: paddleConfig, vlConfig: vlConfig)
+                            paddleConfig: paddleConfig, vlConfig: vlConfig,
+                            dropPageFurniture: dropPageFurniture)
     }
 
     // MARK: - Off-actor recognition
@@ -851,8 +1099,7 @@ final class OCRViewModel: ObservableObject {
         var allText: [String] = []
         var allMarkdown: [String] = []
         // The preview shows page one, so that is the page the overlay describes.
-        var firstPageLines: [PPTextLine] = []
-        var firstPageDocument: VLDocument?
+        var firstPage = Recognition()
         let scale: CGFloat = 2.0
 
         for pageNum in 1...max(1, pageCount) {
@@ -876,23 +1123,22 @@ final class OCRViewModel: ObservableObject {
 
             let result = try recognize(cgImage: cgImage, settings: settings, paddleEngine: paddleEngine,
                                        vlPipeline: vlPipeline, isCancelled: isCancelled, progress: nil)
-            allText.append(result.text)
-            if let markdown = result.document?.markdown, !markdown.isEmpty {
-                allMarkdown.append(markdown)
-            }
+            // Each page is turned into text as it is read: only page one's
+            // blocks survive, so there is nothing left to assemble from later.
+            let assembled = assemble(result, dropPageFurniture: settings.dropPageFurniture)
+            if !assembled.text.isEmpty { allText.append(assembled.text) }
+            if !assembled.markdown.isEmpty { allMarkdown.append(assembled.markdown) }
             if pageNum == 1 {
-                firstPageDocument = result.document.map { page in
-                    var page = page
-                    page.blocks = page.blocks.map { block in
-                        var block = block
-                        block.rect = block.rect.applying(CGAffineTransform(scaleX: 1 / scale, y: 1 / scale))
-                        return block
-                    }
-                    return page
-                }
                 // Boxes come back in rendered-page pixels; scale them down to the
                 // page size the preview is drawn from.
-                firstPageLines = result.lines.map { line in
+                let shrink = CGAffineTransform(scaleX: 1 / scale, y: 1 / scale)
+                firstPage = result
+                firstPage.blocks = result.blocks.map { block in
+                    var block = block
+                    block.rect = block.rect.applying(shrink)
+                    return block
+                }
+                firstPage.lines = result.lines.map { line in
                     PPTextLine(quad: line.quad.map { CGPoint(x: $0.x / scale, y: $0.y / scale) },
                                text: line.text, confidence: line.confidence,
                                wasRotated: line.wasRotated)
@@ -901,13 +1147,27 @@ final class OCRViewModel: ObservableObject {
             progress(Double(pageNum) / Double(pageCount))
         }
 
-        var document = firstPageDocument
-        if document != nil {
-            // The preview and its overlay only ever show page one, but the
-            // exported Markdown should be the whole file.
-            document?.markdown = allMarkdown.joined(separator: "\n\n---\n\n")
-        }
-        return (allText.joined(separator: "\n\n"), firstPageLines, document)
+        var document = firstPage
+        document.rawText = allText.joined(separator: "\n\n")
+        document.rawMarkdown = allMarkdown.joined(separator: "\n\n---\n\n")
+        // Page one's blocks describe page one only; the text above covers the
+        // whole file, so it must not be rebuilt from them.
+        document.derivesFromBlocks = pageCount <= 1
+        return document
+    }
+
+    /// Text and Markdown for one recognition, honouring the page-furniture
+    /// preference. Pure, and deliberately not on the main actor: the PDF path
+    /// calls it per page from the worker thread, and the view model calls it
+    /// again whenever the preference changes.
+    nonisolated static func assemble(_ result: Recognition,
+                                     dropPageFurniture: Bool) -> (text: String, markdown: String) {
+        guard !result.blocks.isEmpty else { return (result.rawText, result.rawMarkdown) }
+        return (PPDocumentAssembler.plainText(from: result.blocks,
+                                              dropPageFurniture: dropPageFurniture),
+                PPDocumentAssembler.markdown(from: result.blocks,
+                                             dropPageFurniture: dropPageFurniture,
+                                             source: result.blockSource))
     }
 
     /// Sends one image to whichever engine is selected.
@@ -918,7 +1178,7 @@ final class OCRViewModel: ObservableObject {
                                               progress: (@Sendable (Double) -> Void)?) throws -> Recognition {
         switch settings.engine {
         case .visionFast, .visionAccurate:
-            return (try performVisionOCR(on: cgImage, settings: settings), [], nil)
+            return Recognition(rawText: try performVisionOCR(on: cgImage, settings: settings))
         case .paddleVL:
             guard let vlPipeline else {
                 throw VLError.backendFailed("PaddleOCR-VL 模型未加载")
@@ -926,18 +1186,22 @@ final class OCRViewModel: ObservableObject {
             let document = try vlPipeline.parse(image: cgImage, config: settings.vlConfig,
                                                 progress: { fraction, _ in progress?(fraction) },
                                                 isCancelled: isCancelled)
-            return (document.plainText, [], document)
+            return Recognition(blocks: document.blocks,
+                               rawText: document.plainText,
+                               rawMarkdown: document.markdown,
+                               blockSource: .visionLanguageModel)
         case .paddleOCR:
             guard let paddleEngine else {
                 throw PPOCRError.sessionFailed("PaddleOCR 模型未加载")
             }
-            let lines = try paddleEngine.recognize(
+            let page = try paddleEngine.recognize(
                 image: cgImage, config: settings.paddleConfig,
                 // Loading and decoding already covered the first fifth of the
                 // bar; map the engine onto the rest.
                 progress: progress.map { report in { report(0.2 + $0 * 0.8) } },
                 isCancelled: isCancelled)
-            return (lines.plainText, lines, nil)
+            return Recognition(lines: page.lines, blocks: page.blocks,
+                               rawText: page.lines.plainText)
         }
     }
 

@@ -46,6 +46,8 @@
 		B1000001000000000000000D /* ModelManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000D /* ModelManagerView.swift */; };
 		B1000001000000000000001A /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000001A /* MarkdownRenderer.swift */; };
 		B1000001000000000000000E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000E /* SettingsView.swift */; };
+		B1000001000000000000010E /* PPStructureAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010E /* PPStructureAssembler.swift */; };
+		B100000100000000000000AB /* MathRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AB /* MathRenderer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -88,6 +90,8 @@
 		B1000002000000000000000D /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
 		B1000002000000000000001A /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		B1000002000000000000000E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B1000002000000000000010E /* PPStructureAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPStructureAssembler.swift; sourceTree = "<group>"; };
+		B100000200000000000000AB /* MathRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathRenderer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +168,7 @@
 				B1000002000000000000000D /* ModelManagerView.swift */,
 				B1000002000000000000000E /* SettingsView.swift */,
 				B1000002000000000000001A /* MarkdownRenderer.swift */,
+				B100000200000000000000AB /* MathRenderer.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -196,6 +201,7 @@
 				B1000002000000000000010B /* PPLayoutDetector.swift */,
 				B1000002000000000000010C /* PPReadingOrder.swift */,
 				B1000002000000000000010D /* PPDocumentAssembler.swift */,
+				B1000002000000000000010E /* PPStructureAssembler.swift */,
 			);
 			path = Layout;
 			sourceTree = "<group>";
@@ -345,6 +351,8 @@
 				B1000001000000000000000D /* ModelManagerView.swift in Sources */,
 				B1000001000000000000000E /* SettingsView.swift in Sources */,
 				B1000001000000000000001A /* MarkdownRenderer.swift in Sources */,
+				B1000001000000000000010E /* PPStructureAssembler.swift in Sources */,
+				B100000100000000000000AB /* MathRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

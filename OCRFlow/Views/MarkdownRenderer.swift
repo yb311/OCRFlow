@@ -117,6 +117,15 @@ enum MDParser {
                 continue
             }
 
+            // A line that is nothing but one inline formula — which is how a
+            // standalone `inline_formula` region arrives — is a display
+            // formula as far as this pane is concerned.
+            if let body = Self.soleInlineFormula(in: line) {
+                append(.formula(body))
+                i += 1
+                continue
+            }
+
             // HTML table — what Table Recognition and Chart Recognition emit
             if line.lowercased().contains("<table") {
                 var body: [String] = []
@@ -229,6 +238,20 @@ enum MDParser {
     /// Inline Markdown only — emphasis, code spans, links — with the line
     /// breaks left alone, which matters for CJK text where joining wrapped
     /// lines with a space inserts gaps that were never in the page.
+    /// The body of `$…$` or `\(…\)` when the whole line is exactly that.
+    static func soleInlineFormula(in line: String) -> String? {
+        for (open, close) in [("\\(", "\\)"), ("$", "$")] {
+            guard line.hasPrefix(open), line.hasSuffix(close),
+                  line.count > open.count + close.count else { continue }
+            let body = String(line.dropFirst(open.count).dropLast(close.count))
+            // A second delimiter inside means this is prose with maths in it,
+            // not one formula.
+            guard !body.contains("$"), MathParser.looksLikeMath(body) else { continue }
+            return body
+        }
+        return nil
+    }
+
     static func inline(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: false,
@@ -292,6 +315,10 @@ enum MDParser {
         for separator in [". ", ".", "、", ") "] where rest.hasPrefix(separator) {
             let text = String(rest.dropFirst(separator.count)).trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else { return nil }
+            // `3.1独立运动` is a date, not the third item of a list. A bare dot
+            // only starts a list when what follows is not another digit —
+            // `1.内容` still counts, because CJK lists are written that way.
+            if separator == ".", let first = text.first, first.isNumber { return nil }
             return ("\(digits).", text)
         }
         return nil
@@ -521,9 +548,14 @@ struct MarkdownDocumentView: View {
                 .padding(.top, level <= 2 ? 6 : 2)
 
         case let .paragraph(text):
-            Text(MDParser.inline(text))
-                .font(.body)
-                .lineSpacing(4)
+            if MathInlineText.hasInlineMath(text) {
+                MathInlineText(source: text, size: 13)
+                    .lineSpacing(4)
+            } else {
+                Text(MDParser.inline(text))
+                    .font(.body)
+                    .lineSpacing(4)
+            }
 
         case let .quote(text):
             HStack(alignment: .top, spacing: 8) {
@@ -562,17 +594,7 @@ struct MarkdownDocumentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
         case let .formula(latex):
-            VStack(spacing: 4) {
-                Text(latex)
-                    .font(.system(.body, design: .monospaced))
-                    .multilineTextAlignment(.center)
-                    .textSelection(.enabled)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity)
-            .background(Color.accentColor.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            MathBlockView(latex: latex)
 
         case let .table(table):
             if renderTables {

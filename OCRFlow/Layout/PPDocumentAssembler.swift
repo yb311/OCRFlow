@@ -1,10 +1,22 @@
 import Foundation
 
+/// Where a block's text came from, which decides how much markup it may carry.
+enum PPTextSource: String, Sendable, Codable {
+    /// PaddleOCR-VL, which returns LaTeX for formulas and HTML for tables
+    /// because it was asked for exactly that.
+    case visionLanguageModel
+    /// PP-OCRv6 text lines. A formula region read this way comes back as the
+    /// characters the recogniser saw, not as LaTeX, so it must not be dressed
+    /// up as maths.
+    case plainOCR
+}
+
 /// Turns recognised layout blocks back into a document.
 ///
-/// This is the last stage of the PaddleOCR-VL pipeline: the blocks arrive in
-/// reading order with their text already filled in, and the only job left is to
-/// give each one the markup its label implies.
+/// This is the last stage of both pipelines: the blocks arrive in reading order
+/// with their text already filled in — by the VLM, or by pouring PP-OCRv6's
+/// text lines into the regions — and the only job left is to give each one the
+/// markup its label implies.
 enum PPDocumentAssembler {
 
     /// Blocks worth emitting, honouring the page-furniture preference.
@@ -15,9 +27,10 @@ enum PPDocumentAssembler {
         }
     }
 
-    static func markdown(from blocks: [PPLayoutBlock], dropPageFurniture: Bool = true) -> String {
+    static func markdown(from blocks: [PPLayoutBlock], dropPageFurniture: Bool = true,
+                         source: PPTextSource = .visionLanguageModel) -> String {
         contentBlocks(blocks, dropPageFurniture: dropPageFurniture)
-            .compactMap(fragment)
+            .compactMap { fragment(for: $0, source: source) }
             .joined(separator: "\n\n")
     }
 
@@ -50,8 +63,31 @@ enum PPDocumentAssembler {
         return result + rest
     }
 
-    private static func fragment(for block: PPLayoutBlock) -> String? {
+    private static func fragment(for block: PPLayoutBlock, source: PPTextSource) -> String? {
         let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Plain OCR of a formula or a table is a run of characters, not LaTeX
+        // and not HTML. Emitting it as a paragraph is the honest rendering;
+        // `$$…$$` around it would only produce a broken formula.
+        if source == .plainOCR {
+            switch block.label {
+            case .image, .headerImage, .footerImage:
+                return "![\(block.label.label)]()"
+            case .chart:
+                let figure = "![\(block.label.label)]()"
+                return text.isEmpty ? figure : "\(figure)\n\n\(text)"
+            case .docTitle:
+                return text.isEmpty ? nil : "# \(text)"
+            case .paragraphTitle:
+                return text.isEmpty ? nil : "## \(text)"
+            case .figureTitle, .visionFootnote:
+                return text.isEmpty ? nil : "*\(text)*"
+            case .footnote:
+                return text.isEmpty ? nil : "> \(text)"
+            default:
+                return text.isEmpty ? nil : text
+            }
+        }
 
         switch block.label {
         case .image, .headerImage, .footerImage:
@@ -83,14 +119,14 @@ enum PPDocumentAssembler {
         case .table:
             // Table Recognition emits HTML, which Markdown passes through
             // untouched and the results pane renders as a grid.
-            return text.isEmpty ? nil : text
+            return text.isEmpty ? nil : normalisedTable(text)
 
         case .chart:
             // Chart Recognition reads a chart out as a table. The numbers are
             // the point, but the chart itself is worth keeping next to them —
             // a bar chart is not reconstructable from its own transcription.
             let figure = "![\(block.label.label)]()"
-            return text.isEmpty ? figure : "\(figure)\n\n\(text)"
+            return text.isEmpty ? figure : "\(figure)\n\n\(normalisedTable(text))"
 
         case .footnote:
             return text.isEmpty ? nil : "> \(text)"
@@ -98,5 +134,53 @@ enum PPDocumentAssembler {
         default:
             return text.isEmpty ? nil : text
         }
+    }
+
+    // MARK: - Tables
+
+    /// Turns the pipe-separated rows the model writes into a valid GitHub
+    /// Markdown table.
+    ///
+    /// Chart Recognition answers with rows like `汽油能源 | 2.2% | 7.9%` and a
+    /// header that is often one cell short, with no `---` rule under it. The
+    /// results pane forgave all of that; every other Markdown reader does not,
+    /// which is why an exported chart showed up in Typora as a paragraph full
+    /// of vertical bars. Anything that is not a pipe table — HTML, prose — is
+    /// returned untouched.
+    static func normalisedTable(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard lines.count > 1, lines.allSatisfy({ $0.contains("|") }) else { return text }
+
+        var rows: [[String]] = []
+        for line in lines {
+            var body = Substring(line)
+            if body.hasPrefix("|") { body = body.dropFirst() }
+            if body.hasSuffix("|") { body = body.dropLast() }
+            let cells = body.components(separatedBy: "|")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            // An existing `---` rule is dropped and rewritten below, so a table
+            // that was already well formed comes back unchanged.
+            let isRule = cells.allSatisfy { cell in
+                !cell.isEmpty && cell.allSatisfy { $0 == "-" || $0 == ":" || $0 == " " }
+            }
+            if !isRule { rows.append(cells) }
+        }
+        guard let width = rows.map(\.count).max(), width > 1, rows.count > 1 else { return text }
+
+        // A header one cell short of the body is the usual shape of a chart
+        // transcription: the row-label column has no title. Pad it at the
+        // front, where the missing cell belongs.
+        func padded(_ cells: [String], leading: Bool) -> String {
+            var cells = cells
+            while cells.count < width { leading ? cells.insert("", at: 0) : cells.append("") }
+            return "| " + cells.joined(separator: " | ") + " |"
+        }
+
+        var out = [padded(rows[0], leading: rows[0].count < width)]
+        out.append("|" + String(repeating: " --- |", count: width))
+        for row in rows.dropFirst() { out.append(padded(row, leading: false)) }
+        return out.joined(separator: "\n")
     }
 }

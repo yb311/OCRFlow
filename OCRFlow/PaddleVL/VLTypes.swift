@@ -94,7 +94,10 @@ struct VLConfig: Equatable, Codable {
     /// Run PP-DocLayoutV3 first and recognise block by block. This is the
     /// official pipeline; turning it off matches `use_layout_detection=False`.
     var useLayoutDetection: Bool = true
-    /// Drop running headers, footers and page numbers from the assembled output.
+    /// Where the preference used to live. It is a document setting rather than
+    /// an engine one — both engines produce layout blocks now — so it moved to
+    /// the view model; this field is only read once, to carry the user's old
+    /// choice forward.
     var dropPageFurniture: Bool = true
 
     static let `default` = VLConfig()

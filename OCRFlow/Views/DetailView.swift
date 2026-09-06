@@ -69,9 +69,12 @@ struct ItemDetailView: View {
     /// snapping back to 1× on every gesture update.
     @State private var zoomAtGestureStart: CGFloat?
     @State private var showCopied = false
-    /// Which pane the PaddleOCR-VL result is shown in. Ignored by the other
-    /// engines, which have nothing but plain text to show.
+    /// Which pane the result is shown in.
     @State private var resultPane: ResultPane = .markdown
+    /// What the user clicked in the preview, echoed in the result list — and
+    /// the other way round. Clicking a box to find out what was read out of it
+    /// is the first thing anyone tries.
+    @State private var selection: PreviewSelection?
 
     /// The parsed document behind the Markdown pane, plus the figure crops it
     /// needs. Both are rebuilt only when the result itself changes: parsing and
@@ -85,8 +88,58 @@ struct ItemDetailView: View {
     private enum ResultPane: String, CaseIterable, Identifiable {
         case markdown = "Markdown"
         case plain    = "纯文本"
+        /// One row per recognised line — or per layout block, for an engine
+        /// that produces no lines. This is the pane the preview points into.
+        case regions  = "逐块"
         case source   = "源码"
         var id: String { rawValue }
+    }
+
+    /// A box in the preview, and the row in the result list that goes with it.
+    enum PreviewSelection: Hashable {
+        case line(Int)
+        case block(Int)
+    }
+
+    /// The rows the 逐块 pane lists: the text lines when there are any,
+    /// otherwise the layout blocks.
+    private var regionRows: [RegionRow] {
+        if !item.textLines.isEmpty {
+            return item.textLines.enumerated().map { index, line in
+                RegionRow(id: .line(index), text: line.text, confidence: line.confidence,
+                          label: blockLabel(containing: line.boundingBox))
+            }
+        }
+        return item.layoutBlocks.enumerated().map { index, block in
+            RegionRow(id: .block(index), text: block.text, confidence: block.score,
+                      label: block.label)
+        }
+    }
+
+    struct RegionRow: Identifiable, Equatable {
+        let id: PreviewSelection
+        var text: String
+        var confidence: Double
+        /// What the layout model called the region this row sits in, which is
+        /// how a header or a page number is recognisable as one.
+        var label: PPLayoutLabel?
+    }
+
+    private func blockLabel(containing rect: CGRect) -> PPLayoutLabel? {
+        item.layoutBlocks
+            .filter { $0.rect.intersects(rect) }
+            .min { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }?
+            .label
+    }
+
+    /// Panes worth offering for this result.
+    private var availablePanes: [ResultPane] {
+        var panes: [ResultPane] = []
+        if item.hasMarkdown { panes.append(.markdown) }
+        panes.append(.plain)
+        if !regionRows.isEmpty { panes.append(.regions) }
+        if item.hasMarkdown { panes.append(.source) }
+        return panes
     }
 
     var body: some View {
@@ -110,7 +163,10 @@ struct ItemDetailView: View {
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if !item.textLines.isEmpty {
+                // Both engines draw boxes now, so both can hide them; the
+                // button used to appear only when there were text lines, which
+                // left the VL pipeline's blocks stuck on screen.
+                if !item.textLines.isEmpty || !item.layoutBlocks.isEmpty {
                     Button {
                         vm.showTextBoxes.toggle()
                     } label: {
@@ -119,7 +175,21 @@ struct ItemDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
-                    .help(vm.showTextBoxes ? "隐藏识别框" : "显示识别框（PP-OCR 文本行 / VL 版面块）")
+                    .help(vm.showTextBoxes ? "隐藏识别框" : "显示识别框（文本行与版面区域）")
+
+                    if hasPageFurniture {
+                        Button {
+                            vm.dropPageFurniture.toggle()
+                        } label: {
+                            Image(systemName: vm.dropPageFurniture
+                                  ? "text.badge.minus" : "text.badge.checkmark")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(vm.dropPageFurniture ? Color.secondary : Color.accentColor)
+                        .help(vm.dropPageFurniture
+                              ? "当前：页眉/页脚/页码不进入结果（预览中以虚线标出）。点击改为保留"
+                              : "当前：页眉/页脚/页码保留在结果中。点击改为丢弃")
+                    }
                     Divider().frame(height: 14)
                 }
                 // Zoom controls
@@ -181,10 +251,29 @@ struct ItemDetailView: View {
                             .overlay {
                                 // Only a finished run's boxes belong on the image.
                                 if showsOverlays, !item.layoutBlocks.isEmpty {
-                                    LayoutBlockOverlay(blocks: item.layoutBlocks, imageSize: item.pixelSize)
+                                    LayoutBlockOverlay(blocks: item.layoutBlocks,
+                                                       imageSize: item.pixelSize,
+                                                       selected: selectedBlockIndex,
+                                                       dimsPageFurniture: vm.dropPageFurniture)
                                 }
                                 if showsOverlays, !item.textLines.isEmpty {
-                                    TextBoxOverlay(lines: item.textLines, imageSize: item.pixelSize)
+                                    TextBoxOverlay(lines: item.textLines,
+                                                   imageSize: item.pixelSize,
+                                                   selected: selectedLineIndex)
+                                }
+                            }
+                            // Declared before the single tap so a double click
+                            // zooms instead of selecting twice.
+                            .onTapGesture(count: 2) { zoom(to: imageZoom == 1 ? 2 : 1) }
+                            .onTapGesture(count: 1, coordinateSpace: .local) { point in
+                                let size = CGSize(width: fitted.width * imageZoom,
+                                                  height: fitted.height * imageZoom)
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    selection = hitTest(point, renderedSize: size)
+                                }
+                                if selection != nil, resultPane != .regions,
+                                   availablePanes.contains(.regions) {
+                                    resultPane = .regions
                                 }
                             }
                             .padding(Self.previewInset / 2)
@@ -207,9 +296,6 @@ struct ItemDetailView: View {
                             }
                             .onEnded { _ in zoomAtGestureStart = nil }
                     )
-                    // Double-click toggles between fitting the pane and 2×,
-                    // the way every other Mac image viewer behaves.
-                    .onTapGesture(count: 2) { zoom(to: imageZoom == 1 ? 2 : 1) }
                 }
             } else {
                 VStack(spacing: 12) {
@@ -225,7 +311,62 @@ struct ItemDetailView: View {
         }
         // A different file starts at "fits the pane" rather than inheriting the
         // zoom someone set for the previous one.
-        .onChange(of: item.id) { _, _ in imageZoom = 1.0 }
+        .onChange(of: item.id) { _, _ in
+            imageZoom = 1.0
+            selection = nil
+        }
+    }
+
+    /// True when the page has anything the 保留页眉页脚 switch would act on.
+    private var hasPageFurniture: Bool {
+        item.layoutBlocks.contains { $0.label.isPageFurniture }
+    }
+
+    private var selectedLineIndex: Int? {
+        if case let .line(index) = selection { return index }
+        return nil
+    }
+
+    private var selectedBlockIndex: Int? {
+        if case let .block(index) = selection { return index }
+        // A selected line lights up the region it belongs to as well, which is
+        // what makes "this line is part of the footer" visible at a glance.
+        if case let .line(index) = selection, item.textLines.indices.contains(index) {
+            let box = item.textLines[index].boundingBox
+            return item.layoutBlocks.indices
+                .filter { item.layoutBlocks[$0].rect.intersects(box) }
+                .min { a, b in
+                    let areaA = item.layoutBlocks[a].rect.width * item.layoutBlocks[a].rect.height
+                    let areaB = item.layoutBlocks[b].rect.width * item.layoutBlocks[b].rect.height
+                    return areaA < areaB
+                }
+        }
+        return nil
+    }
+
+    /// Maps a click on the preview back to the box under it: a text line if
+    /// there is one, otherwise the smallest layout region that contains it.
+    private func hitTest(_ point: CGPoint, renderedSize: CGSize) -> PreviewSelection? {
+        let pixel = item.pixelSize
+        guard renderedSize.width > 0, renderedSize.height > 0,
+              pixel.width > 0, pixel.height > 0 else { return nil }
+        let inImage = CGPoint(x: point.x / renderedSize.width * pixel.width,
+                              y: point.y / renderedSize.height * pixel.height)
+
+        if let index = item.textLines.firstIndex(where: { $0.boundingBox.contains(inImage) }) {
+            return .line(index)
+        }
+        let containing = item.layoutBlocks.indices.filter { item.layoutBlocks[$0].rect.contains(inImage) }
+        if let smallest = containing.min(by: { a, b in
+            let areaA = item.layoutBlocks[a].rect.width * item.layoutBlocks[a].rect.height
+            let areaB = item.layoutBlocks[b].rect.width * item.layoutBlocks[b].rect.height
+            return areaA < areaB
+        }) {
+            return .block(smallest)
+        }
+        // A click on blank paper clears the selection rather than keeping a
+        // highlight the user has moved on from.
+        return nil
     }
 
     private static let previewInset: CGFloat = 32
@@ -355,60 +496,64 @@ struct ItemDetailView: View {
                     subtitle: "该图片可能不含可识别的文字内容",
                     color: .orange
                 )
-            } else if item.hasMarkdown {
-                VStack(spacing: 0) {
-                    Picker("", selection: $resultPane) {
-                        ForEach(ResultPane.allCases) { pane in Text(pane.rawValue).tag(pane) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-
-                    Divider()
-
-                    ScrollView {
-                        Group {
-                            switch resultPane {
-                            case .markdown:
-                                // Rendered rather than raw: the point of the VL
-                                // pipeline is the structure it recovers, so
-                                // headings, tables and figures should look like
-                                // headings, tables and figures.
-                                MarkdownDocumentView(blocks: renderedBlocks,
-                                                     figures: figures,
-                                                     showFigures: vm.renderFigures,
-                                                     renderTables: vm.renderTables)
-                                    .textSelection(.enabled)
-                            case .plain:
-                                Text(item.ocrText)
-                                    .font(.body)
-                                    .textSelection(.enabled)
-                                    .lineSpacing(4)
-                            case .source:
-                                Text(item.markdown)
-                                    .font(.system(.callout, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .lineSpacing(3)
-                            }
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .task(id: renderKey) {
-                        renderedBlocks = MDParser.parse(item.markdown)
-                        figures = DocumentFigures.crops(for: item)
-                    }
-                }
             } else {
-                ScrollView {
-                    Text(item.ocrText)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .lineSpacing(4)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(spacing: 0) {
+                    let panes = availablePanes
+                    if panes.count > 1 {
+                        Picker("", selection: $resultPane) {
+                            ForEach(panes) { pane in Text(pane.rawValue).tag(pane) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+
+                        Divider()
+                    }
+
+                    switch resultPane {
+                    case .regions:
+                        regionList
+                    default:
+                        ScrollView {
+                            Group {
+                                switch resultPane {
+                                case .markdown:
+                                    // Rendered rather than raw: the point of
+                                    // layout analysis is the structure it
+                                    // recovers, so headings, tables and figures
+                                    // should look like headings, tables and
+                                    // figures.
+                                    MarkdownDocumentView(blocks: renderedBlocks,
+                                                         figures: figures,
+                                                         showFigures: vm.renderFigures,
+                                                         renderTables: vm.renderTables)
+                                        .textSelection(.enabled)
+                                case .source:
+                                    Text(item.markdown)
+                                        .font(.system(.callout, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .lineSpacing(3)
+                                default:
+                                    Text(item.ocrText)
+                                        .font(.body)
+                                        .textSelection(.enabled)
+                                        .lineSpacing(4)
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .task(id: renderKey) {
+                            renderedBlocks = MDParser.parse(item.markdown)
+                            figures = DocumentFigures.crops(for: item)
+                        }
+                    }
                 }
+                // A pane that no longer applies to this file would otherwise
+                // show as an empty result.
+                .onAppear { normalisePane() }
+                .onChange(of: renderKey) { _, _ in normalisePane() }
             }
 
         case .cancelled:
@@ -457,6 +602,86 @@ struct ItemDetailView: View {
         }
     }
 
+    /// One row per recognised line (or region), highlighted in step with the
+    /// preview: clicking a box scrolls to its text, clicking the text lights up
+    /// the box. It is also where 页眉/页脚/页码 are visible as such, so the
+    /// decision to drop them is made on something the user can see.
+    private var regionList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(regionRows) { row in
+                        regionRow(row)
+                            .id(row.id)
+                        Divider()
+                    }
+                }
+            }
+            .onChange(of: selection) { _, new in
+                guard let new else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(new, anchor: .center) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func regionRow(_ row: RegionRow) -> some View {
+        let isSelected = selection == row.id
+        let isDropped = vm.dropPageFurniture && (row.label?.isPageFurniture ?? false)
+
+        HStack(alignment: .top, spacing: 8) {
+            if let label = row.label {
+                Text(label.label)
+                    .font(.caption2)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(LayoutBlockOverlay.color(for: label).opacity(0.15), in: Capsule())
+                    .foregroundStyle(LayoutBlockOverlay.color(for: label))
+                    .frame(width: 56, alignment: .leading)
+                    .fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                // Deliberately not selectable: a selectable `Text` takes the
+                // mouse for itself, and this row's whole job is to be clicked.
+                // 复制 lives in the context menu instead.
+                Text(row.text.isEmpty ? "（无文字）" : row.text)
+                    .font(.callout)
+                    .foregroundStyle(isDropped ? .secondary : .primary)
+                    .strikethrough(isDropped, color: .secondary)
+                if isDropped {
+                    Text("按当前设置不会写入结果")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Spacer(minLength: 0)
+            Text("\(Int((row.confidence * 100).rounded()))%")
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(TextBoxOverlay.color(for: row.confidence))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { selection = isSelected ? nil : row.id }
+        .contextMenu {
+            Button("复制这一行") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(row.text, forType: .string)
+            }
+            .disabled(row.text.isEmpty)
+        }
+    }
+
+    /// Keeps `resultPane` on something this result actually has.
+    private func normalisePane() {
+        let panes = availablePanes
+        guard !panes.contains(resultPane) else { return }
+        resultPane = panes.first ?? .plain
+    }
+
     /// Changes whenever the pane has a different document to show — a new
     /// selection, or a result that has just finished.
     private var renderKey: String {
@@ -490,6 +715,9 @@ struct ItemDetailView: View {
 struct TextBoxOverlay: View {
     let lines: [PPTextLine]
     let imageSize: CGSize
+    /// The line the result list is pointing at, drawn to stand out from the
+    /// rest the way a selection should.
+    var selected: Int?
 
     var body: some View {
         GeometryReader { geo in
@@ -498,7 +726,7 @@ struct TextBoxOverlay: View {
                 Canvas { context, _ in
                     let sx = fitted.width / imageSize.width
                     let sy = fitted.height / imageSize.height
-                    for line in lines {
+                    for (index, line) in lines.enumerated() {
                         let points = line.quad.map {
                             CGPoint(x: fitted.minX + $0.x * sx, y: fitted.minY + $0.y * sy)
                         }
@@ -507,9 +735,11 @@ struct TextBoxOverlay: View {
                         path.move(to: first)
                         for p in points.dropFirst() { path.addLine(to: p) }
                         path.closeSubpath()
-                        let tint = Self.color(for: line.confidence)
-                        context.fill(path, with: .color(tint.opacity(0.14)))
-                        context.stroke(path, with: .color(tint.opacity(0.9)), lineWidth: 1)
+                        let isSelected = index == selected
+                        let tint = isSelected ? Color.accentColor : Self.color(for: line.confidence)
+                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.34 : 0.14)))
+                        context.stroke(path, with: .color(tint.opacity(isSelected ? 1 : 0.9)),
+                                       lineWidth: isSelected ? 2.5 : 1)
                     }
                 }
             }
@@ -541,6 +771,11 @@ struct TextBoxOverlay: View {
 struct LayoutBlockOverlay: View {
     let blocks: [PPLayoutBlock]
     let imageSize: CGSize
+    var selected: Int?
+    /// Draw the regions that are being left out of the document as dashed
+    /// outlines, so "these three boxes are the ones being dropped" is something
+    /// the page itself shows rather than something the settings claim.
+    var dimsPageFurniture = false
 
     var body: some View {
         GeometryReader { geo in
@@ -549,15 +784,21 @@ struct LayoutBlockOverlay: View {
                 Canvas { context, _ in
                     let sx = fitted.width / imageSize.width
                     let sy = fitted.height / imageSize.height
-                    for block in blocks {
+                    for (index, block) in blocks.enumerated() {
                         let rect = CGRect(x: fitted.minX + block.rect.minX * sx,
                                           y: fitted.minY + block.rect.minY * sy,
                                           width: block.rect.width * sx,
                                           height: block.rect.height * sy)
-                        let tint = Self.color(for: block.label)
+                        let isSelected = index == selected
+                        let isDropped = dimsPageFurniture && block.label.isPageFurniture
+                        let tint = isSelected ? Color.accentColor : Self.color(for: block.label)
                         let path = Path(roundedRect: rect, cornerRadius: 2)
-                        context.fill(path, with: .color(tint.opacity(0.10)))
-                        context.stroke(path, with: .color(tint.opacity(0.85)), lineWidth: 1.5)
+
+                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.22
+                                                                    : isDropped ? 0.04 : 0.10)))
+                        context.stroke(path, with: .color(tint.opacity(isDropped ? 0.6 : 0.85)),
+                                       style: StrokeStyle(lineWidth: isSelected ? 3 : 1.5,
+                                                          dash: isDropped ? [4, 3] : []))
 
                         var badge = context.resolve(
                             Text("\(block.readingOrder + 1)")
@@ -567,7 +808,8 @@ struct LayoutBlockOverlay: View {
                         let size = badge.measure(in: rect.size)
                         let chip = CGRect(x: rect.minX, y: rect.minY,
                                           width: size.width + 8, height: size.height + 4)
-                        context.fill(Path(roundedRect: chip, cornerRadius: 3), with: .color(tint))
+                        context.fill(Path(roundedRect: chip, cornerRadius: 3),
+                                     with: .color(tint.opacity(isDropped ? 0.5 : 1)))
                         context.draw(badge, at: CGPoint(x: chip.midX, y: chip.midY), anchor: .center)
                     }
                 }

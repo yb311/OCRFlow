@@ -94,7 +94,13 @@ enum PPRecognizerChoice: Hashable, Codable {
 
 /// How the recognised lines are put in order before they become text.
 enum PPTextOrder: String, CaseIterable, Identifiable, Codable {
-    /// Recursive XY-cut: find the columns first, read each one top to bottom.
+    /// PP-DocLayoutV3 finds the regions of the page and predicts the order they
+    /// are read in; the lines are poured into those regions. This is what
+    /// PaddleOCR's own document pipeline does.
+    case layout
+    /// Recursive XY-cut over the text lines: find the columns from the
+    /// whitespace between them, read each one top to bottom. A geometric
+    /// estimate, used when the layout model is not installed.
     case columns
     /// PaddleOCR's own `sorted_boxes`: strictly top to bottom, left to right
     /// within a ~10 px band.
@@ -104,20 +110,29 @@ enum PPTextOrder: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .columns: return "按栏排序（推荐）"
-        case .simple:  return "自上而下"
+        case .layout:  return "版面分析（官方管线，推荐）"
+        case .columns: return "按栏排序（几何估算）"
+        case .simple:  return "自上而下（PaddleOCR 原始顺序）"
         }
     }
 
     var hint: String {
         switch self {
+        case .layout:
+            return "先用 PP-DocLayoutV3 切分出栏目、标题、图表等区域并判定阅读顺序，"
+                 + "再把识别出的文字行放回各自的区域。与 PaddleOCR 官方文档解析管线一致，"
+                 + "同时给出版面结构与 Markdown。需下载版面分析模型"
         case .columns:
-            return "先切分栏目再逐栏阅读，报刊、论文等多栏版面不会串行"
+            return "不依赖版面模型，按文字行之间的空白估算栏目位置。"
+                 + "多栏报刊通常正确，但署名行、右对齐编号一类的元素可能落错位置"
         case .simple:
             return "PaddleOCR 原始顺序，同一水平线上的文字按从左到右排列；"
-                 + "适合票据、表单等左右成对的内容"
+                 + "多栏版面会左右串行，适合票据、表单等左右成对的内容"
         }
     }
+
+    /// True when this mode needs PP-DocLayoutV3 on disk.
+    var needsLayoutModel: Bool { self == .layout }
 }
 
 /// Execution backend handed to ONNX Runtime.
@@ -193,7 +208,7 @@ struct PPOCRConfig: Equatable, Codable {
 
     // Assembly
     /// How the recognised lines are ordered before being joined into text.
-    var readingOrder: PPTextOrder = .columns
+    var readingOrder: PPTextOrder = .layout
 
     static let `default` = PPOCRConfig()
 

@@ -12,6 +12,18 @@ final class PPModelDownloader: ObservableObject {
     /// 0…1 per entry id, present only while that entry is downloading.
     @Published private(set) var progress: [String: Double] = [:]
     @Published private(set) var errors: [String: String] = [:]
+    /// What a reachability check made of each source, so the mirror can be
+    /// shown to work — or not — before a gigabyte of download depends on it.
+    @Published private(set) var reachability: [PPModelCatalog.Source: Reachability] = [:]
+
+    enum Reachability: Equatable {
+        case checking
+        /// Round trip in milliseconds.
+        case reachable(Int)
+        case unreachable(String)
+
+        var isChecking: Bool { self == .checking }
+    }
     /// Bumped whenever the models folder changes, so views recompute the
     /// installed state of every entry.
     @Published private(set) var inventoryVersion = 0
@@ -36,8 +48,10 @@ final class PPModelDownloader: ObservableObject {
             Task { @MainActor in self?.progress[id] = fraction }
         }
 
+        let fallback = PPModelCatalog.Source.allCases.first { $0 != source }
+
         tasks[id] = Task.detached(priority: .utility) { [weak self] in
-            let failure: String?
+            var failure: String?
             do {
                 try await Self.install(entry, from: source, into: destination, progress: report)
                 failure = nil
@@ -45,7 +59,22 @@ final class PPModelDownloader: ObservableObject {
                 // Leaving no error message reads as "the user stopped it".
                 failure = nil
             } catch {
-                failure = error.localizedDescription
+                // One host being unreachable is the common case here — either
+                // Hugging Face from mainland China, or the mirror lagging a
+                // fresh upload — and the other one usually has the same file.
+                if let fallback, !Task.isCancelled {
+                    do {
+                        try await Self.install(entry, from: fallback, into: destination, progress: report)
+                        failure = nil
+                    } catch is CancellationError {
+                        failure = nil
+                    } catch let retryError {
+                        failure = "\(error.localizedDescription)；已改用\(fallback.label)重试，"
+                                + "仍然失败：\(retryError.localizedDescription)"
+                    }
+                } else {
+                    failure = error.localizedDescription
+                }
             }
             await self?.finish(id, error: failure)
         }
@@ -53,6 +82,43 @@ final class PPModelDownloader: ObservableObject {
 
     func cancel(_ entry: PPModelCatalog.Entry) {
         tasks[entry.id]?.cancel()
+    }
+
+    /// Asks each source for the headers of one small file.
+    ///
+    /// The mirror is the only way to reach these models from a lot of networks,
+    /// and "the download failed" is a poor way to find out that the host itself
+    /// is unreachable.
+    func testSources() {
+        for source in PPModelCatalog.Source.allCases {
+            reachability[source] = .checking
+            Task { [weak self] in
+                let result = await Self.probe(source)
+                await MainActor.run { self?.reachability[source] = result }
+            }
+        }
+    }
+
+    /// A HEAD against a file that exists in every mirror of the catalogue.
+    private nonisolated static func probe(_ source: PPModelCatalog.Source) async -> Reachability {
+        guard let url = PPModelCatalog.probeAsset.url(from: source) else {
+            return .unreachable("地址无效")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 15
+        let started = Date()
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let milliseconds = Int(Date().timeIntervalSince(started) * 1000)
+            guard let http = response as? HTTPURLResponse else { return .unreachable("无响应") }
+            guard (200..<400).contains(http.statusCode) else {
+                return .unreachable("HTTP \(http.statusCode)")
+            }
+            return .reachable(milliseconds)
+        } catch {
+            return .unreachable((error as NSError).localizedDescription)
+        }
     }
 
     /// Deletes every file the entry installed.

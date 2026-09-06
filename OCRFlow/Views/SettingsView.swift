@@ -156,6 +156,93 @@ struct SettingsView: View {
         vm.recognitionLanguages.swapAt(index, target)
     }
 
+    // MARK: - Inline model installation
+
+    /// Downloads a catalogue entry without leaving this pane.
+    ///
+    /// The model manager still exists for the bulk of it, but sending someone
+    /// to another window to fetch the one file the setting in front of them
+    /// needs — and then back again to select it — is three steps too many.
+    @ViewBuilder
+    private func inlineDownloadRow(_ entry: PPModelCatalog.Entry) -> some View {
+        let downloader = vm.modelDownloader
+        let isDownloading = downloader.isDownloading(entry)
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: entry.isInstalled ? "checkmark.circle.fill" : "arrow.down.circle")
+                    .foregroundStyle(entry.isInstalled ? Color.green : Color.secondary)
+                Text(entry.name).font(.callout)
+                Text("约 \(Self.sizeText(entry.approximateBytes))")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+                if isDownloading {
+                    Button("取消") { downloader.cancel(entry) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                } else if entry.isInstalled {
+                    Text("已安装").font(.caption).foregroundStyle(.green)
+                } else {
+                    Button("下载") { downloader.download(entry) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            }
+            if isDownloading {
+                ProgressView(value: downloader.progress[entry.id] ?? 0)
+                    .progressViewStyle(.linear)
+            }
+            if let error = downloader.errors[entry.id] {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    /// Which host the inline downloads use, and whether it answers.
+    private var downloadSourceControl: some View {
+        let downloader = vm.modelDownloader
+        return HStack(spacing: 6) {
+            Picker("", selection: Binding(get: { downloader.source },
+                                          set: { downloader.source = $0 })) {
+                ForEach(PPModelCatalog.Source.allCases) { source in
+                    Text(source.label).tag(source)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .fixedSize()
+
+            Button("测试") { downloader.testSources() }
+                .buttonStyle(.link)
+                .controlSize(.small)
+                .help("向两个下载源各发一个请求，看看哪个通")
+
+            switch downloader.reachability[downloader.source] {
+            case .checking:
+                ProgressView().controlSize(.small).scaleEffect(0.6)
+            case let .reachable(milliseconds):
+                Label("\(milliseconds) ms", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            case let .unreachable(reason):
+                Label(reason, systemImage: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            case nil:
+                EmptyView()
+            }
+        }
+    }
+
+    static func sizeText(_ bytes: Int64) -> String {
+        let mb = Double(bytes) / 1_048_576
+        return mb < 1024 ? String(format: "%.0f MB", mb) : String(format: "%.1f GB", mb / 1024)
+    }
+
     /// A friendly name for an installed single-language recogniser, falling
     /// back to the file's own name for one the user dropped in by hand.
     private static func recognizerName(_ recognizer: PPModelStore.InstalledRecognizer) -> String {
@@ -200,10 +287,18 @@ struct SettingsView: View {
                         vm.selectTier(tier)
                     }
                 }
+                if !PPModelCatalog.mediumTier.isInstalled {
+                    Divider().padding(.vertical, 2)
+                    HStack {
+                        Text("尚未安装").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        downloadSourceControl
+                    }
+                    inlineDownloadRow(PPModelCatalog.mediumTier)
+                }
                 Divider().padding(.vertical, 2)
-                modelManagerLink("模型管理")
-                hint("切换档位会把检测阈值恢复为该档位的官方默认值。"
-                     + "medium 档位与其他语种识别器可在模型管理中下载。")
+                modelManagerLink("全部模型管理…")
+                hint("切换档位会把检测阈值恢复为该档位的官方默认值。")
             }
         }
 
@@ -226,46 +321,49 @@ struct SettingsView: View {
                     }
                 }
 
-                // The languages the built-in model cannot read are listed here
-                // rather than only inside the model manager. Left invisible,
-                // the app answers a Korean page with a page of wrong Chinese
-                // and nothing says why.
+                // The languages the built-in model cannot read are listed here,
+                // and installed from here. Left invisible, the app answers a
+                // Korean page with a page of wrong Chinese and nothing says
+                // why; left to another window, installing one means losing
+                // your place in this one.
                 let missing = Self.downloadableLanguages
                 if !missing.isEmpty {
                     Divider().padding(.vertical, 2)
-                    Text("尚未安装的语种")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("尚未安装的语种")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        downloadSourceControl
+                    }
                     ForEach(missing) { entry in
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle")
-                                .foregroundStyle(.secondary)
-                            Text(entry.name).font(.callout)
-                            Text("约 16 MB")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                            Spacer(minLength: 0)
-                            Button("下载…") { openWindow(id: ModelManagerView.windowID) }
-                                .buttonStyle(.link)
-                                .controlSize(.small)
-                        }
+                        inlineDownloadRow(entry)
                     }
                 }
                 hint("PP-OCRv6 没有这些语种的权重，用内置模型识别它们只会得到一堆错字。"
-                     + "装上对应的 PP-OCRv5 识别器后在这里选中即可；文本检测仍由 PP-OCRv6 完成。")
+                     + "在这里直接下载，装好后即可在上面选中；文本检测仍由 PP-OCRv6 完成。")
             }
         }
 
-        settingSection("阅读顺序") {
+        settingSection("阅读顺序与版面") {
             VStack(alignment: .leading, spacing: 10) {
+                let layoutReady = VLModelStore.isLayoutModelInstalled
                 ForEach(PPTextOrder.allCases) { order in
-                    radioRow(title: order.label, subtitle: order.hint,
-                             selected: vm.paddleConfig.readingOrder == order, enabled: true) {
+                    let ready = !order.needsLayoutModel || layoutReady
+                    radioRow(title: order.label,
+                             subtitle: ready ? order.hint : "\(order.hint) —— 尚未下载",
+                             selected: vm.paddleConfig.readingOrder == order,
+                             enabled: ready) {
                         vm.paddleConfig.readingOrder = order
                     }
                 }
-                hint("检测模型只给出文本框的位置，不给出先后。「按栏排序」先找出栏与栏之间的空白，"
-                     + "再逐栏自上而下拼接，报刊、试卷这类多栏版面才不会左右串行。")
+                if !layoutReady {
+                    Divider().padding(.vertical, 2)
+                    inlineDownloadRow(PPModelCatalog.layoutModel)
+                }
+                hint("文本检测只给出每一行的位置，不给出先后。版面分析用 PP-DocLayoutV3 找出页面上的"
+                     + "栏目、标题、图表等区域并判定阅读顺序，再把文字行放回区域里——这也是 PaddleOCR "
+                     + "官方文档解析的做法，同时让结果带上标题层级、图片位置，可直接导出 Markdown。")
             }
         }
 
@@ -368,7 +466,14 @@ struct SettingsView: View {
                     }
                 }
                 Divider().padding(.vertical, 2)
-                modelManagerLink("模型管理")
+                HStack {
+                    modelManagerLink("模型管理")
+                    Spacer()
+                    downloadSourceControl
+                }
+                ForEach(PPModelCatalog.vlEntries.filter { !$0.isInstalled }) { entry in
+                    inlineDownloadRow(entry)
+                }
             }
         }
 
@@ -383,11 +488,6 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-
-                toggleRow(isOn: $vm.vlConfig.dropPageFurniture,
-                          title: "丢弃页眉、页脚与页码",
-                          subtitle: "这些内容每页重复，通常只是噪音。"
-                                  + "只丢弃真正位于页边的短块；若发现标题一类的内容仍被吞掉，可关掉这一项")
 
                 if !vm.vlConfig.useLayoutDetection {
                     Divider().padding(.vertical, 2)
@@ -453,6 +553,17 @@ struct SettingsView: View {
                 noticeBox("文本后处理仅影响新识别的结果，不会修改已有内容。", tint: .accentColor)
             }
 
+            settingSection("页眉页脚") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.dropPageFurniture,
+                              title: "从结果中去掉页眉、页脚与页码",
+                              subtitle: "这些内容每页重复，通常只是噪音")
+                    hint("这些区域始终会被识别，也始终画在预览里（灰色框），这里只决定它们要不要进入"
+                         + "文本和 Markdown。改动立刻生效，不需要重新识别；多页 PDF 例外，"
+                         + "它的正文在识别时就已经逐页拼好了。")
+                }
+            }
+
             settingSection("结果渲染") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.renderFigures,
@@ -468,20 +579,48 @@ struct SettingsView: View {
 
             settingSection("导出") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("导出 Markdown 时一并保存图片", isOn: $vm.exportFigures)
-                    hint("图片写入与 .md 同名的 .assets 文件夹，文档中以相对路径引用；"
-                         + "关闭后图片位置只保留空的占位符。")
-
-                    Picker("文件分隔符", selection: $vm.exportSeparator) {
-                        ForEach(OCRViewModel.ExportSeparator.allCases) { separator in
-                            Text(separator.rawValue).tag(separator)
+                    Picker("导出格式", selection: $vm.exportFormat) {
+                        ForEach(OCRViewModel.ExportFormat.allCases) { format in
+                            Text(format.label).tag(format)
                         }
                     }
                     .pickerStyle(.menu)
-                    hint("多个文件导出为同一文本时，各文件内容之间的分隔方式。")
+                    hint(exportFormatHint)
 
-                    Toggle("导出时包含文件名", isOn: $vm.exportIncludeFilename)
-                    hint("开启后每段内容前会加上「=== 文件名 ===」标题行。")
+                    Picker("导出方式", selection: $vm.exportLayout) {
+                        ForEach(OCRViewModel.ExportLayout.allCases) { layout in
+                            Text(layout.label).tag(layout)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    hint(vm.exportLayout == .combined
+                         ? "所有选中的文件写入同一个文档。"
+                         : "选择一个文件夹，每张图片各写出一个「原文件名_OCR」文档。")
+
+                    if vm.exportFormat == .markdown {
+                        Divider()
+                        Toggle("导出 Markdown 时一并保存图片", isOn: $vm.exportFigures)
+                        hint("图片写入与 .md 同名的 .assets 文件夹，文档中以相对路径引用；"
+                             + "关闭后图片位置只保留空的占位符。")
+                    }
+
+                    if vm.exportLayout == .combined, vm.exportFormat != .json {
+                        Divider()
+                        Picker("文件分隔符", selection: $vm.exportSeparator) {
+                            ForEach(OCRViewModel.ExportSeparator.allCases) { separator in
+                                Text(separator.rawValue).tag(separator)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        hint("多个文件导出为同一文本时，各文件内容之间的分隔方式。")
+                    }
+
+                    if vm.exportFormat != .json {
+                        Toggle("导出时包含文件名", isOn: $vm.exportIncludeFilename)
+                        hint(vm.exportFormat == .markdown
+                             ? "开启后每个文件的内容前会加上一级标题。"
+                             : "开启后每段内容前会加上「=== 文件名 ===」标题行。")
+                    }
                 }
             }
         }
@@ -535,6 +674,19 @@ struct SettingsView: View {
                 Text("识别引擎、模型选择、全部参数、文本与导出选项都会回到初始值。"
                      + "已下载的模型和列表中的文件不受影响。")
             }
+        }
+    }
+
+    private var exportFormatHint: String {
+        switch vm.exportFormat {
+        case .markdown:
+            return "保留标题层级、图片位置与表格。只有做过版面分析的结果才有这些结构"
+                 + "（PaddleOCR-VL，或开启了版面分析的 PP-OCRv6）；没有的会退回纯文本。"
+        case .plainText:
+            return "只写出识别到的文字，不带任何结构。"
+        case .json:
+            return "写出每一行的文字、四点坐标与置信度，以及版面区域的类别、阅读顺序和位置，"
+                 + "供其他程序继续处理。"
         }
     }
 

@@ -46,11 +46,11 @@ struct VLDocumentPipeline {
                                        progress: progress, isCancelled: isCancelled)
         }
 
-        let recognisable = blocks.indices.filter { index in
-            let block = blocks[index]
-            if config.dropPageFurniture && block.label.isPageFurniture { return false }
-            return block.label.vlTask != nil
-        }
+        // Everything readable is read, headers and page numbers included. What
+        // becomes of them is a question about the document, answered later by
+        // 保留页眉页脚 — and answered again the moment the user changes their
+        // mind, which is only possible because the text is already there.
+        let recognisable = blocks.indices.filter { blocks[$0].label.vlTask != nil }
 
         // Layout is a fraction of a second; the VLM calls are the whole cost,
         // so the bar tracks blocks rather than stages.
@@ -69,10 +69,12 @@ struct VLDocumentPipeline {
         }
         progress?(1.0, "完成")
 
+        // Assembled without dropping anything: the caller re-assembles from
+        // `blocks` with the user's current preference.
         return VLDocument(
             blocks: blocks,
-            markdown: PPDocumentAssembler.markdown(from: blocks, dropPageFurniture: config.dropPageFurniture),
-            plainText: PPDocumentAssembler.plainText(from: blocks, dropPageFurniture: config.dropPageFurniture))
+            markdown: PPDocumentAssembler.markdown(from: blocks, dropPageFurniture: false),
+            plainText: PPDocumentAssembler.plainText(from: blocks, dropPageFurniture: false))
     }
 
     /// `use_layout_detection=False`: the whole page, one prompt, one pass.

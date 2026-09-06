@@ -37,6 +37,17 @@ struct ImageItem: Identifiable, Equatable {
     /// engines, which produce plain text and per-line boxes instead.
     var markdown: String
     var layoutBlocks: [PPLayoutBlock]
+    /// Which engine produced the result currently attached, so an export can
+    /// say where the text came from.
+    var engine: OCREngine?
+    /// Where the block text came from, so `ocrText` and `markdown` can be built
+    /// again from the blocks when a document setting changes.
+    var blockSource: PPTextSource
+    /// True when the text and the Markdown cover exactly what `layoutBlocks`
+    /// describes, and can therefore be rebuilt from them. False for a
+    /// multi-page PDF, whose blocks are page one's while its text is the whole
+    /// file.
+    var derivesFromBlocks: Bool
 
     /// Pixel dimensions of the loaded image, which is the coordinate space
     /// `textLines` are expressed in. `NSImage.size` is in points and can differ.
@@ -73,6 +84,8 @@ struct ImageItem: Identifiable, Equatable {
         textLines = []
         markdown = ""
         layoutBlocks = []
+        derivesFromBlocks = false
+        engine = nil
         errorMessage = nil
         processingProgress = 0
     }
@@ -103,6 +116,9 @@ struct ImageItem: Identifiable, Equatable {
         self.textLines = []
         self.markdown = ""
         self.layoutBlocks = []
+        self.blockSource = .plainOCR
+        self.derivesFromBlocks = false
+        self.engine = nil
         self.thumbnail = NSImage(contentsOf: url)
     }
 }
