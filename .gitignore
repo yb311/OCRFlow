@@ -36,3 +36,9 @@ DerivedData/
 *.pkg
 build/
 archive/
+
+# llama.cpp xcframework (fetched by Scripts/fetch-llama-xcframework.sh)
+Vendor/
+
+# Bundled PaddleOCR ONNX weights (fetched by Scripts/fetch-paddleocr-models.sh bundled)
+OCRFlow/Resources/PaddleOCR/*.onnx

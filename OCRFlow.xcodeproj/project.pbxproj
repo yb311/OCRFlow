@@ -16,6 +16,36 @@
 		A1000001000000000000AA07 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA07 /* DropZoneView.swift */; };
 		A1000001000000000000AA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA08 /* Assets.xcassets */; };
 		A1000001000000000000AA0A /* DropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0A /* DropHelper.swift */; };
+		B10000010000000000000000 /* PPOCREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000000 /* PPOCREngine.swift */; };
+		B10000010000000000000001 /* PPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000001 /* PPTypes.swift */; };
+		B10000010000000000000002 /* PPModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000002 /* PPModelStore.swift */; };
+		B10000010000000000000003 /* PPSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000003 /* PPSession.swift */; };
+		B10000010000000000000004 /* PPDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000004 /* PPDetector.swift */; };
+		B10000010000000000000005 /* PPTextLineClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000005 /* PPTextLineClassifier.swift */; };
+		B10000010000000000000006 /* PPRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000006 /* PPRecognizer.swift */; };
+		B10000010000000000000007 /* PPImageBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000007 /* PPImageBuffer.swift */; };
+		B10000010000000000000008 /* PPGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000008 /* PPGeometry.swift */; };
+		B10000010000000000000009 /* PPConnectedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000009 /* PPConnectedComponents.swift */; };
+		B10000010000000000000A03 /* PaddleOCR in Resources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A03 /* PaddleOCR */; };
+		B10000010000000000000A06 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = B1000010000000000000AA05 /* onnxruntime */; };
+		B10000010000000000000A07 /* PPDocOrientationClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A07 /* PPDocOrientationClassifier.swift */; };
+		B1000001000000000000010A /* PPLayoutTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010A /* PPLayoutTypes.swift */; };
+		B1000001000000000000010B /* PPLayoutDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010B /* PPLayoutDetector.swift */; };
+		B1000001000000000000010C /* PPReadingOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010C /* PPReadingOrder.swift */; };
+		B1000001000000000000010D /* PPDocumentAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010D /* PPDocumentAssembler.swift */; };
+		B1000001000000000000020A /* VLTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000020A /* VLTypes.swift */; };
+		B1000001000000000000020B /* VLModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000020B /* VLModelStore.swift */; };
+		B1000001000000000000020C /* VLImageBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000020C /* VLImageBuffer.swift */; };
+		B1000001000000000000020D /* VLEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000020D /* VLEngine.swift */; };
+		B1000001000000000000020E /* VLDocumentPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000020E /* VLDocumentPipeline.swift */; };
+		B1000001000000000000030A /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B1000002000000000000030A /* llama.xcframework */; };
+		B1000001000000000000030B /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B1000002000000000000030A /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B1000001000000000000000A /* PPDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000A /* PPDictionary.swift */; };
+		B1000001000000000000000B /* PPModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000B /* PPModelCatalog.swift */; };
+		B1000001000000000000000C /* PPModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000C /* PPModelDownloader.swift */; };
+		B1000001000000000000000D /* ModelManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000D /* ModelManagerView.swift */; };
+		B1000001000000000000001A /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000001A /* MarkdownRenderer.swift */; };
+		B1000001000000000000000E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000E /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +60,34 @@
 		A1000002000000000000AA08 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000002000000000000AA09 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000002000000000000AA0A /* DropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropHelper.swift; sourceTree = "<group>"; };
+		B10000020000000000000000 /* PPOCREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPOCREngine.swift; sourceTree = "<group>"; };
+		B10000020000000000000001 /* PPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPTypes.swift; sourceTree = "<group>"; };
+		B10000020000000000000002 /* PPModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPModelStore.swift; sourceTree = "<group>"; };
+		B10000020000000000000003 /* PPSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPSession.swift; sourceTree = "<group>"; };
+		B10000020000000000000004 /* PPDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDetector.swift; sourceTree = "<group>"; };
+		B10000020000000000000005 /* PPTextLineClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPTextLineClassifier.swift; sourceTree = "<group>"; };
+		B10000020000000000000006 /* PPRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPRecognizer.swift; sourceTree = "<group>"; };
+		B10000020000000000000007 /* PPImageBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPImageBuffer.swift; sourceTree = "<group>"; };
+		B10000020000000000000008 /* PPGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPGeometry.swift; sourceTree = "<group>"; };
+		B10000020000000000000009 /* PPConnectedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPConnectedComponents.swift; sourceTree = "<group>"; };
+		B10000020000000000000A03 /* PaddleOCR */ = {isa = PBXFileReference; lastKnownFileType = folder; path = PaddleOCR; sourceTree = "<group>"; };
+		B10000020000000000000A07 /* PPDocOrientationClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocOrientationClassifier.swift; sourceTree = "<group>"; };
+		B1000002000000000000010A /* PPLayoutTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutTypes.swift; sourceTree = "<group>"; };
+		B1000002000000000000010B /* PPLayoutDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutDetector.swift; sourceTree = "<group>"; };
+		B1000002000000000000010C /* PPReadingOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPReadingOrder.swift; sourceTree = "<group>"; };
+		B1000002000000000000010D /* PPDocumentAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocumentAssembler.swift; sourceTree = "<group>"; };
+		B1000002000000000000020A /* VLTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLTypes.swift; sourceTree = "<group>"; };
+		B1000002000000000000020B /* VLModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLModelStore.swift; sourceTree = "<group>"; };
+		B1000002000000000000020C /* VLImageBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLImageBuffer.swift; sourceTree = "<group>"; };
+		B1000002000000000000020D /* VLEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLEngine.swift; sourceTree = "<group>"; };
+		B1000002000000000000020E /* VLDocumentPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLDocumentPipeline.swift; sourceTree = "<group>"; };
+		B1000002000000000000030A /* llama.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = llama.xcframework; path = Vendor/llama.xcframework; sourceTree = SOURCE_ROOT; };
+		B1000002000000000000000A /* PPDictionary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDictionary.swift; sourceTree = "<group>"; };
+		B1000002000000000000000B /* PPModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPModelCatalog.swift; sourceTree = "<group>"; };
+		B1000002000000000000000C /* PPModelDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPModelDownloader.swift; sourceTree = "<group>"; };
+		B1000002000000000000000D /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
+		B1000002000000000000001A /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
+		B1000002000000000000000E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,6 +95,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000010000000000000A06 /* onnxruntime in Frameworks */,
+				B1000001000000000000030A /* llama.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -48,6 +108,7 @@
 			children = (
 				A1000004000000000000AA01 /* OCRFlow */,
 				A1000004000000000000AA02 /* Products */,
+				B1000002000000000000030A /* llama.xcframework */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,6 +120,10 @@
 				A1000004000000000000AA03 /* Models */,
 				A1000004000000000000AA04 /* ViewModels */,
 				A1000004000000000000AA05 /* Views */,
+				B10000040000000000000A01 /* PaddleOCR */,
+				B1000004000000000000010A /* Layout */,
+				B1000004000000000000020A /* PaddleVL */,
+				B10000040000000000000A02 /* Resources */,
 				A1000002000000000000AA08 /* Assets.xcassets */,
 				A1000002000000000000AA09 /* Info.plist */,
 			);
@@ -96,8 +161,63 @@
 				A1000002000000000000AA06 /* DetailView.swift */,
 				A1000002000000000000AA07 /* DropZoneView.swift */,
 				A1000002000000000000AA0A /* DropHelper.swift */,
+				B1000002000000000000000D /* ModelManagerView.swift */,
+				B1000002000000000000000E /* SettingsView.swift */,
+				B1000002000000000000001A /* MarkdownRenderer.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		B10000040000000000000A01 /* PaddleOCR */ = {
+			isa = PBXGroup;
+			children = (
+				B10000020000000000000000 /* PPOCREngine.swift */,
+				B10000020000000000000001 /* PPTypes.swift */,
+				B10000020000000000000002 /* PPModelStore.swift */,
+				B10000020000000000000003 /* PPSession.swift */,
+				B10000020000000000000004 /* PPDetector.swift */,
+				B10000020000000000000A07 /* PPDocOrientationClassifier.swift */,
+				B10000020000000000000005 /* PPTextLineClassifier.swift */,
+				B10000020000000000000006 /* PPRecognizer.swift */,
+				B10000020000000000000007 /* PPImageBuffer.swift */,
+				B10000020000000000000008 /* PPGeometry.swift */,
+				B10000020000000000000009 /* PPConnectedComponents.swift */,
+				B1000002000000000000000A /* PPDictionary.swift */,
+				B1000002000000000000000B /* PPModelCatalog.swift */,
+				B1000002000000000000000C /* PPModelDownloader.swift */,
+			);
+			path = PaddleOCR;
+			sourceTree = "<group>";
+		};
+		B1000004000000000000010A /* Layout */ = {
+			isa = PBXGroup;
+			children = (
+				B1000002000000000000010A /* PPLayoutTypes.swift */,
+				B1000002000000000000010B /* PPLayoutDetector.swift */,
+				B1000002000000000000010C /* PPReadingOrder.swift */,
+				B1000002000000000000010D /* PPDocumentAssembler.swift */,
+			);
+			path = Layout;
+			sourceTree = "<group>";
+		};
+		B1000004000000000000020A /* PaddleVL */ = {
+			isa = PBXGroup;
+			children = (
+				B1000002000000000000020A /* VLTypes.swift */,
+				B1000002000000000000020B /* VLModelStore.swift */,
+				B1000002000000000000020C /* VLImageBuffer.swift */,
+				B1000002000000000000020D /* VLEngine.swift */,
+				B1000002000000000000020E /* VLDocumentPipeline.swift */,
+			);
+			path = PaddleVL;
+			sourceTree = "<group>";
+		};
+		B10000040000000000000A02 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000020000000000000A03 /* PaddleOCR */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -110,6 +230,7 @@
 				A1000006000000000000AA01 /* Sources */,
 				A1000003000000000000AA01 /* Frameworks */,
 				A1000007000000000000AA01 /* Resources */,
+				B1000005000000000000030A /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -117,6 +238,7 @@
 			);
 			name = OCRFlow;
 			packageProductDependencies = (
+				B1000010000000000000AA05 /* onnxruntime */,
 			);
 			productName = OCRFlow;
 			productReference = A1000002000000000000AA00 /* OCRFlow.app */;
@@ -148,6 +270,7 @@
 			mainGroup = A1000004000000000000AA00;
 			productRefGroup = A1000004000000000000AA02 /* Products */;
 			packageReferences = (
+				B10000090000000000000A04 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -157,12 +280,27 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		B1000005000000000000030A /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				B1000001000000000000030B /* llama.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXResourcesBuildPhase section */
 		A1000007000000000000AA01 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A1000001000000000000AA08 /* Assets.xcassets in Resources */,
+				B10000010000000000000A03 /* PaddleOCR in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,6 +319,32 @@
 				A1000001000000000000AA06 /* DetailView.swift in Sources */,
 				A1000001000000000000AA07 /* DropZoneView.swift in Sources */,
 				A1000001000000000000AA0A /* DropHelper.swift in Sources */,
+				B10000010000000000000000 /* PPOCREngine.swift in Sources */,
+				B10000010000000000000001 /* PPTypes.swift in Sources */,
+				B10000010000000000000002 /* PPModelStore.swift in Sources */,
+				B10000010000000000000003 /* PPSession.swift in Sources */,
+				B10000010000000000000004 /* PPDetector.swift in Sources */,
+				B10000010000000000000A07 /* PPDocOrientationClassifier.swift in Sources */,
+				B10000010000000000000005 /* PPTextLineClassifier.swift in Sources */,
+				B10000010000000000000006 /* PPRecognizer.swift in Sources */,
+				B10000010000000000000007 /* PPImageBuffer.swift in Sources */,
+				B10000010000000000000008 /* PPGeometry.swift in Sources */,
+				B10000010000000000000009 /* PPConnectedComponents.swift in Sources */,
+				B1000001000000000000010A /* PPLayoutTypes.swift in Sources */,
+				B1000001000000000000010B /* PPLayoutDetector.swift in Sources */,
+				B1000001000000000000010C /* PPReadingOrder.swift in Sources */,
+				B1000001000000000000010D /* PPDocumentAssembler.swift in Sources */,
+				B1000001000000000000020A /* VLTypes.swift in Sources */,
+				B1000001000000000000020B /* VLModelStore.swift in Sources */,
+				B1000001000000000000020C /* VLImageBuffer.swift in Sources */,
+				B1000001000000000000020D /* VLEngine.swift in Sources */,
+				B1000001000000000000020E /* VLDocumentPipeline.swift in Sources */,
+				B1000001000000000000000A /* PPDictionary.swift in Sources */,
+				B1000001000000000000000B /* PPModelCatalog.swift in Sources */,
+				B1000001000000000000000C /* PPModelDownloader.swift in Sources */,
+				B1000001000000000000000D /* ModelManagerView.swift in Sources */,
+				B1000001000000000000000E /* SettingsView.swift in Sources */,
+				B1000001000000000000001A /* MarkdownRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,7 +406,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -302,7 +466,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -332,6 +496,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ocrflow.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor",
+				);
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -359,6 +527,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ocrflow.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor",
+				);
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -387,6 +559,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B10000090000000000000A04 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
+			requirement = {
+				kind = exactVersion;
+				version = 1.24.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B1000010000000000000AA05 /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B10000090000000000000A04 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = onnxruntime;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 	};
 	rootObject = A1000009000000000000AA01 /* Project object */;
 }
