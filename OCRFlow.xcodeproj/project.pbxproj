@@ -48,6 +48,7 @@
 		B1000001000000000000000E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000000E /* SettingsView.swift */; };
 		B1000001000000000000010E /* PPStructureAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010E /* PPStructureAssembler.swift */; };
 		B100000100000000000000AB /* MathRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AB /* MathRenderer.swift */; };
+		B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010F /* PPLayoutPostProcess.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -92,6 +93,7 @@
 		B1000002000000000000000E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B1000002000000000000010E /* PPStructureAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPStructureAssembler.swift; sourceTree = "<group>"; };
 		B100000200000000000000AB /* MathRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathRenderer.swift; sourceTree = "<group>"; };
+		B1000002000000000000010F /* PPLayoutPostProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutPostProcess.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -202,6 +204,7 @@
 				B1000002000000000000010C /* PPReadingOrder.swift */,
 				B1000002000000000000010D /* PPDocumentAssembler.swift */,
 				B1000002000000000000010E /* PPStructureAssembler.swift */,
+				B1000002000000000000010F /* PPLayoutPostProcess.swift */,
 			);
 			path = Layout;
 			sourceTree = "<group>";
@@ -353,6 +356,7 @@
 				B1000001000000000000001A /* MarkdownRenderer.swift in Sources */,
 				B1000001000000000000010E /* PPStructureAssembler.swift in Sources */,
 				B100000100000000000000AB /* MathRenderer.swift in Sources */,
+				B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

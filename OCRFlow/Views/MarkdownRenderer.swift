@@ -92,11 +92,14 @@ enum MDParser {
                 continue
             }
 
-            // Display formula, either "$$…$$" on one line or fenced over several
-            if line.hasPrefix("$$") {
-                let inner = String(line.dropFirst(2))
-                if inner.hasSuffix("$$") {
-                    append(.formula(String(inner.dropLast(2))
+            // Display formula: `$$…$$` or the `\[…\]` the VL model writes,
+            // on one line or fenced over several. A `\begin{array}` runs to
+            // several lines, so the closing delimiter is what ends the block —
+            // not a blank line.
+            if let opening = Self.mathOpening(of: line) {
+                let inner = String(line.dropFirst(opening.open.count))
+                if inner.hasSuffix(opening.close), inner.count >= opening.close.count {
+                    append(.formula(String(inner.dropLast(opening.close.count))
                         .trimmingCharacters(in: .whitespaces)))
                     i += 1
                     continue
@@ -104,11 +107,12 @@ enum MDParser {
                 var body: [String] = inner.isEmpty ? [] : [inner]
                 i += 1
                 while i < lines.count,
-                      !lines[i].trimmingCharacters(in: .whitespaces).hasSuffix("$$") {
+                      !lines[i].trimmingCharacters(in: .whitespaces).hasSuffix(opening.close) {
                     body.append(lines[i]); i += 1
                 }
                 if i < lines.count {
-                    let closing = String(lines[i].trimmingCharacters(in: .whitespaces).dropLast(2))
+                    let closing = String(lines[i].trimmingCharacters(in: .whitespaces)
+                        .dropLast(opening.close.count))
                     if !closing.trimmingCharacters(in: .whitespaces).isEmpty { body.append(closing) }
                     i += 1
                 }
@@ -238,6 +242,14 @@ enum MDParser {
     /// Inline Markdown only — emphasis, code spans, links — with the line
     /// breaks left alone, which matters for CJK text where joining wrapped
     /// lines with a space inserts gaps that were never in the page.
+    /// The delimiters a display formula starts with, if this line starts one.
+    static func mathOpening(of line: String) -> (open: String, close: String)? {
+        for pair in [("$$", "$$"), ("\\[", "\\]")] where line.hasPrefix(pair.0) {
+            return pair
+        }
+        return nil
+    }
+
     /// The body of `$…$` or `\(…\)` when the whole line is exactly that.
     static func soleInlineFormula(in line: String) -> String? {
         for (open, close) in [("\\(", "\\)"), ("$", "$")] {

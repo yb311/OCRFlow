@@ -62,8 +62,14 @@ struct VLDocumentPipeline {
             progress?(0.1 + 0.9 * Double(position) / total,
                       "识别第 \(position + 1)/\(recognisable.count) 块（\(blocks[index].label.label)）")
 
+            // Crop a little wider than the box. A region that hugs the glyphs
+            // clips their edges, and a model shown a clipped word drops it;
+            // PaddleOCR grows the box the same way, as `unclip_ratio`.
+            let crop = PPLayoutPostProcess.expanded(
+                blocks[index].rect, ratio: config.cropUnclipRatio,
+                within: CGSize(width: buffer.width, height: buffer.height))
             blocks[index].text = try vl.recognize(image: image,
-                                                  crop: blocks[index].rect,
+                                                  crop: crop,
                                                   task: task,
                                                   isCancelled: isCancelled)
         }

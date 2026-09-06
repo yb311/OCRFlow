@@ -107,14 +107,14 @@ enum PPDocumentAssembler {
 
         case .displayFormula:
             guard !text.isEmpty else { return nil }
-            // The model returns bare LaTeX; wrap it unless it already carries
-            // its own delimiters.
-            if text.hasPrefix("$$") || text.hasPrefix("\\[") { return text }
-            return "$$\n\(text)\n$$"
+            return displayMath(text)
 
         case .inlineFormula:
             guard !text.isEmpty else { return nil }
-            return text.hasPrefix("$") ? text : "$\(text)$"
+            // A formula region that survived the containment filter really is
+            // standalone, so it is set as display maths rather than squeezed
+            // into a line of its own with `$…$`.
+            return displayMath(text)
 
         case .table:
             // Table Recognition emits HTML, which Markdown passes through
@@ -132,8 +132,48 @@ enum PPDocumentAssembler {
             return text.isEmpty ? nil : "> \(text)"
 
         default:
-            return text.isEmpty ? nil : text
+            return text.isEmpty ? nil : normalisingInlineMath(text)
         }
+    }
+
+    // MARK: - Formulas
+
+    /// One display formula, in the delimiters everything downstream expects.
+    ///
+    /// The model answers with `\[ … \]`, which is valid LaTeX and understood by
+    /// nothing else: Markdown readers — including this app's own — look for
+    /// `$$`. Wrapping the model's answer without unwrapping what it already
+    /// carried is how `$\[k \geq 2\]$` ended up in an exported document.
+    static func displayMath(_ latex: String) -> String {
+        let body = strippingMathDelimiters(latex)
+        guard !body.isEmpty else { return "" }
+        return "$$\n\(body)\n$$"
+    }
+
+    /// Removes whatever delimiters the model put around a formula.
+    static func strippingMathDelimiters(_ latex: String) -> String {
+        var text = latex.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Repeated because the model sometimes doubles them up.
+        var changed = true
+        while changed {
+            changed = false
+            for (open, close) in [("$$", "$$"), ("\\[", "\\]"), ("\\(", "\\)"), ("$", "$")]
+            where text.hasPrefix(open) && text.hasSuffix(close)
+                && text.count > open.count + close.count {
+                text = String(text.dropFirst(open.count).dropLast(close.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                changed = true
+                break
+            }
+        }
+        return text
+    }
+
+    /// Rewrites the LaTeX delimiters inside a run of prose to the Markdown
+    /// ones, so a paragraph carrying `\(x\)` renders its maths as maths.
+    static func normalisingInlineMath(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\(", with: "$")
+            .replacingOccurrences(of: "\\)", with: "$")
     }
 
     // MARK: - Tables

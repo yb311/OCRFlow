@@ -673,17 +673,23 @@ extension EnvironmentValues {
 
 // MARK: - Entry points
 
-/// A display formula, centred, with the LaTeX available underneath on demand.
+/// A display formula: centred, on the page's own background, with the LaTeX
+/// and a copy button appearing only under the pointer.
+///
+/// The tinted panel it used to sit in made every formula look like a callout;
+/// a formula is body content, and the reference renderer sets it as such.
 struct MathBlockView: View {
     let latex: String
     @State private var showsSource = false
+    @State private var isHovering = false
+    @State private var didCopy = false
 
     var body: some View {
         VStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
-                MathNodeView(node: MathParser.parse(latex), size: 17, display: true)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 2)
+                MathNodeView(node: MathParser.parse(latex), size: 18, display: true)
+                    .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity)
             }
             if showsSource {
                 Text(latex)
@@ -691,16 +697,40 @@ struct MathBlockView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.secondary.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: 5))
             }
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
-        .background(Color.accentColor.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .contentShape(Rectangle())
-        .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { showsSource.toggle() } }
-        .help(showsSource ? "点击收起 LaTeX 源码" : "点击查看 LaTeX 源码")
+        .overlay(alignment: .topTrailing) {
+            if isHovering {
+                HStack(spacing: 4) {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(latex, forType: .string)
+                        didCopy = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { didCopy = false }
+                    } label: {
+                        Label(didCopy ? "已复制" : "复制", systemImage: didCopy ? "checkmark" : "doc.on.doc")
+                            .font(.caption2)
+                    }
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { showsSource.toggle() }
+                    } label: {
+                        Label("LaTeX", systemImage: showsSource ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .transition(.opacity)
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
+        }
     }
 }
 

@@ -97,6 +97,10 @@ struct PPLayoutDetector {
             orderKeys.append(detections[row + 6])
         }
 
-        return PPReadingOrder.sort(blocks, modelKeys: orderKeys)
+        // A detector reports every region it believes in, and those regions
+        // overlap; the reference pipeline suppresses the duplicates before
+        // anything is read out of them.
+        let cleaned = PPLayoutPostProcess.clean(blocks, keys: orderKeys)
+        return PPReadingOrder.sort(cleaned.blocks, modelKeys: cleaned.keys)
     }
 }
