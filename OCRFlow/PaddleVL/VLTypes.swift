@@ -94,6 +94,25 @@ struct VLConfig: Equatable, Codable {
     /// Run PP-DocLayoutV3 first and recognise block by block. This is the
     /// official pipeline; turning it off matches `use_layout_detection=False`.
     var useLayoutDetection: Bool = true
+    // Sampling. PaddleOCR passes these straight through to the VLM, and its
+    // defaults are a plain greedy decode — temperature 0, no penalty, top-p 1.
+    /// 0 keeps the decode greedy, which is what a transcription model wants.
+    var temperature: Double = 0
+    /// Nucleus sampling cut-off. Only consulted when the temperature is above 0.
+    var topP: Double = 1
+    /// Above 1, tokens already produced are made less likely — the knob the
+    /// reference UI calls 重复抑制强度.
+    var repetitionPenalty: Double = 1
+
+    // Which of the specialised prompts the pipeline is allowed to use.
+    /// Read charts as data tables. Off in the reference pipeline: a chart read
+    /// as a table is a guess at numbers that are only drawn.
+    var useChartRecognition: Bool = false
+    /// Read the curved text on stamps and seals.
+    var useSealRecognition: Bool = true
+    /// Also read any text inside a figure, rather than treating it as a picture.
+    var useImageTextRecognition: Bool = false
+
     /// How much wider than the detected region each crop is taken. PaddleOCR
     /// exposes the same knob on its layout stage as `unclip_ratio`.
     var cropUnclipRatio: Double = 1.05
@@ -104,6 +123,33 @@ struct VLConfig: Equatable, Codable {
     var dropPageFurniture: Bool = true
 
     static let `default` = VLConfig()
+}
+
+extension VLConfig {
+    /// Field by field, so a settings file from an older build keeps everything
+    /// it still knows about instead of resetting the lot.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = VLConfig()
+        func value<T: Decodable>(_ key: CodingKeys, _ default: T) -> T {
+            (try? container.decode(T.self, forKey: key)) ?? `default`
+        }
+        variant = value(.variant, fallback.variant)
+        contextTokens = value(.contextTokens, fallback.contextTokens)
+        maxOutputTokens = value(.maxOutputTokens, fallback.maxOutputTokens)
+        threadCount = value(.threadCount, fallback.threadCount)
+        useGPU = value(.useGPU, fallback.useGPU)
+        wholeImageTask = value(.wholeImageTask, fallback.wholeImageTask)
+        useLayoutDetection = value(.useLayoutDetection, fallback.useLayoutDetection)
+        temperature = value(.temperature, fallback.temperature)
+        topP = value(.topP, fallback.topP)
+        repetitionPenalty = value(.repetitionPenalty, fallback.repetitionPenalty)
+        useChartRecognition = value(.useChartRecognition, fallback.useChartRecognition)
+        useSealRecognition = value(.useSealRecognition, fallback.useSealRecognition)
+        useImageTextRecognition = value(.useImageTextRecognition, fallback.useImageTextRecognition)
+        cropUnclipRatio = value(.cropUnclipRatio, fallback.cropUnclipRatio)
+        dropPageFurniture = value(.dropPageFurniture, fallback.dropPageFurniture)
+    }
 }
 
 enum VLError: LocalizedError {

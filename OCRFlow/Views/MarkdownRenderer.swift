@@ -29,6 +29,8 @@ struct MDBlock: Identifiable {
 
     let id: Int
     let kind: Kind
+    /// The layout region this was assembled from, when there was one.
+    var sourceBlock: Int?
 }
 
 struct MDListItem: Identifiable {
@@ -62,6 +64,26 @@ struct MDTable {
 // MARK: - Parsing
 
 enum MDParser {
+
+    /// Parses each fragment on its own, so every rendered block keeps the
+    /// layout region it came from. Figure placeholders are renumbered across
+    /// the whole document afterwards, because the crops are found by their
+    /// position in the document rather than within a fragment.
+    static func parse(fragments: [PPDocumentAssembler.Fragment]) -> [MDBlock] {
+        var out: [MDBlock] = []
+        var figureOrdinal = 0
+        for fragment in fragments {
+            for block in parse(fragment.markdown) {
+                var kind = block.kind
+                if case let .figure(_, caption) = kind {
+                    kind = .figure(ordinal: figureOrdinal, caption: caption)
+                    figureOrdinal += 1
+                }
+                out.append(MDBlock(id: out.count, kind: kind, sourceBlock: fragment.source))
+            }
+        }
+        return out
+    }
 
     static func parse(_ source: String) -> [MDBlock] {
         var blocks: [MDBlock] = []
@@ -541,12 +563,54 @@ struct MarkdownDocumentView: View {
     var figures: [NSImage?] = []
     var showFigures = true
     var renderTables = true
+    /// The layout region the pointer is over, wherever it is being pointed at:
+    /// the page, or this document.
+    var highlighted: Int?
+    /// The region the user has clicked, which stays lit when the pointer moves
+    /// away.
+    var selected: Int?
+    /// What the region is called, for the tag shown beside it.
+    var labelForSource: (Int) -> String? = { _ in nil }
+    var onHover: (Int?) -> Void = { _ in }
+    var onTap: (Int) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(blocks) { block in
+                let isLit = block.sourceBlock != nil
+                    && (block.sourceBlock == highlighted || block.sourceBlock == selected)
                 view(for: block)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background {
+                        // The page and the document are two views of the same
+                        // thing; pointing at one lights up the other.
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(Color.accentColor.opacity(isLit ? 0.10 : 0))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 5)
+                                    .strokeBorder(Color.accentColor.opacity(isLit ? 0.55 : 0),
+                                                  lineWidth: 1)
+                            }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if isLit, let source = block.sourceBlock,
+                           let name = labelForSource(source) {
+                            Text(name)
+                                .font(.caption2)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.accentColor, in: Capsule())
+                                .foregroundStyle(.white)
+                                .offset(x: 4, y: -8)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onHover { inside in onHover(inside ? block.sourceBlock : nil) }
+                    .onTapGesture { if let source = block.sourceBlock { onTap(source) } }
+                    .id(block.id)
             }
         }
     }

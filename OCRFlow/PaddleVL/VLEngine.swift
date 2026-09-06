@@ -178,9 +178,13 @@ final class VLEngine: @unchecked Sendable {
         return nPast
     }
 
-    /// Greedy decoding. PaddleOCR-VL is a transcription model, so there is
-    /// nothing to gain from sampling — the reference pipeline runs at
-    /// temperature 0 and so do we.
+    /// Decoding, greedy by default.
+    ///
+    /// PaddleOCR-VL is a transcription model and the reference pipeline runs it
+    /// at temperature 0, which is the default here too. The three knobs it
+    /// exposes — repetition penalty, temperature, top-p — are implemented
+    /// because a page that sends the decoder into a loop is the one case where
+    /// a plain greedy decode has no way out.
     private func generate(from nPast: inout llama_pos,
                           limit: Int,
                           isCancelled: (() -> Bool)?,
@@ -203,12 +207,8 @@ final class VLEngine: @unchecked Sendable {
             if isCancelled?() == true { break }
 
             guard let logits = llama_get_logits_ith(context, -1) else { break }
-            var best = llama_token(0)
-            var bestValue = -Float.greatestFiniteMagnitude
-            for id in 0..<vocabSize where logits[id] > bestValue {
-                bestValue = logits[id]
-                best = llama_token(id)
-            }
+            let best = Self.sample(logits: logits, vocabSize: vocabSize,
+                                   produced: tokens, config: config)
             if llama_vocab_is_eog(vocab, best) { break }
 
             let written = piece.withUnsafeMutableBufferPointer {
@@ -249,6 +249,61 @@ final class VLEngine: @unchecked Sendable {
 
         return String(decoding: bytes, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Picks the next token.
+    ///
+    /// With the reference defaults this is `argmax` and nothing else runs.
+    private static func sample(logits: UnsafeMutablePointer<Float>, vocabSize: Int,
+                               produced: [llama_token], config: VLConfig) -> llama_token {
+        let penalty = Float(config.repetitionPenalty)
+        if penalty > 1 {
+            // The CTRL formulation: a token already produced is pushed towards
+            // zero, whichever side of it the logit is on.
+            for token in Set(produced) {
+                let id = Int(token)
+                guard id >= 0, id < vocabSize else { continue }
+                logits[id] = logits[id] > 0 ? logits[id] / penalty : logits[id] * penalty
+            }
+        }
+
+        guard config.temperature > 0 else {
+            var best = llama_token(0)
+            var bestValue = -Float.greatestFiniteMagnitude
+            for id in 0..<vocabSize where logits[id] > bestValue {
+                bestValue = logits[id]
+                best = llama_token(id)
+            }
+            return best
+        }
+
+        let temperature = Float(config.temperature)
+        var candidates = (0..<vocabSize).map { (id: $0, logit: logits[$0] / temperature) }
+        candidates.sort { $0.logit > $1.logit }
+
+        // Softmax over the sorted head is enough: the tail is what top-p is
+        // about to discard anyway.
+        let maxLogit = candidates[0].logit
+        var probabilities = candidates.map { expf($0.logit - maxLogit) }
+        let total = probabilities.reduce(0, +)
+        guard total > 0 else { return llama_token(candidates[0].id) }
+        for index in probabilities.indices { probabilities[index] /= total }
+
+        let topP = Float(min(max(config.topP, 0.01), 1))
+        var cumulative: Float = 0
+        var cutoff = probabilities.count
+        for index in probabilities.indices {
+            cumulative += probabilities[index]
+            if cumulative >= topP { cutoff = index + 1; break }
+        }
+
+        let roll = Float.random(in: 0..<max(cumulative, .leastNonzeroMagnitude))
+        var running: Float = 0
+        for index in 0..<cutoff {
+            running += probabilities[index]
+            if running >= roll { return llama_token(candidates[index].id) }
+        }
+        return llama_token(candidates[0].id)
     }
 
     /// Detects a degenerate loop at the tail: the last `period` tokens repeated

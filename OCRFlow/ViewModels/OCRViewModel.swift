@@ -67,6 +67,10 @@ struct OCRSettings: Codable, Equatable {
     var renderTables = true
     var exportFigures = true
     var dropPageFurniture = true
+    /// `rawName` of every auxiliary region kept in the document. Stored as
+    /// strings so a label added to the model later cannot make the file
+    /// unreadable.
+    var keptAuxiliary: [String] = []
 }
 
 extension OCRSettings {
@@ -104,6 +108,12 @@ extension OCRSettings {
         // a build carries the user's choice there.
         dropPageFurniture = (try? container.decode(Bool.self, forKey: .dropPageFurniture))
             ?? vl.dropPageFurniture
+        // Before the switches were split apart there was one of them, and it
+        // covered the three that repeat on every page.
+        keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
+            ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
+                    .filter { !$0.isPageFurniture }.map(\.rawName)
+                : PPLayoutLabel.auxiliary.map(\.rawName))
     }
 }
 
@@ -246,7 +256,8 @@ final class OCRViewModel: ObservableObject {
                     renderFigures: renderFigures,
                     renderTables: renderTables,
                     exportFigures: exportFigures,
-                    dropPageFurniture: dropPageFurniture)
+                    dropPageFurniture: dropPageFurniture,
+                    keptAuxiliary: keptAuxiliary.map(\.rawName))
     }
 
     private func persistSettings() {
@@ -288,6 +299,7 @@ final class OCRViewModel: ObservableObject {
         renderTables = settings.renderTables
         exportFigures = settings.exportFigures
         dropPageFurniture = settings.dropPageFurniture
+        keptAuxiliary = Set(settings.keptAuxiliary.compactMap(PPLayoutLabel.init(rawName:)))
     }
 
     func resetAllSettings() {
@@ -462,6 +474,38 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
+    /// Which auxiliary regions stay in the document. Everything not in here is
+    /// filtered out, which is how PaddleOCR's own 辅助内容解析 switches read:
+    /// off means "the model found it and left it out".
+    @Published var keptAuxiliary: Set<PPLayoutLabel> = [] {
+        didSet {
+            guard oldValue != keptAuxiliary else { return }
+            persistSettings()
+            rebuildDocuments()
+        }
+    }
+
+    /// The regions left out of the assembled document.
+    var droppedLabels: Set<PPLayoutLabel> {
+        Set(PPLayoutLabel.auxiliary).subtracting(keptAuxiliary)
+    }
+
+    func setAuxiliary(_ label: PPLayoutLabel, kept: Bool) {
+        if kept { keptAuxiliary.insert(label) } else { keptAuxiliary.remove(label) }
+    }
+
+    /// The document in pieces that remember which region each came from, for
+    /// the rendered view. Falls back to one nameless piece for a result with no
+    /// regions behind it.
+    func documentFragments(for item: ImageItem) -> [PPDocumentAssembler.Fragment] {
+        guard !item.layoutBlocks.isEmpty, item.derivesFromBlocks else {
+            return [PPDocumentAssembler.Fragment(source: nil, markdown: item.markdown)]
+        }
+        return PPDocumentAssembler.fragments(from: item.layoutBlocks,
+                                             dropping: droppedLabels,
+                                             source: item.blockSource)
+    }
+
     /// Rebuilds the text and the Markdown of every result that still has the
     /// blocks it was assembled from.
     func rebuildDocuments() {
@@ -469,7 +513,7 @@ final class OCRViewModel: ObservableObject {
             let item = items[index]
             let recognition = Recognition(lines: item.textLines, blocks: item.layoutBlocks,
                                           blockSource: item.blockSource)
-            let assembled = Self.assemble(recognition, dropPageFurniture: dropPageFurniture)
+            let assembled = Self.assemble(recognition, dropping: droppedLabels)
             items[index].ocrText = postProcess(assembled.text)
             items[index].markdown = assembled.markdown
         }
@@ -976,7 +1020,7 @@ final class OCRViewModel: ObservableObject {
                 return
             }
             var updated = items[i]
-            let assembled = Self.assemble(result, dropPageFurniture: dropPageFurniture)
+            let assembled = Self.assemble(result, dropping: droppedLabels)
             updated.status = .completed
             updated.ocrText = postProcess(assembled.text)
             updated.markdown = assembled.markdown
@@ -1037,13 +1081,13 @@ final class OCRViewModel: ObservableObject {
         var vlConfig: VLConfig
         /// Only used for a multi-page PDF, whose pages are assembled as they
         /// are read because only page one's blocks are kept afterwards.
-        var dropPageFurniture: Bool
+        var droppedLabels: Set<PPLayoutLabel>
     }
 
     private func currentRecognitionSettings() -> RecognitionSettings {
         RecognitionSettings(engine: ocrEngine, visionLanguages: recognitionLanguages,
                             paddleConfig: paddleConfig, vlConfig: vlConfig,
-                            dropPageFurniture: dropPageFurniture)
+                            droppedLabels: droppedLabels)
     }
 
     // MARK: - Off-actor recognition
@@ -1125,7 +1169,7 @@ final class OCRViewModel: ObservableObject {
                                        vlPipeline: vlPipeline, isCancelled: isCancelled, progress: nil)
             // Each page is turned into text as it is read: only page one's
             // blocks survive, so there is nothing left to assemble from later.
-            let assembled = assemble(result, dropPageFurniture: settings.dropPageFurniture)
+            let assembled = assemble(result, dropping: settings.droppedLabels)
             if !assembled.text.isEmpty { allText.append(assembled.text) }
             if !assembled.markdown.isEmpty { allMarkdown.append(assembled.markdown) }
             if pageNum == 1 {
@@ -1161,12 +1205,10 @@ final class OCRViewModel: ObservableObject {
     /// calls it per page from the worker thread, and the view model calls it
     /// again whenever the preference changes.
     nonisolated static func assemble(_ result: Recognition,
-                                     dropPageFurniture: Bool) -> (text: String, markdown: String) {
+                                     dropping: Set<PPLayoutLabel>) -> (text: String, markdown: String) {
         guard !result.blocks.isEmpty else { return (result.rawText, result.rawMarkdown) }
-        return (PPDocumentAssembler.plainText(from: result.blocks,
-                                              dropPageFurniture: dropPageFurniture),
-                PPDocumentAssembler.markdown(from: result.blocks,
-                                             dropPageFurniture: dropPageFurniture,
+        return (PPDocumentAssembler.plainText(from: result.blocks, dropping: dropping),
+                PPDocumentAssembler.markdown(from: result.blocks, dropping: dropping,
                                              source: result.blockSource))
     }
 

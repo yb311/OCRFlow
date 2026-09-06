@@ -19,27 +19,82 @@ enum PPTextSource: String, Sendable, Codable {
 /// markup its label implies.
 enum PPDocumentAssembler {
 
-    /// Blocks worth emitting, honouring the page-furniture preference.
-    static func contentBlocks(_ blocks: [PPLayoutBlock], dropPageFurniture: Bool) -> [PPLayoutBlock] {
-        blocks.filter { block in
-            if dropPageFurniture && block.label.isPageFurniture { return false }
-            return true
+    /// Blocks worth emitting, honouring the auxiliary-content preferences.
+    static func contentBlocks(_ blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel>) -> [PPLayoutBlock] {
+        contentIndices(blocks, dropping: dropping).map { blocks[$0] }
+    }
+
+    /// Indices of the blocks worth emitting, so a caller that needs to know
+    /// where each piece came from can keep the link.
+    static func contentIndices(_ blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel>) -> [Int] {
+        let keep = blocks.indices.filter { !dropping.contains(blocks[$0].label) }
+        return keep.filter { index in
+            !isEchoOfNeighbour(index, in: blocks, among: keep)
         }
     }
 
-    static func markdown(from blocks: [PPLayoutBlock], dropPageFurniture: Bool = true,
+    /// True when a block only repeats the start of the one beside it.
+    ///
+    /// A region that clips a line in half is read as the first few words of
+    /// that line, and those words then appear twice in a row — once from the
+    /// fragment and once from the paragraph that contains the whole line. The
+    /// geometry stage drops most of these; this catches the ones whose boxes
+    /// overlap too little to look like duplicates but whose text plainly is.
+    private static func isEchoOfNeighbour(_ index: Int, in blocks: [PPLayoutBlock],
+                                          among keep: [Int]) -> Bool {
+        let text = blocks[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 3, blocks[index].label.vlTask != nil else { return false }
+        guard let position = keep.firstIndex(of: index) else { return false }
+
+        for offset in [-1, 1] {
+            let neighbourPosition = position + offset
+            guard keep.indices.contains(neighbourPosition) else { continue }
+            let other = blocks[keep[neighbourPosition]].text
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Only a clearly shorter run counts as an echo; two similar-length
+            // blocks are two pieces of content that happen to start alike.
+            guard other.count > text.count * 5 / 3 else { continue }
+            if other.contains(text) { return true }
+        }
+        return false
+    }
+
+    /// One region's worth of document, and which region it came from.
+    ///
+    /// Keeping the link is what lets the rendered document point back at the
+    /// page: hovering a paragraph can light up the box it was read out of only
+    /// if something remembers which box that was.
+    struct Fragment: Equatable {
+        /// Index into the item's `layoutBlocks`, or nil for a document that has
+        /// no regions behind it (Apple Vision, or a whole-page VL pass).
+        var source: Int?
+        var markdown: String
+    }
+
+    /// The document, in pieces that still know where they came from.
+    static func fragments(from blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel> = [],
+                          source: PPTextSource = .visionLanguageModel) -> [Fragment] {
+        contentIndices(blocks, dropping: dropping).compactMap { index in
+            guard let text = fragment(for: blocks[index], source: source) else { return nil }
+            return Fragment(source: index, markdown: text)
+        }
+    }
+
+    /// The whole document as one string — the pieces joined, so the text that
+    /// is exported and the text that is rendered cannot drift apart.
+    static func markdown(from blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel> = [],
                          source: PPTextSource = .visionLanguageModel) -> String {
-        contentBlocks(blocks, dropPageFurniture: dropPageFurniture)
-            .compactMap { fragment(for: $0, source: source) }
+        fragments(from: blocks, dropping: dropping, source: source)
+            .map(\.markdown)
             .joined(separator: "\n\n")
     }
 
     /// The same content with the markup stripped, for the plain-text pane and
     /// for the existing text export.
-    static func plainText(from blocks: [PPLayoutBlock], dropPageFurniture: Bool = true) -> String {
-        contentBlocks(blocks, dropPageFurniture: dropPageFurniture)
-            .filter { !$0.text.isEmpty }
-            .map(\.text)
+    static func plainText(from blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel> = []) -> String {
+        contentIndices(blocks, dropping: dropping)
+            .map { blocks[$0].text }
+            .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
     }
 

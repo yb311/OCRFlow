@@ -133,6 +133,24 @@ enum PPLayoutLabel: Int, CaseIterable {
     var isPageFurniture: Bool {
         self == .header || self == .footer || self == .number
     }
+
+    /// Looks a label back up from the identifier PaddleOCR uses for it, which
+    /// is what the settings file stores.
+    init?(rawName: String) {
+        guard let match = PPLayoutLabel.allCases.first(where: { $0.rawName == rawName }) else {
+            return nil
+        }
+        self = match
+    }
+
+    /// The regions PaddleOCR calls 辅助内容 — everything that frames a page
+    /// rather than being part of what it says. The reference pipeline filters
+    /// all of them by default and offers one switch each.
+    static let auxiliary: [PPLayoutLabel] = [
+        .header, .footer, .number, .footnote, .asideText, .headerImage, .footerImage,
+    ]
+
+    var isAuxiliary: Bool { Self.auxiliary.contains(self) }
 }
 
 extension Array where Element == PPLayoutBlock {

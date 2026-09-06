@@ -50,14 +50,14 @@ struct VLDocumentPipeline {
         // becomes of them is a question about the document, answered later by
         // 保留页眉页脚 — and answered again the moment the user changes their
         // mind, which is only possible because the text is already there.
-        let recognisable = blocks.indices.filter { blocks[$0].label.vlTask != nil }
+        let recognisable = blocks.indices.filter { task(for: blocks[$0].label, config: config) != nil }
 
         // Layout is a fraction of a second; the VLM calls are the whole cost,
         // so the bar tracks blocks rather than stages.
         let total = Double(max(recognisable.count, 1))
         for (position, index) in recognisable.enumerated() {
             if isCancelled?() == true { break }
-            guard let task = blocks[index].label.vlTask else { continue }
+            guard let task = task(for: blocks[index].label, config: config) else { continue }
 
             progress?(0.1 + 0.9 * Double(position) / total,
                       "识别第 \(position + 1)/\(recognisable.count) 块（\(blocks[index].label.label)）")
@@ -79,8 +79,26 @@ struct VLDocumentPipeline {
         // `blocks` with the user's current preference.
         return VLDocument(
             blocks: blocks,
-            markdown: PPDocumentAssembler.markdown(from: blocks, dropPageFurniture: false),
-            plainText: PPDocumentAssembler.plainText(from: blocks, dropPageFurniture: false))
+            markdown: PPDocumentAssembler.markdown(from: blocks),
+            plainText: PPDocumentAssembler.plainText(from: blocks))
+    }
+
+    /// The prompt for a region, or nil when the switches say to leave it alone.
+    ///
+    /// Mirrors PaddleOCR's own module switches: a chart is only transcribed
+    /// when chart recognition is on — otherwise it is a picture, which is the
+    /// reference default — and the same for seals and text inside figures.
+    private func task(for label: PPLayoutLabel, config: VLConfig) -> VLTask? {
+        switch label {
+        case .chart:
+            return config.useChartRecognition ? .chart : nil
+        case .seal:
+            return config.useSealRecognition ? .seal : nil
+        case .image, .headerImage, .footerImage:
+            return config.useImageTextRecognition ? .ocr : nil
+        default:
+            return label.vlTask
+        }
     }
 
     /// `use_layout_detection=False`: the whole page, one prompt, one pass.

@@ -489,6 +489,11 @@ struct SettingsView: View {
                         .foregroundStyle(.orange)
                 }
 
+                valueSlider("区域外扩系数", value: $vm.vlConfig.cropUnclipRatio,
+                            range: 1.0...1.3, step: 0.01,
+                            hint: "裁剪每个版面区域时向外扩张的比例。贴着文字裁会切掉笔画边缘，"
+                                + "模型因此漏字；对应官方的 unclip_ratio")
+
                 if !vm.vlConfig.useLayoutDetection {
                     Divider().padding(.vertical, 2)
                     Picker("整页提示词", selection: $vm.vlConfig.wholeImageTask) {
@@ -498,6 +503,38 @@ struct SettingsView: View {
                     }
                     hint(vm.vlConfig.wholeImageTask.hint)
                 }
+            }
+        }
+
+        settingSection("识别模块") {
+            VStack(alignment: .leading, spacing: 10) {
+                toggleRow(isOn: $vm.vlConfig.useChartRecognition,
+                          title: "图表识别",
+                          subtitle: "把柱状图、折线图读成数据表格。官方默认关闭——图上只画了形状，"
+                                  + "读出来的数字是模型的估计")
+                toggleRow(isOn: $vm.vlConfig.useSealRecognition,
+                          title: "印章识别",
+                          subtitle: "读出印章上的弧形文字")
+                toggleRow(isOn: $vm.vlConfig.useImageTextRecognition,
+                          title: "图片文字识别",
+                          subtitle: "连图片区域里的文字也读出来；关闭时图片只作为插图保留")
+                hint("关闭的模块对应的区域仍会出现在预览里，只是不送去识别。")
+            }
+        }
+
+        settingSection("采样参数") {
+            VStack(alignment: .leading, spacing: 12) {
+                valueSlider("重复抑制强度", value: $vm.vlConfig.repetitionPenalty,
+                            range: 1.0...1.5, step: 0.05,
+                            hint: "大于 1 时，已经输出过的词更不容易再次出现。遇到整段重复可以调到 1.05–1.15")
+                valueSlider("识别稳定性（temperature）", value: $vm.vlConfig.temperature,
+                            range: 0...1.0, step: 0.05,
+                            hint: "0 表示每次都选最有把握的那个词，也是官方默认；调高会引入随机性，"
+                                + "对转写任务通常没有好处")
+                valueSlider("结果可信范围（top-p）", value: $vm.vlConfig.topP,
+                            range: 0.1...1.0, step: 0.05,
+                            hint: "只在 temperature 大于 0 时生效：从累计概率达到该值的候选里采样")
+                hint("与 PaddleOCR 官方的三个采样参数一一对应，默认值也相同（1.00 / 0.00 / 1.0）。")
             }
         }
 
@@ -553,14 +590,26 @@ struct SettingsView: View {
                 noticeBox("文本后处理仅影响新识别的结果，不会修改已有内容。", tint: .accentColor)
             }
 
-            settingSection("页眉页脚") {
-                VStack(alignment: .leading, spacing: 10) {
-                    toggleRow(isOn: $vm.dropPageFurniture,
-                              title: "从结果中去掉页眉、页脚与页码",
-                              subtitle: "这些内容每页重复，通常只是噪音")
-                    hint("这些区域始终会被识别，也始终画在预览里（灰色框），这里只决定它们要不要进入"
-                         + "文本和 Markdown。改动立刻生效，不需要重新识别；多页 PDF 例外，"
-                         + "它的正文在识别时就已经逐页拼好了。")
+            settingSection("辅助内容解析") {
+                VStack(alignment: .leading, spacing: 8) {
+                    hint("页眉、页脚、页码这类内容会被版面模型认出来并默认过滤掉；"
+                         + "打开某一项表示把它保留在结果里。与 PaddleOCR 官方的「辅助内容解析」一一对应。")
+                    ForEach(PPLayoutLabel.auxiliary, id: \.rawValue) { label in
+                        Toggle(isOn: Binding(
+                            get: { vm.keptAuxiliary.contains(label) },
+                            set: { vm.setAuxiliary(label, kept: $0) })) {
+                            HStack(spacing: 6) {
+                                Text(label.label).font(.callout)
+                                Text(label.rawName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    Divider().padding(.vertical, 2)
+                    hint("这些区域始终会被识别，也始终画在预览里（被过滤的画成虚线框），"
+                         + "这里只决定它们要不要进入文本和 Markdown。改动立刻生效，不需要重新识别；"
+                         + "多页 PDF 例外，它的正文在识别时就已经逐页拼好了。")
                 }
             }
 

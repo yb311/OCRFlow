@@ -75,6 +75,13 @@ struct ItemDetailView: View {
     /// the other way round. Clicking a box to find out what was read out of it
     /// is the first thing anyone tries.
     @State private var selection: PreviewSelection?
+    /// What the pointer is over right now — the transient counterpart to
+    /// `selection`. Pointing at a paragraph on the page lights up its text, and
+    /// pointing at the text lights up the paragraph.
+    @State private var hovered: PreviewSelection?
+    /// True while the pointer is on the page rather than in the document, which
+    /// is when it is worth scrolling the document to keep up.
+    @State private var hoveringPage = false
 
     /// The parsed document behind the Markdown pane, plus the figure crops it
     /// needs. Both are rebuilt only when the result itself changes: parsing and
@@ -177,18 +184,24 @@ struct ItemDetailView: View {
                     .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
                     .help(vm.showTextBoxes ? "隐藏识别框" : "显示识别框（文本行与版面区域）")
 
-                    if hasPageFurniture {
-                        Button {
-                            vm.dropPageFurniture.toggle()
+                    // The auxiliary regions this page actually has, each one
+                    // switchable from here: the decision is about what is on
+                    // the page in front of you, so it belongs next to it.
+                    let auxiliary = presentAuxiliaryLabels
+                    if !auxiliary.isEmpty {
+                        Menu {
+                            ForEach(auxiliary, id: \.rawValue) { label in
+                                Toggle(label.label, isOn: Binding(
+                                    get: { vm.keptAuxiliary.contains(label) },
+                                    set: { vm.setAuxiliary(label, kept: $0) }))
+                            }
                         } label: {
-                            Image(systemName: vm.dropPageFurniture
-                                  ? "text.badge.minus" : "text.badge.checkmark")
+                            Image(systemName: vm.droppedLabels.isDisjoint(with: auxiliary)
+                                  ? "text.badge.checkmark" : "text.badge.minus")
                         }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(vm.dropPageFurniture ? Color.secondary : Color.accentColor)
-                        .help(vm.dropPageFurniture
-                              ? "当前：页眉/页脚/页码不进入结果（预览中以虚线标出）。点击改为保留"
-                              : "当前：页眉/页脚/页码保留在结果中。点击改为丢弃")
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help("这一页上的页眉/页脚/页码等辅助内容要不要写进结果（虚线框表示已排除）")
                     }
                     Divider().frame(height: 14)
                 }
@@ -254,12 +267,14 @@ struct ItemDetailView: View {
                                     LayoutBlockOverlay(blocks: item.layoutBlocks,
                                                        imageSize: item.pixelSize,
                                                        selected: selectedBlockIndex,
-                                                       dimsPageFurniture: vm.dropPageFurniture)
+                                                       highlighted: hoveredBlockIndex,
+                                                       dropped: vm.droppedLabels)
                                 }
                                 if showsOverlays, !item.textLines.isEmpty {
                                     TextBoxOverlay(lines: item.textLines,
                                                    imageSize: item.pixelSize,
-                                                   selected: selectedLineIndex)
+                                                   selected: selectedLineIndex,
+                                                   highlighted: hoveredLineIndex)
                                 }
                             }
                             // Declared before the single tap so a double click
@@ -271,9 +286,21 @@ struct ItemDetailView: View {
                                 withAnimation(.easeOut(duration: 0.15)) {
                                     selection = hitTest(point, renderedSize: size)
                                 }
-                                if selection != nil, resultPane != .regions,
-                                   availablePanes.contains(.regions) {
-                                    resultPane = .regions
+                            }
+                            // Hovering is the fast way to ask "what did it read
+                            // here?" — no click, no second pane, the answer
+                            // lights up where it already is.
+                            .onContinuousHover(coordinateSpace: .local) { phase in
+                                switch phase {
+                                case let .active(point):
+                                    let size = CGSize(width: fitted.width * imageZoom,
+                                                      height: fitted.height * imageZoom)
+                                    hoveringPage = true
+                                    let hit = hitTest(point, renderedSize: size)
+                                    if hit != hovered { hovered = hit }
+                                case .ended:
+                                    hoveringPage = false
+                                    hovered = nil
                                 }
                             }
                             .padding(Self.previewInset / 2)
@@ -317,9 +344,11 @@ struct ItemDetailView: View {
         }
     }
 
-    /// True when the page has anything the 保留页眉页脚 switch would act on.
-    private var hasPageFurniture: Bool {
-        item.layoutBlocks.contains { $0.label.isPageFurniture }
+    /// The auxiliary regions this page actually contains, in the order the
+    /// settings pane lists them.
+    private var presentAuxiliaryLabels: [PPLayoutLabel] {
+        let present = Set(item.layoutBlocks.map(\.label))
+        return PPLayoutLabel.auxiliary.filter(present.contains)
     }
 
     private var selectedLineIndex: Int? {
@@ -327,7 +356,22 @@ struct ItemDetailView: View {
         return nil
     }
 
+    private var hoveredLineIndex: Int? {
+        if case let .line(index) = hovered { return index }
+        return nil
+    }
+
+    private var hoveredBlockIndex: Int? {
+        blockIndex(for: hovered)
+    }
+
     private var selectedBlockIndex: Int? {
+        blockIndex(for: selection)
+    }
+
+    /// The region a selection points into: the region itself, or the one the
+    /// selected text line sits in.
+    private func blockIndex(for selection: PreviewSelection?) -> Int? {
         if case let .block(index) = selection { return index }
         // A selected line lights up the region it belongs to as well, which is
         // what makes "this line is part of the footer" visible at a glance.
@@ -514,27 +558,57 @@ struct ItemDetailView: View {
                     switch resultPane {
                     case .regions:
                         regionList
+                    case .markdown:
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                // Rendered rather than raw: the point of layout
+                                // analysis is the structure it recovers, so
+                                // headings, tables and figures should look like
+                                // headings, tables and figures — and each of
+                                // them still knows which part of the page it
+                                // was read from.
+                                MarkdownDocumentView(
+                                    blocks: renderedBlocks,
+                                    figures: figures,
+                                    showFigures: vm.renderFigures,
+                                    renderTables: vm.renderTables,
+                                    highlighted: hoveredBlockIndex,
+                                    selected: selectedBlockIndex,
+                                    labelForSource: { index in
+                                        item.layoutBlocks.indices.contains(index)
+                                            ? item.layoutBlocks[index].label.label : nil
+                                    },
+                                    onHover: { source in
+                                        // Only the page scrolls this pane; the
+                                        // pane moving under its own pointer
+                                        // would fight the user.
+                                        hoveringPage = false
+                                        hovered = source.map { .block($0) }
+                                    },
+                                    onTap: { source in selection = .block(source) })
+                                    .textSelection(.enabled)
+                                    .padding(16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .onChange(of: hoveredBlockIndex) { _, source in
+                                guard hoveringPage, let source,
+                                      let target = renderedBlocks.first(where: { $0.sourceBlock == source })
+                                else { return }
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(target.id, anchor: .center)
+                                }
+                            }
+                        }
+                        .task(id: renderKey) { await refreshDocument() }
                     default:
                         ScrollView {
                             Group {
-                                switch resultPane {
-                                case .markdown:
-                                    // Rendered rather than raw: the point of
-                                    // layout analysis is the structure it
-                                    // recovers, so headings, tables and figures
-                                    // should look like headings, tables and
-                                    // figures.
-                                    MarkdownDocumentView(blocks: renderedBlocks,
-                                                         figures: figures,
-                                                         showFigures: vm.renderFigures,
-                                                         renderTables: vm.renderTables)
-                                        .textSelection(.enabled)
-                                case .source:
+                                if resultPane == .source {
                                     Text(item.markdown)
                                         .font(.system(.callout, design: .monospaced))
                                         .textSelection(.enabled)
                                         .lineSpacing(3)
-                                default:
+                                } else {
                                     Text(item.ocrText)
                                         .font(.body)
                                         .textSelection(.enabled)
@@ -543,10 +617,6 @@ struct ItemDetailView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .task(id: renderKey) {
-                            renderedBlocks = MDParser.parse(item.markdown)
-                            figures = DocumentFigures.crops(for: item)
                         }
                     }
                 }
@@ -626,8 +696,8 @@ struct ItemDetailView: View {
 
     @ViewBuilder
     private func regionRow(_ row: RegionRow) -> some View {
-        let isSelected = selection == row.id
-        let isDropped = vm.dropPageFurniture && (row.label?.isPageFurniture ?? false)
+        let isSelected = selection == row.id || hovered == row.id
+        let isDropped = row.label.map(vm.droppedLabels.contains) ?? false
 
         HStack(alignment: .top, spacing: 8) {
             if let label = row.label {
@@ -666,6 +736,10 @@ struct ItemDetailView: View {
         .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { selection = isSelected ? nil : row.id }
+        .onHover { inside in
+            hoveringPage = false
+            hovered = inside ? row.id : nil
+        }
         .contextMenu {
             Button("复制这一行") {
                 NSPasteboard.general.clearContents()
@@ -682,10 +756,16 @@ struct ItemDetailView: View {
         resultPane = panes.first ?? .plain
     }
 
+    private func refreshDocument() async {
+        renderedBlocks = MDParser.parse(fragments: vm.documentFragments(for: item))
+        figures = DocumentFigures.crops(for: item)
+    }
+
     /// Changes whenever the pane has a different document to show — a new
-    /// selection, or a result that has just finished.
+    /// selection, a result that has just finished, or the page-furniture switch
+    /// having added or removed regions.
     private var renderKey: String {
-        "\(item.id)#\(item.markdown.count)#\(item.layoutBlocks.count)"
+        "\(item.id)#\(item.markdown.count)#\(item.layoutBlocks.count)#\(vm.keptAuxiliary.count)"
     }
 
     private func statusPlaceholder(icon: String, title: String, subtitle: String, color: Color) -> some View {
@@ -718,6 +798,8 @@ struct TextBoxOverlay: View {
     /// The line the result list is pointing at, drawn to stand out from the
     /// rest the way a selection should.
     var selected: Int?
+    /// The line under the pointer, lit more softly than a selection.
+    var highlighted: Int?
 
     var body: some View {
         GeometryReader { geo in
@@ -736,10 +818,13 @@ struct TextBoxOverlay: View {
                         for p in points.dropFirst() { path.addLine(to: p) }
                         path.closeSubpath()
                         let isSelected = index == selected
-                        let tint = isSelected ? Color.accentColor : Self.color(for: line.confidence)
-                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.34 : 0.14)))
-                        context.stroke(path, with: .color(tint.opacity(isSelected ? 1 : 0.9)),
-                                       lineWidth: isSelected ? 2.5 : 1)
+                        let isHovered = index == highlighted
+                        let lit = isSelected || isHovered
+                        let tint = lit ? Color.accentColor : Self.color(for: line.confidence)
+                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.34
+                                                                    : isHovered ? 0.22 : 0.14)))
+                        context.stroke(path, with: .color(tint.opacity(lit ? 1 : 0.9)),
+                                       lineWidth: isSelected ? 2.5 : isHovered ? 2 : 1)
                     }
                 }
             }
@@ -772,10 +857,13 @@ struct LayoutBlockOverlay: View {
     let blocks: [PPLayoutBlock]
     let imageSize: CGSize
     var selected: Int?
+    /// The region under the pointer, wherever the pointer is: on the page, or
+    /// on the text that came out of it.
+    var highlighted: Int?
     /// Draw the regions that are being left out of the document as dashed
     /// outlines, so "these three boxes are the ones being dropped" is something
     /// the page itself shows rather than something the settings claim.
-    var dimsPageFurniture = false
+    var dropped: Set<PPLayoutLabel> = []
 
     var body: some View {
         GeometryReader { geo in
@@ -790,22 +878,30 @@ struct LayoutBlockOverlay: View {
                                           width: block.rect.width * sx,
                                           height: block.rect.height * sy)
                         let isSelected = index == selected
-                        let isDropped = dimsPageFurniture && block.label.isPageFurniture
-                        let tint = isSelected ? Color.accentColor : Self.color(for: block.label)
+                        let isHovered = index == highlighted
+                        let lit = isSelected || isHovered
+                        let isDropped = dropped.contains(block.label)
+                        let tint = lit ? Color.accentColor : Self.color(for: block.label)
                         let path = Path(roundedRect: rect, cornerRadius: 2)
 
                         context.fill(path, with: .color(tint.opacity(isSelected ? 0.22
+                                                                    : isHovered ? 0.16
                                                                     : isDropped ? 0.04 : 0.10)))
                         context.stroke(path, with: .color(tint.opacity(isDropped ? 0.6 : 0.85)),
-                                       style: StrokeStyle(lineWidth: isSelected ? 3 : 1.5,
+                                       style: StrokeStyle(lineWidth: isSelected ? 3 : isHovered ? 2.5 : 1.5,
                                                           dash: isDropped ? [4, 3] : []))
 
+                        // The reading-order number normally; the region's name
+                        // once it is under the pointer, which is the thing
+                        // worth knowing at that moment.
+                        let caption = lit ? "\(block.readingOrder + 1) \(block.label.label)"
+                                          : "\(block.readingOrder + 1)"
                         var badge = context.resolve(
-                            Text("\(block.readingOrder + 1)")
+                            Text(caption)
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(.white))
                         badge.shading = .color(.white)
-                        let size = badge.measure(in: rect.size)
+                        let size = badge.measure(in: CGSize(width: 200, height: rect.height))
                         let chip = CGRect(x: rect.minX, y: rect.minY,
                                           width: size.width + 8, height: size.height + 4)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),

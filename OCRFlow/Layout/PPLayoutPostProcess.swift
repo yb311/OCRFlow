@@ -21,9 +21,11 @@ enum PPLayoutPostProcess {
     static func clean(_ blocks: [PPLayoutBlock],
                       keys: [Float],
                       nmsThreshold: Double = 0.5,
+                      crossClassThreshold: Double = 0.7,
                       containmentThreshold: Double = 0.8) -> (blocks: [PPLayoutBlock], keys: [Float]) {
         var kept = Array(blocks.indices)
-        kept = survivingNMS(kept, blocks: blocks, threshold: nmsThreshold)
+        kept = survivingNMS(kept, blocks: blocks, threshold: nmsThreshold,
+                            crossClassThreshold: crossClassThreshold)
         kept = survivingContainment(kept, blocks: blocks, threshold: containmentThreshold)
         let order = Set(kept)
         // The reading-order keys are positional, so they have to be filtered in
@@ -35,18 +37,24 @@ enum PPLayoutPostProcess {
 
     // MARK: - Non-maximum suppression
 
-    /// Drops the lower-scoring of two boxes of the same class that describe the
-    /// same region.
+    /// Drops the lower-scoring of two boxes that describe the same region.
+    ///
+    /// Two boxes of the same class need only overlap moderately to be the same
+    /// thing said twice. Two boxes of *different* classes have to be all but
+    /// identical before one is dropped — but they do have to be dropped: a
+    /// byline read once as a title and once as body text is one line of the
+    /// page, and printing it twice is worse than printing it under the wrong
+    /// name.
     static func survivingNMS(_ candidates: [Int], blocks: [PPLayoutBlock],
-                             threshold: Double) -> [Int] {
+                             threshold: Double, crossClassThreshold: Double) -> [Int] {
         let byScore = candidates.sorted { blocks[$0].score > blocks[$1].score }
         var kept: [Int] = []
         for index in byScore {
             let box = blocks[index].rect
             let label = blocks[index].label
             let duplicate = kept.contains { other in
-                blocks[other].label == label
-                    && intersectionOverUnion(box, blocks[other].rect) > threshold
+                let limit = blocks[other].label == label ? threshold : crossClassThreshold
+                return intersectionOverUnion(box, blocks[other].rect) > limit
             }
             if !duplicate { kept.append(index) }
         }
