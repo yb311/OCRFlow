@@ -752,10 +752,10 @@ struct TextBoxOverlay: View {
                         let isHovered = index == highlighted
                         let lit = isSelected || isHovered
                         let tint = Self.color(for: line.confidence)
-                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.34
-                                                                    : isHovered ? 0.22 : 0.14)))
-                        context.stroke(path, with: .color(tint.opacity(lit ? 1 : 0.9)),
-                                       lineWidth: isSelected ? 2.5 : isHovered ? 2 : 1)
+                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.28
+                                                                    : isHovered ? 0.18 : 0.10)))
+                        context.stroke(path, with: .color(tint.opacity(lit ? 0.95 : 0.75)),
+                                       lineWidth: isSelected ? 1.5 : isHovered ? 1.2 : 0.75)
                     }
                 }
             }
@@ -826,11 +826,11 @@ struct LayoutBlockOverlay: View {
                         let tint = Self.color(for: block.label)
                         let path = Path(roundedRect: rect, cornerRadius: 2)
 
-                        context.fill(path, with: .color(tint.opacity(lit ? 0.22
-                                                                    : isDropped ? 0.04 : 0.10)))
-                        context.stroke(path, with: .color(tint.opacity(isDropped && !lit ? 0.6 : 0.9)),
-                                       style: StrokeStyle(lineWidth: isSelected ? 3 : isHovered ? 2.5 : 1.5,
-                                                          dash: isDropped ? [4, 3] : []))
+                        context.fill(path, with: .color(tint.opacity(lit ? 0.18
+                                                                    : isDropped ? 0.04 : 0.08)))
+                        context.stroke(path, with: .color(tint.opacity(isDropped && !lit ? 0.55 : 0.8)),
+                                       style: StrokeStyle(lineWidth: isSelected ? 1.75 : isHovered ? 1.4 : 0.75,
+                                                          dash: isDropped ? [3, 2.5] : []))
 
                         let caption = lit || !showsAll
                             ? "\(block.readingOrder + 1) \(block.label.label)"
