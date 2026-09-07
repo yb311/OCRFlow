@@ -105,36 +105,6 @@ struct ItemDetailView: View {
         case block(Int)
     }
 
-    /// What the pointer is over, in words: the region's kind, how sure the
-    /// model was, and what it read there.
-    ///
-    /// This is what the 逐块 pane used to be for. A list of every line was a
-    /// poor way to answer "what did it make of *this*" — you had to find the
-    /// row — so the answer now appears where the question is asked.
-    struct HoverReading: Equatable {
-        var label: PPLayoutLabel?
-        var confidence: Double
-        var text: String
-        var isDropped = false
-    }
-
-    private var hoverReading: HoverReading? {
-        switch hovered {
-        case let .line(index):
-            guard item.textLines.indices.contains(index) else { return nil }
-            let line = item.textLines[index]
-            return HoverReading(label: blockLabel(containing: line.boundingBox),
-                                confidence: line.confidence, text: line.text)
-        case let .block(index):
-            guard item.layoutBlocks.indices.contains(index) else { return nil }
-            let block = item.layoutBlocks[index]
-            return HoverReading(label: block.label, confidence: block.score, text: block.text,
-                                isDropped: vm.droppedLabels.contains(block.label))
-        case nil:
-            return nil
-        }
-    }
-
     private func blockLabel(containing rect: CGRect) -> PPLayoutLabel? {
         item.layoutBlocks
             .filter { $0.rect.intersects(rect) }
@@ -180,11 +150,13 @@ struct ItemDetailView: View {
                         vm.showTextBoxes.toggle()
                     } label: {
                         Image(systemName: vm.showTextBoxes
-                              ? "viewfinder.circle.fill" : "viewfinder.circle")
+                              ? "square.grid.3x3.fill" : "square.grid.3x3")
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
-                    .help(vm.showTextBoxes ? "隐藏识别框" : "显示识别框（文本行与版面区域）")
+                    .help(vm.showTextBoxes
+                          ? "显示全部标注（关闭后只显示指向的那一块）"
+                          : "只显示指向的那一块（打开可一次看到全部标注）")
 
                     // The auxiliary regions this page actually has, each one
                     // switchable from here: the decision is about what is on
@@ -264,19 +236,23 @@ struct ItemDetailView: View {
                             .frame(width: fitted.width * imageZoom,
                                    height: fitted.height * imageZoom)
                             .overlay {
-                                // Only a finished run's boxes belong on the image.
-                                if showsOverlays, !item.layoutBlocks.isEmpty {
+                                // Only a finished run's boxes belong on the
+                                // image. With the toggle off they appear one at
+                                // a time, under the pointer.
+                                if item.status == .completed, !item.layoutBlocks.isEmpty {
                                     LayoutBlockOverlay(blocks: item.layoutBlocks,
                                                        imageSize: item.pixelSize,
                                                        selected: selectedBlockIndex,
                                                        highlighted: hoveredBlockIndex,
+                                                       showsAll: vm.showTextBoxes,
                                                        dropped: vm.droppedLabels)
                                 }
-                                if showsOverlays, !item.textLines.isEmpty {
+                                if item.status == .completed, !item.textLines.isEmpty {
                                     TextBoxOverlay(lines: item.textLines,
                                                    imageSize: item.pixelSize,
                                                    selected: selectedLineIndex,
-                                                   highlighted: hoveredLineIndex)
+                                                   highlighted: hoveredLineIndex,
+                                                   showsAll: vm.showTextBoxes)
                                 }
                             }
                             // Declared before the single tap so a double click
@@ -325,13 +301,6 @@ struct ItemDetailView: View {
                             }
                             .onEnded { _ in zoomAtGestureStart = nil }
                     )
-                }
-                .overlay(alignment: .bottom) {
-                    if let reading = hoverReading {
-                        hoverReadout(reading)
-                            .padding(10)
-                            .transition(.opacity)
-                    }
                 }
             } else {
                 VStack(spacing: 12) {
@@ -420,44 +389,6 @@ struct ItemDetailView: View {
         // A click on blank paper clears the selection rather than keeping a
         // highlight the user has moved on from.
         return nil
-    }
-
-    /// A strip along the bottom of the preview saying what is under the
-    /// pointer. Fixed in place rather than following the cursor: it has to be
-    /// readable, and a card that moves while you read it is not.
-    private func hoverReadout(_ reading: HoverReading) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            if let label = reading.label {
-                Text(label.label)
-                    .font(.caption2)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(LayoutBlockOverlay.color(for: label).opacity(0.18), in: Capsule())
-                    .foregroundStyle(LayoutBlockOverlay.color(for: label))
-                    .fixedSize()
-            }
-            Text(reading.text.isEmpty ? "（无文字）" : reading.text)
-                .font(.caption)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if reading.isDropped {
-                Text("已排除")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .fixedSize()
-            }
-            Text("\(Int((reading.confidence * 100).rounded()))%")
-                .font(.caption2)
-                .monospacedDigit()
-                .foregroundStyle(TextBoxOverlay.color(for: reading.confidence))
-                .fixedSize()
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-        .allowsHitTesting(false)
     }
 
     private static let previewInset: CGFloat = 32
@@ -623,6 +554,11 @@ struct ItemDetailView: View {
                                         item.layoutBlocks.indices.contains(index)
                                             ? item.layoutBlocks[index].label.label : nil
                                     },
+                                    colorForSource: { index in
+                                        item.layoutBlocks.indices.contains(index)
+                                            ? LayoutBlockOverlay.color(for: item.layoutBlocks[index].label)
+                                            : nil
+                                    },
                                     onHover: { source in
                                         // Only the page scrolls this pane; the
                                         // pane moving under its own pointer
@@ -778,6 +714,8 @@ struct TextBoxOverlay: View {
     var selected: Int?
     /// The line under the pointer, lit more softly than a selection.
     var highlighted: Int?
+    /// Draw every line, or only the one being pointed at.
+    var showsAll = true
 
     var body: some View {
         GeometryReader { geo in
@@ -786,7 +724,8 @@ struct TextBoxOverlay: View {
                 Canvas { context, _ in
                     let sx = fitted.width / imageSize.width
                     let sy = fitted.height / imageSize.height
-                    for (index, line) in lines.enumerated() {
+                    for (index, line) in lines.enumerated()
+                    where showsAll || index == highlighted || index == selected {
                         let points = line.quad.map {
                             CGPoint(x: fitted.minX + $0.x * sx, y: fitted.minY + $0.y * sy)
                         }
@@ -798,7 +737,7 @@ struct TextBoxOverlay: View {
                         let isSelected = index == selected
                         let isHovered = index == highlighted
                         let lit = isSelected || isHovered
-                        let tint = lit ? Color.accentColor : Self.color(for: line.confidence)
+                        let tint = Self.color(for: line.confidence)
                         context.fill(path, with: .color(tint.opacity(isSelected ? 0.34
                                                                     : isHovered ? 0.22 : 0.14)))
                         context.stroke(path, with: .color(tint.opacity(lit ? 1 : 0.9)),
@@ -838,9 +777,11 @@ struct LayoutBlockOverlay: View {
     /// The region under the pointer, wherever the pointer is: on the page, or
     /// on the text that came out of it.
     var highlighted: Int?
-    /// Draw the regions that are being left out of the document as dashed
-    /// outlines, so "these three boxes are the ones being dropped" is something
-    /// the page itself shows rather than something the settings claim.
+    /// Draw every region, or only the one being pointed at. Off, the page is
+    /// the page and a box appears where you look; on, the whole analysis is
+    /// visible at once.
+    var showsAll = true
+    /// Regions being left out of the document, drawn dashed.
     var dropped: Set<PPLayoutLabel> = []
 
     var body: some View {
@@ -850,7 +791,13 @@ struct LayoutBlockOverlay: View {
                 Canvas { context, _ in
                     let sx = fitted.width / imageSize.width
                     let sy = fitted.height / imageSize.height
-                    for (index, block) in blocks.enumerated() {
+                    // Chips are placed after the boxes so a label is never
+                    // hidden under the next region's outline, and each one is
+                    // put where it does not sit on top of another.
+                    var placed: [CGRect] = []
+
+                    for index in visibleIndices {
+                        let block = blocks[index]
                         let rect = CGRect(x: fitted.minX + block.rect.minX * sx,
                                           y: fitted.minY + block.rect.minY * sy,
                                           width: block.rect.width * sx,
@@ -859,37 +806,70 @@ struct LayoutBlockOverlay: View {
                         let isHovered = index == highlighted
                         let lit = isSelected || isHovered
                         let isDropped = dropped.contains(block.label)
-                        let tint = lit ? Color.accentColor : Self.color(for: block.label)
+                        // The colour says what the region *is*, in the preview
+                        // and in the text alike; being pointed at makes it
+                        // heavier, not a different colour.
+                        let tint = Self.color(for: block.label)
                         let path = Path(roundedRect: rect, cornerRadius: 2)
 
-                        context.fill(path, with: .color(tint.opacity(isSelected ? 0.22
-                                                                    : isHovered ? 0.16
+                        context.fill(path, with: .color(tint.opacity(lit ? 0.22
                                                                     : isDropped ? 0.04 : 0.10)))
-                        context.stroke(path, with: .color(tint.opacity(isDropped ? 0.6 : 0.85)),
+                        context.stroke(path, with: .color(tint.opacity(isDropped && !lit ? 0.6 : 0.9)),
                                        style: StrokeStyle(lineWidth: isSelected ? 3 : isHovered ? 2.5 : 1.5,
                                                           dash: isDropped ? [4, 3] : []))
 
-                        // The reading-order number normally; the region's name
-                        // once it is under the pointer, which is the thing
-                        // worth knowing at that moment.
-                        let caption = lit ? "\(block.readingOrder + 1) \(block.label.label)"
-                                          : "\(block.readingOrder + 1)"
+                        let caption = lit || !showsAll
+                            ? "\(block.readingOrder + 1) \(block.label.label)"
+                            : "\(block.readingOrder + 1)"
                         var badge = context.resolve(
                             Text(caption)
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(.white))
                         badge.shading = .color(.white)
-                        let size = badge.measure(in: CGSize(width: 200, height: rect.height))
-                        let chip = CGRect(x: rect.minX, y: rect.minY,
-                                          width: size.width + 8, height: size.height + 4)
+                        let size = badge.measure(in: CGSize(width: 240, height: rect.height))
+                        let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
+                                                                             height: size.height + 4),
+                                                      avoiding: placed, within: fitted)
+                        placed.append(chip)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),
-                                     with: .color(tint.opacity(isDropped ? 0.5 : 1)))
+                                     with: .color(tint.opacity(isDropped && !lit ? 0.5 : 1)))
                         context.draw(badge, at: CGPoint(x: chip.midX, y: chip.midY), anchor: .center)
                     }
                 }
             }
         }
         .allowsHitTesting(false)
+    }
+
+    /// Which regions to draw: all of them, or just the one being pointed at.
+    private var visibleIndices: [Int] {
+        guard !showsAll else { return Array(blocks.indices) }
+        return [highlighted, selected].compactMap { $0 }.filter(blocks.indices.contains)
+    }
+
+    /// Somewhere for the label that is not on top of another label.
+    ///
+    /// A page with regions packed against each other stacks its numbers into an
+    /// unreadable pile otherwise. The corners are tried in turn and the first
+    /// free one wins; if the region is boxed in on all four, the label goes
+    /// where it belongs and overlaps, which is at least predictable.
+    static func chipPlacement(for rect: CGRect, size: CGSize,
+                              avoiding placed: [CGRect], within bounds: CGRect) -> CGRect {
+        let candidates = [
+            CGPoint(x: rect.minX, y: rect.minY),                                  // inside top left
+            CGPoint(x: rect.maxX - size.width, y: rect.minY),                     // inside top right
+            CGPoint(x: rect.minX, y: rect.maxY - size.height),                    // inside bottom left
+            CGPoint(x: rect.maxX - size.width, y: rect.maxY - size.height),       // inside bottom right
+            CGPoint(x: rect.minX, y: rect.minY - size.height - 1),                // just above
+            CGPoint(x: rect.minX, y: rect.maxY + 1),                              // just below
+            CGPoint(x: rect.minX - size.width - 1, y: rect.minY),                 // just left
+        ]
+        for origin in candidates {
+            let chip = CGRect(origin: origin, size: size)
+            guard bounds.contains(chip) else { continue }
+            if !placed.contains(where: { $0.intersects(chip) }) { return chip }
+        }
+        return CGRect(origin: candidates[0], size: size)
     }
 
     /// Colour by what the block is, so a page's structure reads at a glance.

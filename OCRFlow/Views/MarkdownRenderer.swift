@@ -571,6 +571,8 @@ struct MarkdownDocumentView: View {
     var selected: Int?
     /// What the region is called, for the tag shown beside it.
     var labelForSource: (Int) -> String? = { _ in nil }
+    /// What the region *is*, so the text matches its box in the preview.
+    var colorForSource: (Int) -> Color? = { _ in nil }
     var onHover: (Int?) -> Void = { _ in }
     var onTap: (Int) -> Void = { _ in }
     /// What the model read out of a region, and where a correction goes.
@@ -579,70 +581,116 @@ struct MarkdownDocumentView: View {
 
     @State private var editing: Int?
     @State private var draft = ""
+    /// Formula regions currently showing their LaTeX instead of their maths.
+    @State private var showsSource: Set<Int> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(blocks) { block in
-                let isLit = block.sourceBlock != nil
-                    && (block.sourceBlock == highlighted || block.sourceBlock == selected)
+                let source = block.sourceBlock
+                let isLit = source != nil && (source == highlighted || source == selected)
+                let tint = source.flatMap(colorForSource) ?? .accentColor
                 Group {
                     // While a region is being corrected its own markup is set
                     // aside: what is edited is what the model actually wrote,
                     // not the rendering of it.
-                    if let source = block.sourceBlock, editing == source,
-                       isFirstBlock(of: source, block) {
+                    if let source, editing == source, isFirstBlock(of: source, block) {
                         correctionEditor(for: source)
-                    } else if block.sourceBlock == editing, editing != nil {
+                    } else if source == editing, editing != nil {
+                        EmptyView()
+                    } else if let source, showsSource.contains(source),
+                              isFirstBlock(of: source, block), let latex = textForSource(source) {
+                        // The LaTeX behind a formula, shown in place of it
+                        // rather than beneath it — one thing at a time.
+                        Text(latex)
+                            .font(.system(.callout, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if let source, showsSource.contains(source), source == block.sourceBlock,
+                              !isFirstBlock(of: source, block) {
                         EmptyView()
                     } else {
                         view(for: block)
                     }
                 }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background {
-                        // The page and the document are two views of the same
-                        // thing; pointing at one lights up the other.
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.accentColor.opacity(isLit ? 0.10 : 0))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 5)
-                                    .strokeBorder(Color.accentColor.opacity(isLit ? 0.55 : 0),
-                                                  lineWidth: 1)
-                            }
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if isLit, let source = block.sourceBlock, editing == nil {
-                            HStack(spacing: 4) {
-                                if let name = labelForSource(source) {
-                                    Text(name)
-                                        .font(.caption2)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 1)
-                                        .background(Color.accentColor, in: Capsule())
-                                        .foregroundStyle(.white)
-                                }
-                                if onCorrect != nil, let text = textForSource(source) {
-                                    Button {
-                                        draft = text
-                                        editing = source
-                                    } label: {
-                                        Label("纠正", systemImage: "pencil").font(.caption2)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
-                                }
-                            }
-                            .offset(x: 4, y: -8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background {
+                    // The page and the document are two views of the same
+                    // thing, in the same colours: the tint is what the region
+                    // *is*, matching its box in the preview exactly.
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(tint.opacity(isLit ? 0.12 : 0))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 5)
+                                .strokeBorder(tint.opacity(isLit ? 0.7 : 0), lineWidth: 1)
                         }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isLit, let source, editing == nil, isFirstBlock(of: source, block) {
+                        blockControls(for: source, tint: tint, block: block)
+                            .offset(x: 4, y: -9)
                     }
-                    .contentShape(Rectangle())
-                    .onHover { inside in onHover(inside ? block.sourceBlock : nil) }
-                    .onTapGesture { if let source = block.sourceBlock { onTap(source) } }
-                    .id(block.id)
+                }
+                .contentShape(Rectangle())
+                .onHover { inside in onHover(inside ? source : nil) }
+                .onTapGesture { if let source { onTap(source) } }
+                .id(block.id)
             }
         }
+    }
+
+    /// The one row of controls a block gets: what it is, and what can be done
+    /// with it. Formulas do not get a panel of their own — a formula is a block
+    /// like any other, and its LaTeX is one more thing this row can show.
+    @ViewBuilder
+    private func blockControls(for source: Int, tint: Color, block: MDBlock) -> some View {
+        let isFormula = { if case .formula = block.kind { return true } else { return false } }()
+        HStack(spacing: 4) {
+            if let name = labelForSource(source) {
+                Text(name)
+                    .font(.caption2)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(tint, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+            if let text = textForSource(source) {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc").font(.caption2)
+                }
+                if isFormula {
+                    Button {
+                        if showsSource.contains(source) {
+                            showsSource.remove(source)
+                        } else {
+                            showsSource.insert(source)
+                        }
+                    } label: {
+                        Label("LaTeX", systemImage: showsSource.contains(source)
+                              ? "function" : "chevron.left.forwardslash.chevron.right")
+                            .font(.caption2)
+                    }
+                }
+                if onCorrect != nil {
+                    Button {
+                        draft = text
+                        editing = source
+                    } label: {
+                        Label("纠正", systemImage: "pencil").font(.caption2)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.mini)
+        .fixedSize()
+        .labelStyle(.titleAndIcon)
     }
 
     /// True for the first rendered block of a region, which is the one that
