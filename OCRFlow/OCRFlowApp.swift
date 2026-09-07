@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct OCRFlowApp: App {
     @StateObject private var viewModel = OCRViewModel()
+    @StateObject private var updater = UpdaterController()
 
     var body: some Scene {
         WindowGroup {
@@ -13,6 +14,13 @@ struct OCRFlowApp: App {
         .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 1100, height: 700)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("检查更新…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canCheckForUpdates)
+            }
+
             // Replaces the standard New group, which this app has no use for.
             CommandGroup(replacing: .newItem) {
                 Button("打开图片…") {
@@ -50,6 +58,7 @@ struct OCRFlowApp: App {
         Settings {
             SettingsView()
                 .environmentObject(viewModel)
+                .environmentObject(updater)
         }
 
         // Its own window rather than a sheet on top of the settings sheet:

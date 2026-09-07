@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  SPARKLE_VERSION: 2.9.6
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Derive version
+        id: version
+        run: |
+          echo "short=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          echo "build=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore llama.xcframework
+        id: llama-cache
+        uses: actions/cache@v6
+        with:
+          path: Vendor/llama.xcframework
+          key: llama-${{ hashFiles('Scripts/fetch-llama-xcframework.sh') }}
+
+      - name: Fetch llama.xcframework
+        if: steps.llama-cache.outputs.cache-hit != 'true'
+        run: Scripts/fetch-llama-xcframework.sh
+
+      - name: Restore bundled models
+        id: models-cache
+        uses: actions/cache@v6
+        with:
+          path: OCRFlow/Resources/PaddleOCR
+          key: ppocr-${{ hashFiles('Scripts/fetch-paddleocr-models.sh') }}
+
+      - name: Fetch bundled models
+        if: steps.models-cache.outputs.cache-hit != 'true'
+        run: Scripts/fetch-paddleocr-models.sh bundled
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          security find-identity -v -p codesigning "$keychain"
+
+      - name: Archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild -project OCRFlow.xcodeproj -scheme OCRFlow \
+            -configuration Release \
+            -derivedDataPath build/DerivedData \
+            -archivePath build/OCRFlow.xcarchive \
+            MARKETING_VERSION="${{ steps.version.outputs.short }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build }}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            archive
+
+      - name: Export signed app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > build/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>teamID</key>
+              <string>${APPLE_TEAM_ID}</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Developer ID Application</string>
+              <key>destination</key>
+              <string>export</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath build/OCRFlow.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export
+
+          codesign --verify --deep --strict --verbose=2 build/export/OCRFlow.app
+
+      - name: Notarize and staple the app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          ditto -c -k --keepParent build/export/OCRFlow.app build/notarize.zip
+          xcrun notarytool submit build/notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple build/export/OCRFlow.app
+
+      - name: Package the disk image and update archive
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          version="${{ steps.version.outputs.short }}"
+
+          Scripts/make-dmg.sh build/export/OCRFlow.app "build/OCRFlow-$version.dmg"
+          xcrun notarytool submit "build/OCRFlow-$version.dmg" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "build/OCRFlow-$version.dmg"
+
+          # Sparkle updates from the zip: the app inside is already stapled, so
+          # it validates offline the same way the disk image does.
+          ditto -c -k --keepParent build/export/OCRFlow.app "build/OCRFlow-$version.zip"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.short }}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "OCRFlow $version" \
+            --generate-notes \
+            "build/OCRFlow-$version.dmg" \
+            "build/OCRFlow-$version.zip"
+
+      - name: Publish the appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          version="${{ steps.version.outputs.short }}"
+
+          curl --fail --location --silent \
+            -o "$RUNNER_TEMP/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
+
+          notes="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
+          gh api --method POST /markdown \
+            -f text="$notes" -f mode=gfm -f context="$GITHUB_REPOSITORY" \
+            > build/notes.html
+
+          signature="$(printf '%s' "$SPARKLE_PRIVATE_KEY" \
+            | "$RUNNER_TEMP/sparkle/bin/sign_update" --ed-key-file - -p "build/OCRFlow-$version.zip")"
+
+          Scripts/make-appcast.sh \
+            build/export/OCRFlow.app \
+            "build/OCRFlow-$version.zip" \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/OCRFlow-$version.zip" \
+            "$signature" \
+            build/notes.html > build/appcast.xml
+
+          gh release upload "$GITHUB_REF_NAME" build/appcast.xml
+
+      - name: Clean up the keychain
+        if: always()
+        run: security delete-keychain "$SIGNING_KEYCHAIN" || true

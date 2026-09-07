@@ -33,30 +33,38 @@ A native macOS app for batch OCR (Optical Character Recognition) and document pa
 
 ### Building from source
 
-The PaddleOCR-VL engine links llama.cpp, which is fetched as a pinned prebuilt
-xcframework rather than committed:
+Two sets of binaries are fetched by script rather than committed: the pinned
+llama.cpp xcframework the PaddleOCR-VL engine links against, and the ONNX models
+that ship inside the bundle.
 
 ```bash
 Scripts/fetch-llama-xcframework.sh
+Scripts/fetch-paddleocr-models.sh bundled
 ```
 
-Run it once after cloning, before opening the Xcode project. Pass `--source` to
-build llama.cpp yourself instead (needs `cmake`).
+Run both once after cloning, before opening the Xcode project. Pass `--source`
+to the first to build llama.cpp yourself instead (needs `cmake`).
 
 ## Installation
 
 ### Option 1 — Download DMG (Recommended)
 
 1. Go to the [Releases](../../releases) page
-2. Download the latest `OCRFlow.dmg`
+2. Download the latest `OCRFlow-<version>.dmg`
 3. Open the DMG and drag **OCRFlow.app** to your Applications folder
-4. First launch: right-click the app → **Open** to bypass Gatekeeper (unsigned build)
+
+Releases are signed with a Developer ID certificate and notarised by Apple, so
+they open normally — no right-click-to-open, and no Gatekeeper warning. The app
+checks for updates on its own and can install them in place; you can also ask it
+to look via **OCRFlow → 检查更新…**.
 
 ### Option 2 — Build from Source
 
 ```bash
 git clone https://github.com/yb311/OCRFlow.git
 cd OCRFlow
+Scripts/fetch-llama-xcframework.sh
+Scripts/fetch-paddleocr-models.sh bundled
 open OCRFlow.xcodeproj
 ```
 
@@ -240,8 +248,13 @@ OCRFlow/
 │   ├── VLImageBuffer.swift            # CGImage → RGB8 for mtmd
 │   ├── VLEngine.swift                 # llama.cpp + mtmd wrapper
 │   └── VLDocumentPipeline.swift       # Layout → per-block VLM → assembly
+├── Updates/
+│   └── UpdaterController.swift        # Sparkle updater, menu and settings state
 └── Resources/PaddleOCR/      # Bundled ONNX models + character dictionary
 ```
+
+Releases are built and published by GitHub Actions; see
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Contributing
 

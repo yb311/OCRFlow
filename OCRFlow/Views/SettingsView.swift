@@ -9,6 +9,7 @@ import SwiftUI
 /// "以下设置暂不生效" banners were apologising for.
 struct SettingsView: View {
     @EnvironmentObject var vm: OCRViewModel
+    @EnvironmentObject var updater: UpdaterController
     @Environment(\.openWindow) private var openWindow
 
     /// Remembered across openings: someone who tunes thresholds keeps coming
@@ -735,6 +736,22 @@ struct SettingsView: View {
                 }
             }
 
+            settingSection("软件更新") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $updater.automaticallyChecksForUpdates,
+                              title: "自动检查更新",
+                              subtitle: "在后台向 GitHub Releases 查询新版本，下载前会先征求同意")
+                    HStack(spacing: 10) {
+                        Button("现在检查…") { updater.checkForUpdates() }
+                            .buttonStyle(.bordered)
+                            .disabled(!updater.canCheckForUpdates)
+                        Text("当前版本 \(appVersion)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             settingSection("重置") {
                 VStack(alignment: .leading, spacing: 8) {
                     Button("恢复全部默认设置…") { showResetConfirm = true }
@@ -752,6 +769,13 @@ struct SettingsView: View {
                      + "已下载的模型和列表中的文件不受影响。")
             }
         }
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
     }
 
     private var exportFormatHint: String {

@@ -64,6 +64,8 @@ case "${1:-}" in
             fetch "PP-OCRv6_${tier}_det_onnx" inference.onnx "${BUNDLED}" "PP-OCRv6_${tier}_det.onnx"
             fetch "PP-OCRv6_${tier}_rec_onnx" inference.onnx "${BUNDLED}" "PP-OCRv6_${tier}_rec.onnx"
         done
+        fetch PP-LCNet_x0_25_textline_ori_onnx inference.onnx "${BUNDLED}" PP-LCNet_x0_25_textline_ori.onnx
+        fetch PP-LCNet_x1_0_doc_ori_onnx inference.onnx "${BUNDLED}" PP-LCNet_x1_0_doc_ori.onnx
         extract_dict PP-OCRv6_tiny_rec_onnx  "${BUNDLED}" PP-OCRv6_tiny_rec_dict.txt
         extract_dict PP-OCRv6_small_rec_onnx "${BUNDLED}" ppocrv6_dict.txt
         echo "Done."

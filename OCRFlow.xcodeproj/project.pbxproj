@@ -52,6 +52,8 @@
 		B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010F /* PPLayoutPostProcess.swift */; };
 		B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A08 /* PPDocUnwarper.swift */; };
 		B100000100000000000000AC /* MathSyntax.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AC /* MathSyntax.swift */; };
+		B1000001000000000000040A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B1000010000000000000BB05 /* Sparkle */; };
+		B1000001000000000000040B /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000040B /* UpdaterController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +102,7 @@
 		B1000002000000000000010F /* PPLayoutPostProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutPostProcess.swift; sourceTree = "<group>"; };
 		B10000020000000000000A08 /* PPDocUnwarper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocUnwarper.swift; sourceTree = "<group>"; };
 		B100000200000000000000AC /* MathSyntax.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathSyntax.swift; sourceTree = "<group>"; };
+		B1000002000000000000040B /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +112,7 @@
 			files = (
 				B10000010000000000000A06 /* onnxruntime in Frameworks */,
 				B1000001000000000000030A /* llama.xcframework in Frameworks */,
+				B1000001000000000000040A /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,6 +136,7 @@
 				A1000004000000000000AA03 /* Models */,
 				A1000004000000000000AA04 /* ViewModels */,
 				A1000004000000000000AA05 /* Views */,
+				B1000004000000000000040A /* Updates */,
 				B10000040000000000000A01 /* PaddleOCR */,
 				B1000004000000000000010A /* Layout */,
 				B1000004000000000000020A /* PaddleVL */,
@@ -181,6 +186,14 @@
 				B100000200000000000000AC /* MathSyntax.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		B1000004000000000000040A /* Updates */ = {
+			isa = PBXGroup;
+			children = (
+				B1000002000000000000040B /* UpdaterController.swift */,
+			);
+			path = Updates;
 			sourceTree = "<group>";
 		};
 		B10000040000000000000A01 /* PaddleOCR */ = {
@@ -257,6 +270,7 @@
 			name = OCRFlow;
 			packageProductDependencies = (
 				B1000010000000000000AA05 /* onnxruntime */,
+				B1000010000000000000BB05 /* Sparkle */,
 			);
 			productName = OCRFlow;
 			productReference = A1000002000000000000AA00 /* OCRFlow.app */;
@@ -289,6 +303,7 @@
 			productRefGroup = A1000004000000000000AA02 /* Products */;
 			packageReferences = (
 				B10000090000000000000A04 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
+				B10000090000000000000B04 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -369,6 +384,7 @@
 				B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */,
 				B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */,
 				B100000100000000000000AC /* MathSyntax.swift in Sources */,
+				B1000001000000000000040B /* UpdaterController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -540,6 +556,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OCRFlow/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -593,6 +610,14 @@
 				version = 1.24.2;
 			};
 		};
+		B10000090000000000000B04 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -600,6 +625,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B10000090000000000000A04 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
 			productName = onnxruntime;
+		};
+		B1000010000000000000BB05 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B10000090000000000000B04 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 
