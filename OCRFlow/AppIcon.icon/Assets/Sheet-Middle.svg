@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 220 220">
+  <!-- The middle sheet. See Sheet-Back.svg for the shared canvas conventions. -->
+  <g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)">
+    <g transform="translate(-1.995 0.14) rotate(-4 110 109)">
+      <rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/>
+    </g>
+  </g>
+</svg>

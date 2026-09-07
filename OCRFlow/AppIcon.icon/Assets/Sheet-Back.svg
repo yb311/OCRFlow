@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 220 220">
+  <!-- The hindmost sheet of the stack. Icon Composer composites one layer per
+     file, so each is a full 1024pt canvas with everything else left empty.
+     The 220-unit viewBox is the grid the artwork was drawn on; it spans the
+     whole icon, and the system masks it to the platform's shape.
+
+     The outer group is the framing, and every layer carries the identical one
+     so the sheets stay registered with each other. It scales about the stack's
+     own centre — (105.745 109.497), the middle of the union of all three
+     sheets once rotated, not the middle of any one of them — and drops that
+     centre on the canvas centre. At 1.3x the outermost corner of the fan
+     clears the mask by about 7% of the canvas, so nothing is cropped and the
+     rounded corners never bite into a sheet. -->
+  <g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)">
+    <g transform="translate(-9.816 1.908) rotate(-11 110 107)">
+      <rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/>
+    </g>
+  </g>
+</svg>

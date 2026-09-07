@@ -16,6 +16,7 @@
 		A1000001000000000000AA07 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA07 /* DropZoneView.swift */; };
 		A1000001000000000000AA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA08 /* Assets.xcassets */; };
 		A1000001000000000000AA0A /* DropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0A /* DropHelper.swift */; };
+		A1000001000000000000AA0B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0B /* AppIcon.icon */; };
 		B10000010000000000000000 /* PPOCREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000000 /* PPOCREngine.swift */; };
 		B10000010000000000000001 /* PPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000001 /* PPTypes.swift */; };
 		B10000010000000000000002 /* PPModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000002 /* PPModelStore.swift */; };
@@ -65,6 +66,7 @@
 		A1000002000000000000AA08 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000002000000000000AA09 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000002000000000000AA0A /* DropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropHelper.swift; sourceTree = "<group>"; };
+		A1000002000000000000AA0B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B10000020000000000000000 /* PPOCREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPOCREngine.swift; sourceTree = "<group>"; };
 		B10000020000000000000001 /* PPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPTypes.swift; sourceTree = "<group>"; };
 		B10000020000000000000002 /* PPModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPModelStore.swift; sourceTree = "<group>"; };
@@ -135,6 +137,7 @@
 				B1000004000000000000020A /* PaddleVL */,
 				B10000040000000000000A02 /* Resources */,
 				A1000002000000000000AA08 /* Assets.xcassets */,
+				A1000002000000000000AA0B /* AppIcon.icon */,
 				A1000002000000000000AA09 /* Info.plist */,
 			);
 			path = OCRFlow;
@@ -315,6 +318,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000001000000000000AA08 /* Assets.xcassets in Resources */,
+				A1000001000000000000AA0B /* AppIcon.icon in Resources */,
 				B10000010000000000000A03 /* PaddleOCR in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
