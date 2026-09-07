@@ -523,7 +523,7 @@ enum DocumentFigures {
     /// only page one's blocks are kept.
     static func crops(for item: ImageItem) -> [NSImage?] {
         guard !item.layoutBlocks.isEmpty,
-              let page = item.thumbnail?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+              let page = item.displayImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         else { return [] }
 
         let pixel = item.pixelSize

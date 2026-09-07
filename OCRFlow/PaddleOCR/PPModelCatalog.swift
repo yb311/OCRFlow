@@ -166,6 +166,19 @@ enum PPModelCatalog {
                   localName: VLModelVariant.quantized.mmprojFileName),
         ])
 
+    /// UVDoc, the page-flattening stage. Small enough to install in seconds,
+    /// and only useful for photographs of pages rather than scans, so it is
+    /// downloaded on demand rather than shipped.
+    static let unwarpingModel = Entry(
+        id: "pp.unwarp",
+        name: "UVDoc 图片扭曲矫正",
+        detail: "把拍歪、卷曲、对折的书页展平后再识别；扫描件用不上",
+        approximateBytes: 31_000_000,
+        assets: [
+            Asset(repo: "UVDoc_onnx", remoteFile: "inference.onnx",
+                  localName: PPModelStore.unwarpingModelFileName),
+        ])
+
     /// A small file used only to check whether a source answers at all.
     /// `inference.yml` is a few kilobytes, and every mirror carries it.
     static let probeAsset = Asset(repo: "korean_PP-OCRv5_mobile_rec_onnx",
@@ -174,5 +187,7 @@ enum PPModelCatalog {
 
     static var vlEntries: [Entry] { [layoutModel, vlQuantized, vlOfficial] }
 
-    static var allEntries: [Entry] { [mediumTier] + vlEntries + languageRecognizers }
+    static var allEntries: [Entry] {
+        [mediumTier, unwarpingModel] + vlEntries + languageRecognizers
+    }
 }

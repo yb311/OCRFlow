@@ -249,7 +249,7 @@ struct ItemDetailView: View {
 
             Divider()
 
-            if let thumb = item.thumbnail {
+            if let thumb = item.displayImage {
                 GeometryReader { geo in
                     // The size the image would take at 1× — what `scaledToFit`
                     // used to work out on its own — scaled by the zoom, so the

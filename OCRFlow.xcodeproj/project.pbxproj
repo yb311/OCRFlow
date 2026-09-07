@@ -49,6 +49,7 @@
 		B1000001000000000000010E /* PPStructureAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010E /* PPStructureAssembler.swift */; };
 		B100000100000000000000AB /* MathRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AB /* MathRenderer.swift */; };
 		B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010F /* PPLayoutPostProcess.swift */; };
+		B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A08 /* PPDocUnwarper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,6 +95,7 @@
 		B1000002000000000000010E /* PPStructureAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPStructureAssembler.swift; sourceTree = "<group>"; };
 		B100000200000000000000AB /* MathRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathRenderer.swift; sourceTree = "<group>"; };
 		B1000002000000000000010F /* PPLayoutPostProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutPostProcess.swift; sourceTree = "<group>"; };
+		B10000020000000000000A08 /* PPDocUnwarper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocUnwarper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -192,6 +194,7 @@
 				B1000002000000000000000A /* PPDictionary.swift */,
 				B1000002000000000000000B /* PPModelCatalog.swift */,
 				B1000002000000000000000C /* PPModelDownloader.swift */,
+				B10000020000000000000A08 /* PPDocUnwarper.swift */,
 			);
 			path = PaddleOCR;
 			sourceTree = "<group>";
@@ -357,6 +360,7 @@
 				B1000001000000000000010E /* PPStructureAssembler.swift in Sources */,
 				B100000100000000000000AB /* MathRenderer.swift in Sources */,
 				B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */,
+				B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

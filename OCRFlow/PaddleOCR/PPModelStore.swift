@@ -23,6 +23,19 @@ enum PPModelStore {
         return base.appendingPathComponent("OCRFlow/Models", isDirectory: true)
     }
 
+    /// UVDoc's file name in the user models folder.
+    static let unwarpingModelFileName = "UVDoc.onnx"
+
+    static var isUnwarpingModelInstalled: Bool { isDownloaded(unwarpingModelFileName) }
+
+    static func resolveUnwarpingModel() throws -> URL {
+        guard let url = existingUserFile(unwarpingModelFileName) else {
+            throw PPOCRError.modelsMissing(tier: .small, missing: [unwarpingModelFileName],
+                                           searchPath: userModelsDirectory.path)
+        }
+        return url
+    }
+
     static func ensureUserModelsDirectory() {
         try? FileManager.default.createDirectory(at: userModelsDirectory,
                                                  withIntermediateDirectories: true)

@@ -384,6 +384,19 @@ struct SettingsView: View {
             }
         }
 
+        settingSection("图像预处理") {
+            VStack(alignment: .leading, spacing: 10) {
+                toggleRow(isOn: $vm.useDocUnwarping,
+                          title: "图片扭曲矫正",
+                          subtitle: "拍歪、卷曲、对折的书页先展平再识别。扫描件不需要，"
+                                  + "开启后预览显示的是展平后的页面")
+                if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
+                    inlineDownloadRow(PPModelCatalog.unwarpingModel)
+                }
+                hint("对应 PaddleOCR 的 use_doc_unwarping，两个引擎都会用到。")
+            }
+        }
+
         settingSection("方向校正") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.paddleConfig.useDocOrientation,
@@ -473,6 +486,18 @@ struct SettingsView: View {
                 }
                 ForEach(PPModelCatalog.vlEntries.filter { !$0.isInstalled }) { entry in
                     inlineDownloadRow(entry)
+                }
+            }
+        }
+
+        settingSection("图像预处理") {
+            VStack(alignment: .leading, spacing: 10) {
+                toggleRow(isOn: $vm.useDocUnwarping,
+                          title: "图片扭曲矫正",
+                          subtitle: "拍歪、卷曲、对折的书页先展平再识别。扫描件不需要，"
+                                  + "开启后预览显示的是展平后的页面")
+                if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
+                    inlineDownloadRow(PPModelCatalog.unwarpingModel)
                 }
             }
         }

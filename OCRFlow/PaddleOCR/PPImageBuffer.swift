@@ -78,6 +78,28 @@ final class PPImageBuffer {
     /// The half-pixel centre convention (`src = (dst + 0.5) * scale - 0.5`) is
     /// what OpenCV uses; sampling at `dst * scale` instead would shift the
     /// image by up to half a pixel and measurably move the detector's output.
+    /// The buffer as an image again, for the rectified page the preview shows.
+    var cgImage: CGImage? {
+        var rgba = [UInt8](repeating: 255, count: width * height * 4)
+        pixels.withUnsafeBufferPointer { src in
+            rgba.withUnsafeMutableBufferPointer { dst in
+                for i in 0..<(width * height) {
+                    dst[i * 4]     = src[i * 3 + 2]
+                    dst[i * 4 + 1] = src[i * 3 + 1]
+                    dst[i * 4 + 2] = src[i * 3]
+                }
+            }
+        }
+        return rgba.withUnsafeMutableBytes { raw -> CGImage? in
+            guard let ctx = CGContext(data: raw.baseAddress, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+            else { return nil }
+            return ctx.makeImage()
+        }
+    }
+
     func resized(toWidth newW: Int, height newH: Int) -> PPImageBuffer {
         let newW = max(1, newW), newH = max(1, newH)
         if newW == width && newH == height { return PPImageBuffer(width: width, height: height, pixels: pixels) }

@@ -40,6 +40,13 @@ struct ImageItem: Identifiable, Equatable {
     /// Which engine produced the result currently attached, so an export can
     /// say where the text came from.
     var engine: OCREngine?
+    /// The page after 图片扭曲矫正 flattened it.
+    ///
+    /// Kept because the boxes belong to *this* image, not to the original: the
+    /// rectification is a per-pixel warp, so there is no way to map a box back
+    /// onto the photograph. The preview shows this one, which is also the
+    /// honest thing to show — it is what was read.
+    var rectifiedImage: NSImage?
     /// Where the block text came from, so `ocrText` and `markdown` can be built
     /// again from the blocks when a document setting changes.
     var blockSource: PPTextSource
@@ -49,10 +56,27 @@ struct ImageItem: Identifiable, Equatable {
     /// file.
     var derivesFromBlocks: Bool
 
-    /// Pixel dimensions of the loaded image, which is the coordinate space
-    /// `textLines` are expressed in. `NSImage.size` is in points and can differ.
+    /// The page the result describes: the rectified one when there is one.
+    var displayImage: NSImage? { rectifiedImage ?? thumbnail }
+
+    /// Wraps a decoded page so its pixel dimensions survive.
+    ///
+    /// `NSImage(cgImage:size:)` wraps the image in a snapshot representation
+    /// that reports its size scaled by the screen's backing factor — on a
+    /// Retina display, twice the pixels the image actually has. Every box
+    /// drawn over it then lands at half the right place. A bitmap
+    /// representation reports what is really there.
+    static func page(from image: CGImage) -> NSImage {
+        let rep = NSBitmapImageRep(cgImage: image)
+        let page = NSImage(size: NSSize(width: rep.pixelsWide, height: rep.pixelsHigh))
+        page.addRepresentation(rep)
+        return page
+    }
+
+    /// Pixel dimensions of the page the boxes are expressed in. `NSImage.size`
+    /// is in points and can differ.
     var pixelSize: CGSize {
-        guard let rep = thumbnail?.representations.first else { return thumbnail?.size ?? .zero }
+        guard let rep = displayImage?.representations.first else { return displayImage?.size ?? .zero }
         return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
     }
 
@@ -86,6 +110,7 @@ struct ImageItem: Identifiable, Equatable {
         layoutBlocks = []
         derivesFromBlocks = false
         engine = nil
+        rectifiedImage = nil
         errorMessage = nil
         processingProgress = 0
     }
@@ -105,7 +130,8 @@ struct ImageItem: Identifiable, Equatable {
         lhs.id == rhs.id && lhs.status == rhs.status &&
         lhs.ocrText == rhs.ocrText && lhs.markdown == rhs.markdown &&
         lhs.processingProgress == rhs.processingProgress &&
-        lhs.layoutBlocks == rhs.layoutBlocks
+        lhs.layoutBlocks == rhs.layoutBlocks &&
+        lhs.rectifiedImage === rhs.rectifiedImage
     }
 
     init(url: URL) {
@@ -120,6 +146,7 @@ struct ImageItem: Identifiable, Equatable {
         self.blockSource = .plainOCR
         self.derivesFromBlocks = false
         self.engine = nil
+        self.rectifiedImage = nil
         self.thumbnail = NSImage(contentsOf: url)
     }
 }

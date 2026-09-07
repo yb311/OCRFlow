@@ -71,6 +71,7 @@ struct OCRSettings: Codable, Equatable {
     /// strings so a label added to the model later cannot make the file
     /// unreadable.
     var keptAuxiliary: [String] = []
+    var useDocUnwarping = false
 }
 
 extension OCRSettings {
@@ -110,6 +111,7 @@ extension OCRSettings {
             ?? vl.dropPageFurniture
         // Before the switches were split apart there was one of them, and it
         // covered the three that repeat on every page.
+        useDocUnwarping = value(.useDocUnwarping, fallback.useDocUnwarping)
         keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
             ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
                     .filter { !$0.isPageFurniture }.map(\.rawName)
@@ -186,6 +188,9 @@ final class OCRViewModel: ObservableObject {
 
     /// Loaded ONNX sessions, kept alive across images.
     private var paddleEngine: PPOCREngine?
+    /// UVDoc, loaded the first time a page has to be flattened.
+    private var docUnwarper: PPDocUnwarper?
+    private var docUnwarperEnv: ORTEnv?
     /// Read from the OCR worker thread to honour the Stop button mid-image.
     private let cancellation = PPCancellationToken()
 
@@ -257,7 +262,8 @@ final class OCRViewModel: ObservableObject {
                     renderTables: renderTables,
                     exportFigures: exportFigures,
                     dropPageFurniture: dropPageFurniture,
-                    keptAuxiliary: keptAuxiliary.map(\.rawName))
+                    keptAuxiliary: keptAuxiliary.map(\.rawName),
+                    useDocUnwarping: useDocUnwarping)
     }
 
     private func persistSettings() {
@@ -300,6 +306,7 @@ final class OCRViewModel: ObservableObject {
         exportFigures = settings.exportFigures
         dropPageFurniture = settings.dropPageFurniture
         keptAuxiliary = Set(settings.keptAuxiliary.compactMap(PPLayoutLabel.init(rawName:)))
+        useDocUnwarping = settings.useDocUnwarping
     }
 
     func resetAllSettings() {
@@ -471,6 +478,17 @@ final class OCRViewModel: ObservableObject {
             guard oldValue != dropPageFurniture else { return }
             persistSettings()
             rebuildDocuments()
+        }
+    }
+
+    /// Flatten a photographed page before reading it — PaddleOCR's
+    /// 图片扭曲矫正. Off by default, as upstream: a scan has nothing to flatten,
+    /// and the model would only resample it.
+    @Published var useDocUnwarping = false {
+        didSet {
+            guard oldValue != useDocUnwarping else { return }
+            if !useDocUnwarping { docUnwarper = nil; docUnwarperEnv = nil }
+            persistSettings()
         }
     }
 
@@ -1008,6 +1026,7 @@ final class OCRViewModel: ObservableObject {
         do {
             var paddleEngine: PPOCREngine?
             var vlPipeline: VLDocumentPipeline?
+            let unwarper = await loadDocUnwarper()
             switch settings.engine {
             case .paddleOCR:
                 paddleEngine = try await loadPaddleEngine(for: settings.paddleConfig)
@@ -1023,7 +1042,7 @@ final class OCRViewModel: ObservableObject {
             // blocking the actor in turn.
             let result = try await Task.detached(priority: .userInitiated) {
                 try Self.recognizeDocument(at: url, settings: settings, paddleEngine: paddleEngine,
-                                           vlPipeline: vlPipeline,
+                                           vlPipeline: vlPipeline, unwarper: unwarper,
                                            isCancelled: { cancelToken.isCancelled },
                                            progress: reportProgress)
             }.value
@@ -1051,6 +1070,7 @@ final class OCRViewModel: ObservableObject {
             updated.blockSource = result.blockSource
             updated.derivesFromBlocks = result.derivesFromBlocks && !result.blocks.isEmpty
             updated.engine = settings.engine
+            updated.rectifiedImage = result.rectified.map(ImageItem.page(from:))
             updated.processingProgress = 1.0
             items[i] = updated          // single assignment → one objectWillChange
         } catch {
@@ -1086,6 +1106,9 @@ final class OCRViewModel: ObservableObject {
         /// OCR lines. The assembler needs to know: wrapping a PP-OCR formula
         /// block in `$$` would claim a LaTeX transcription it never made.
         var blockSource: PPTextSource = .plainOCR
+        /// The page after unwarping, when it ran: the boxes describe this
+        /// image rather than the file on disk.
+        var rectified: CGImage?
         /// False for a multi-page PDF, whose blocks only describe page one
         /// while the text covers the whole file. Re-deriving from those blocks
         /// would throw every page but the first away.
@@ -1105,13 +1128,15 @@ final class OCRViewModel: ObservableObject {
         /// are read because only page one's blocks are kept afterwards.
         var droppedLabels: Set<PPLayoutLabel>
         var inferHeadingLevels: Bool
+        var useDocUnwarping: Bool
     }
 
     private func currentRecognitionSettings() -> RecognitionSettings {
         RecognitionSettings(engine: ocrEngine, visionLanguages: recognitionLanguages,
                             paddleConfig: paddleConfig, vlConfig: vlConfig,
                             droppedLabels: droppedLabels,
-                            inferHeadingLevels: vlConfig.inferHeadingLevels)
+                            inferHeadingLevels: vlConfig.inferHeadingLevels,
+                            useDocUnwarping: useDocUnwarping)
     }
 
     // MARK: - Off-actor recognition
@@ -1127,19 +1152,23 @@ final class OCRViewModel: ObservableObject {
     nonisolated private static func recognizeDocument(at url: URL, settings: RecognitionSettings,
                                                       paddleEngine: PPOCREngine?,
                                                       vlPipeline: VLDocumentPipeline?,
+                                                      unwarper: PPDocUnwarper?,
                                                       isCancelled: @escaping () -> Bool,
                                                       progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
         if url.pathExtension.lowercased() == "pdf" {
             return try recognizePDF(at: url, settings: settings, paddleEngine: paddleEngine,
-                                    vlPipeline: vlPipeline, isCancelled: isCancelled, progress: progress)
+                                    vlPipeline: vlPipeline, unwarper: unwarper,
+                                    isCancelled: isCancelled, progress: progress)
         }
         return try recognizeImage(at: url, settings: settings, paddleEngine: paddleEngine,
-                                  vlPipeline: vlPipeline, isCancelled: isCancelled, progress: progress)
+                                  vlPipeline: vlPipeline, unwarper: unwarper,
+                                  isCancelled: isCancelled, progress: progress)
     }
 
     nonisolated private static func recognizeImage(at url: URL, settings: RecognitionSettings,
                                                    paddleEngine: PPOCREngine?,
                                                    vlPipeline: VLDocumentPipeline?,
+                                                   unwarper: PPDocUnwarper?,
                                                    isCancelled: @escaping () -> Bool,
                                                    progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
         guard let image = NSImage(contentsOf: url),
@@ -1148,7 +1177,8 @@ final class OCRViewModel: ObservableObject {
         }
         progress(0.2)
         let result = try recognize(cgImage: cgImage, settings: settings, paddleEngine: paddleEngine,
-                                   vlPipeline: vlPipeline, isCancelled: isCancelled, progress: progress)
+                                   vlPipeline: vlPipeline, unwarper: unwarper,
+                                   isCancelled: isCancelled, progress: progress)
         progress(1.0)
         return result
     }
@@ -1156,6 +1186,7 @@ final class OCRViewModel: ObservableObject {
     nonisolated private static func recognizePDF(at url: URL, settings: RecognitionSettings,
                                                  paddleEngine: PPOCREngine?,
                                                  vlPipeline: VLDocumentPipeline?,
+                                                 unwarper: PPDocUnwarper?,
                                                  isCancelled: @escaping () -> Bool,
                                                  progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
         // Rasterise each page, then run the selected engine over it.
@@ -1190,7 +1221,8 @@ final class OCRViewModel: ObservableObject {
             guard let cgImage = context.makeImage() else { continue }
 
             let result = try recognize(cgImage: cgImage, settings: settings, paddleEngine: paddleEngine,
-                                       vlPipeline: vlPipeline, isCancelled: isCancelled, progress: nil)
+                                       vlPipeline: vlPipeline, unwarper: unwarper,
+                                       isCancelled: isCancelled, progress: nil)
             // Each page is turned into text as it is read: only page one's
             // blocks survive, so there is nothing left to assemble from later.
             let assembled = assemble(result, dropping: settings.droppedLabels,
@@ -1240,14 +1272,27 @@ final class OCRViewModel: ObservableObject {
     }
 
     /// Sends one image to whichever engine is selected.
-    nonisolated private static func recognize(cgImage: CGImage, settings: RecognitionSettings,
+    nonisolated private static func recognize(cgImage source: CGImage, settings: RecognitionSettings,
                                               paddleEngine: PPOCREngine?,
                                               vlPipeline: VLDocumentPipeline?,
+                                              unwarper: PPDocUnwarper?,
                                               isCancelled: @escaping () -> Bool,
                                               progress: (@Sendable (Double) -> Void)?) throws -> Recognition {
+        // Flattening comes first, exactly as it does upstream: everything after
+        // it — layout, detection, recognition — assumes text runs in straight
+        // lines. A failure here is not fatal; the page is read as photographed.
+        var cgImage = source
+        var rectified: CGImage?
+        if let unwarper, let buffer = PPImageBuffer(cgImage: source),
+           let flattened = try? unwarper.rectify(buffer), let image = flattened.cgImage {
+            cgImage = image
+            rectified = image
+        }
+
         switch settings.engine {
         case .visionFast, .visionAccurate:
-            return Recognition(rawText: try performVisionOCR(on: cgImage, settings: settings))
+            return Recognition(rawText: try performVisionOCR(on: cgImage, settings: settings),
+                               rectified: rectified)
         case .paddleVL:
             guard let vlPipeline else {
                 throw VLError.backendFailed("PaddleOCR-VL 模型未加载")
@@ -1258,7 +1303,8 @@ final class OCRViewModel: ObservableObject {
             return Recognition(blocks: document.blocks,
                                rawText: document.plainText,
                                rawMarkdown: document.markdown,
-                               blockSource: .visionLanguageModel)
+                               blockSource: .visionLanguageModel,
+                               rectified: rectified)
         case .paddleOCR:
             guard let paddleEngine else {
                 throw PPOCRError.sessionFailed("PaddleOCR 模型未加载")
@@ -1270,7 +1316,8 @@ final class OCRViewModel: ObservableObject {
                 progress: progress.map { report in { report(0.2 + $0 * 0.8) } },
                 isCancelled: isCancelled)
             return Recognition(lines: page.lines, blocks: page.blocks,
-                               rawText: page.lines.plainText)
+                               rawText: page.lines.plainText,
+                               rectified: rectified)
         }
     }
 
@@ -1330,6 +1377,22 @@ final class OCRViewModel: ObservableObject {
         }
 
         return VLDocumentPipeline(layout: detector, vl: vlEngine!)
+    }
+
+    /// Loads UVDoc if the setting asks for it and the file is there. A missing
+    /// model is not an error: the page is simply read as photographed.
+    private func loadDocUnwarper() async -> PPDocUnwarper? {
+        guard useDocUnwarping, PPModelStore.isUnwarpingModelInstalled else { return nil }
+        if let docUnwarper { return docUnwarper }
+        guard let url = try? PPModelStore.resolveUnwarpingModel(),
+              let env = try? ORTEnv(loggingLevel: .error) else { return nil }
+        let session = try? await Task.detached(priority: .userInitiated) {
+            try PPSession(modelPath: url, env: env, config: .default)
+        }.value
+        guard let session else { return nil }
+        docUnwarperEnv = env
+        docUnwarper = PPDocUnwarper(session: session)
+        return docUnwarper
     }
 
     private func loadPaddleEngine(for config: PPOCRConfig) async throws -> PPOCREngine {
