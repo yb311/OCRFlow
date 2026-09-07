@@ -1,441 +1,5 @@
 import SwiftUI
-
-// MARK: - Model
-
-/// A parsed piece of LaTeX maths.
-///
-/// PaddleOCR-VL answers a formula region with LaTeX, which used to be shown as
-/// the LaTeX itself: correct, and unreadable. This is enough of the language to
-/// set the formulas an OCR of a textbook or an exam paper actually produces —
-/// fractions, roots, scripts, big operators, matrices and the usual symbols.
-///
-/// Anything outside that subset is kept as `unknown` and drawn as the source
-/// text, marked, rather than dropped or silently mangled: a formula that is
-/// half-rendered and half-visible is still readable, one that has quietly lost
-/// a term is not.
-indirect enum MathNode: Equatable {
-    /// Literal characters, already mapped out of LaTeX into Unicode.
-    case run(String)
-    case sequence([MathNode])
-    case fraction(numerator: MathNode, denominator: MathNode)
-    case radical(index: MathNode?, radicand: MathNode)
-    /// `limits` puts the scripts above and below instead of beside, which is
-    /// what a display-style `\sum_{i=1}^{n}` wants.
-    case scripted(base: MathNode, superscript: MathNode?, subscript: MathNode?, limits: Bool)
-    case styled(MathNode, MathTextStyle)
-    case delimited(open: String, body: MathNode, close: String)
-    case matrix(rows: [[MathNode]], open: String, close: String)
-    /// Horizontal space, in ems.
-    case space(Double)
-    case unknown(String)
-
-    var isEmpty: Bool {
-        switch self {
-        case let .run(text):      return text.isEmpty
-        case let .sequence(list): return list.allSatisfy(\.isEmpty)
-        default:                  return false
-        }
-    }
-}
-
-enum MathTextStyle: Equatable {
-    /// `\mathrm`, `\operatorname` — upright, still maths.
-    case upright
-    case bold
-    case italic
-    /// `\text` — prose inside a formula.
-    case prose
-}
-
-// MARK: - Parsing
-
-enum MathParser {
-
-    /// Parses one formula. Delimiters (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`) are
-    /// stripped if present.
-    static func parse(_ latex: String) -> MathNode {
-        var scanner = Scanner(source: Array(stripDelimiters(latex)))
-        let node = scanner.parseSequence(stopAt: [])
-        return node
-    }
-
-    /// The body of a formula, without whatever wrapped it.
-    static func stripDelimiters(_ latex: String) -> String {
-        var text = latex.trimmingCharacters(in: .whitespacesAndNewlines)
-        for (open, close) in [("$$", "$$"), ("\\[", "\\]"), ("\\(", "\\)"), ("$", "$")]
-        where text.hasPrefix(open) && text.hasSuffix(close) && text.count > open.count + close.count {
-            text = String(text.dropFirst(open.count).dropLast(close.count))
-            break
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// True when the string looks like it is meant to be maths at all. Used to
-    /// decide whether a `$…$` run in a paragraph is a formula or a price.
-    static func looksLikeMath(_ body: String) -> Bool {
-        guard !body.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-        if body.contains("\\") || body.contains("^") || body.contains("_") { return true }
-        // A bare `$12.50$` is not a formula; a bare `x + 1` is.
-        return body.contains { "+-=<>*/".contains($0) }
-    }
-
-    // MARK: Scanner
-
-    private struct Scanner {
-        let source: [Character]
-        var index = 0
-
-        var isAtEnd: Bool { index >= source.count }
-
-        /// `stopAtBracket` is for a root's degree — `\sqrt[3]{8}` — where the
-        /// closing bracket ends the argument. Everywhere else `]` is an
-        /// ordinary character, as in an interval.
-        mutating func parseSequence(stopAt stoppers: Set<String>,
-                                    stopAtBracket: Bool = false,
-                                    stopAtRowBreak: Bool = false) -> MathNode {
-            var nodes: [MathNode] = []
-            while !isAtEnd {
-                // Before the stop checks, not after: `a & b \\ c` has a space
-                // in front of the row break, and looking at that space instead
-                // of the break is how a matrix ends up as a single row.
-                skipSpaces()
-                if let next = peekCommand(), stoppers.contains(next) { break }
-                if let character = peek() {
-                    if character == "}" || character == "&" { break }
-                    if stopAtBracket, character == "]" { break }
-                    // `\\` ends a row of a matrix; left to the atom parser it
-                    // would be swallowed as a line break inside the cell, and
-                    // the whole matrix would come out as one crooked row.
-                    if stopAtRowBreak, character == "\\", peekNext() == "\\" { break }
-                }
-                guard let atom = parseScripted(stopAt: stoppers) else { break }
-                nodes.append(atom)
-            }
-            return nodes.count == 1 ? nodes[0] : .sequence(merged(nodes))
-        }
-
-        /// Runs of literal characters are merged so a formula is not built out
-        /// of one view per character.
-        private func merged(_ nodes: [MathNode]) -> [MathNode] {
-            var out: [MathNode] = []
-            for node in nodes {
-                if case let .run(text) = node, case let .run(previous)? = out.last {
-                    out[out.count - 1] = .run(previous + text)
-                } else {
-                    out.append(node)
-                }
-            }
-            return out
-        }
-
-        /// An atom plus whatever `^`/`_` follows it.
-        private mutating func parseScripted(stopAt stoppers: Set<String>) -> MathNode? {
-            guard var base = parseAtom(stopAt: stoppers) else { return nil }
-            var superscript: MathNode?
-            var subscriptNode: MathNode?
-            var limits = false
-
-            if case let .run(text) = base, Self.bigOperators.contains(text) { limits = true }
-
-            while let character = peek(), character == "^" || character == "_" {
-                index += 1
-                skipSpaces()
-                let script = parseAtom(stopAt: stoppers) ?? .run("")
-                if character == "^" { superscript = script } else { subscriptNode = script }
-            }
-            guard superscript != nil || subscriptNode != nil else { return base }
-            // `\limits` / `\nolimits` were consumed as commands by parseAtom.
-            if case let .styled(inner, .upright) = base, case .run = inner { base = .styled(inner, .upright) }
-            return .scripted(base: base, superscript: superscript,
-                             subscript: subscriptNode, limits: limits)
-        }
-
-        private mutating func parseAtom(stopAt stoppers: Set<String>) -> MathNode? {
-            skipSpaces()
-            guard let character = peek() else { return nil }
-
-            switch character {
-            case "{":
-                index += 1
-                let body = parseSequence(stopAt: stoppers)
-                expect("}")
-                return body
-            case "}", "&":
-                return nil
-            case "\\":
-                return parseCommand(stopAt: stoppers)
-            default:
-                index += 1
-                return .run(String(character))
-            }
-        }
-
-        private mutating func parseCommand(stopAt stoppers: Set<String>) -> MathNode? {
-            index += 1                                  // the backslash
-            guard let first = peek() else { return .run("\\") }
-
-            // `\\` is a row break; `\,` and friends are spacing.
-            if !first.isLetter {
-                index += 1
-                if let width = Self.spacing[String(first)] { return .space(width) }
-                if first == "\\" { return .run("\n") }
-                return .run(String(first))
-            }
-
-            var name = ""
-            while let character = peek(), character.isLetter {
-                name.append(character)
-                index += 1
-            }
-
-            switch name {
-            case "frac", "dfrac", "tfrac", "cfrac":
-                let numerator = parseAtom(stopAt: stoppers) ?? .run("")
-                let denominator = parseAtom(stopAt: stoppers) ?? .run("")
-                return .fraction(numerator: numerator, denominator: denominator)
-
-            case "sqrt":
-                var degree: MathNode?
-                skipSpaces()
-                if peek() == "[" {
-                    index += 1
-                    degree = parseSequence(stopAt: [], stopAtBracket: true)
-                    expect("]")
-                }
-                let radicand = parseAtom(stopAt: stoppers) ?? .run("")
-                return .radical(index: degree, radicand: radicand)
-
-            case "text", "textrm", "textnormal", "mbox":
-                // Prose, taken verbatim: the spaces in `\text{if }` are part of
-                // the sentence, and parsing it as maths would eat them.
-                return .styled(.run(parseBracedRaw()), .prose)
-            case "mathrm", "operatorname", "mathsf", "mathtt":
-                return .styled(parseAtom(stopAt: stoppers) ?? .run(""), .upright)
-            case "mathbf", "textbf", "bm", "boldsymbol":
-                return .styled(parseAtom(stopAt: stoppers) ?? .run(""), .bold)
-            case "mathit", "textit":
-                return .styled(parseAtom(stopAt: stoppers) ?? .run(""), .italic)
-
-            case "left":
-                let open = parseDelimiter()
-                let body = parseSequence(stopAt: ["right"])
-                var close = ""
-                if peekCommand() == "right" {
-                    skipCommand()
-                    close = parseDelimiter()
-                }
-                return .delimited(open: open, body: body, close: close)
-
-            case "right":
-                // Unbalanced; treated as a literal so nothing disappears.
-                return .run(parseDelimiter())
-
-            case "begin":
-                return parseEnvironment()
-            case "end":
-                _ = parseBracedName()
-                return nil
-
-            case "limits", "nolimits", "displaystyle", "textstyle", "scriptstyle", "!":
-                return .space(0)
-
-            case "quad":  return .space(1)
-            case "qquad": return .space(2)
-
-            default:
-                if let symbol = Self.symbols[name] { return .run(symbol) }
-                if Self.functionNames.contains(name) { return .styled(.run(name), .upright) }
-                return .unknown("\\" + name)
-            }
-        }
-
-        /// `\begin{pmatrix} a & b \\ c & d \end{pmatrix}` and its relatives.
-        private mutating func parseEnvironment() -> MathNode {
-            let name = parseBracedName()
-            // `array` carries a column spec — `{cc}` — which only affects
-            // alignment, and every column is centred here anyway.
-            if name == "array" { _ = parseBracedGroupRaw() }
-
-            var rows: [[MathNode]] = [[]]
-            while !isAtEnd {
-                if peekCommand() == "end" {
-                    skipCommand()
-                    _ = parseBracedName()
-                    break
-                }
-                let cell = parseSequence(stopAt: ["end"], stopAtRowBreak: true)
-                rows[rows.count - 1].append(cell)
-                skipSpaces()
-                if peek() == "&" {
-                    index += 1
-                    continue
-                }
-                if peek() == "\\" && peekNext() == "\\" {
-                    index += 2
-                    rows.append([])
-                    continue
-                }
-                if peek() == "}" { index += 1; continue }
-                if peekCommand() == nil, peek() != nil, peek() != "&" { index += 1 }
-            }
-            // A trailing `\\` leaves an empty row behind.
-            if let last = rows.last, last.allSatisfy(\.isEmpty) { rows.removeLast() }
-
-            let fence = Self.matrixFences[name] ?? ("", "")
-            return .matrix(rows: rows, open: fence.0, close: fence.1)
-        }
-
-        private mutating func parseDelimiter() -> String {
-            skipSpaces()
-            guard let character = peek() else { return "" }
-            if character == "\\" {
-                index += 1
-                var name = ""
-                while let next = peek(), next.isLetter { name.append(next); index += 1 }
-                if name.isEmpty, let next = peek() { index += 1; return String(next) }
-                if name == "left" || name == "right" { return "" }
-                return Self.symbols[name] ?? ""
-            }
-            index += 1
-            return character == "." ? "" : String(character)
-        }
-
-        private mutating func parseBracedName() -> String {
-            skipSpaces()
-            guard peek() == "{" else { return "" }
-            index += 1
-            var name = ""
-            while let character = peek(), character != "}" { name.append(character); index += 1 }
-            expect("}")
-            return name.trimmingCharacters(in: .whitespaces)
-        }
-
-        private mutating func parseBracedGroupRaw() -> String { parseBracedName() }
-
-        /// The literal contents of `{…}`, nesting included, with nothing
-        /// interpreted.
-        private mutating func parseBracedRaw() -> String {
-            skipSpaces()
-            guard peek() == "{" else {
-                guard let character = peek() else { return "" }
-                index += 1
-                return String(character)
-            }
-            index += 1
-            var depth = 1
-            var body = ""
-            while let character = peek() {
-                index += 1
-                if character == "{" { depth += 1 }
-                if character == "}" {
-                    depth -= 1
-                    if depth == 0 { break }
-                }
-                body.append(character)
-            }
-            return body
-        }
-
-        // MARK: Primitives
-
-        private func peek() -> Character? { isAtEnd ? nil : source[index] }
-        private func peekNext() -> Character? {
-            index + 1 < source.count ? source[index + 1] : nil
-        }
-
-        /// The name of the command at the cursor, without consuming it.
-        private func peekCommand() -> String? {
-            guard peek() == "\\" else { return nil }
-            var cursor = index + 1
-            var name = ""
-            while cursor < source.count, source[cursor].isLetter {
-                name.append(source[cursor])
-                cursor += 1
-            }
-            return name.isEmpty ? nil : name
-        }
-
-        private mutating func skipCommand() {
-            guard peek() == "\\" else { return }
-            index += 1
-            while let character = peek(), character.isLetter { index += 1 }
-        }
-
-        private mutating func skipSpaces() {
-            while let character = peek(), character == " " || character == "\t" { index += 1 }
-        }
-
-        private mutating func expect(_ character: Character) {
-            if peek() == character { index += 1 }
-        }
-
-        // MARK: Tables
-
-        static let bigOperators: Set<String> = ["∑", "∏", "∐", "⋃", "⋂", "lim"]
-
-        static let spacing: [String: Double] = [
-            ",": 0.17, ";": 0.28, ":": 0.22, " ": 0.25, "!": -0.17,
-        ]
-
-        static let matrixFences: [String: (String, String)] = [
-            "matrix": ("", ""),
-            "pmatrix": ("(", ")"),
-            "bmatrix": ("[", "]"),
-            "Bmatrix": ("{", "}"),
-            "vmatrix": ("|", "|"),
-            "Vmatrix": ("‖", "‖"),
-            "cases": ("{", ""),
-            "array": ("", ""),
-            "aligned": ("", ""),
-            "align": ("", ""),
-        ]
-
-        static let functionNames: Set<String> = [
-            "sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan",
-            "sinh", "cosh", "tanh", "log", "ln", "lg", "exp", "det", "dim", "ker",
-            "deg", "gcd", "hom", "arg", "max", "min", "sup", "inf", "mod",
-        ]
-
-        static let symbols: [String: String] = [
-            // Greek, lower case
-            "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ", "epsilon": "ϵ",
-            "varepsilon": "ε", "zeta": "ζ", "eta": "η", "theta": "θ", "vartheta": "ϑ",
-            "iota": "ι", "kappa": "κ", "lambda": "λ", "mu": "μ", "nu": "ν", "xi": "ξ",
-            "pi": "π", "varpi": "ϖ", "rho": "ρ", "varrho": "ϱ", "sigma": "σ",
-            "varsigma": "ς", "tau": "τ", "upsilon": "υ", "phi": "ϕ", "varphi": "φ",
-            "chi": "χ", "psi": "ψ", "omega": "ω",
-            // Greek, upper case
-            "Gamma": "Γ", "Delta": "Δ", "Theta": "Θ", "Lambda": "Λ", "Xi": "Ξ",
-            "Pi": "Π", "Sigma": "Σ", "Upsilon": "Υ", "Phi": "Φ", "Psi": "Ψ", "Omega": "Ω",
-            // Operators
-            "sum": "∑", "prod": "∏", "coprod": "∐", "int": "∫", "iint": "∬",
-            "iiint": "∭", "oint": "∮", "bigcup": "⋃", "bigcap": "⋂", "lim": "lim",
-            "times": "×", "div": "÷", "pm": "±", "mp": "∓", "cdot": "·", "cdots": "⋯",
-            "ldots": "…", "dots": "…", "vdots": "⋮", "ddots": "⋱", "ast": "∗", "star": "⋆",
-            "circ": "∘", "bullet": "∙", "oplus": "⊕", "ominus": "⊖", "otimes": "⊗",
-            "cup": "∪", "cap": "∩", "setminus": "∖", "wedge": "∧", "vee": "∨",
-            // Relations
-            "leq": "≤", "le": "≤", "geq": "≥", "ge": "≥", "neq": "≠", "ne": "≠",
-            "approx": "≈", "sim": "∼", "simeq": "≃", "cong": "≅", "equiv": "≡",
-            "propto": "∝", "ll": "≪", "gg": "≫", "subset": "⊂", "supset": "⊃",
-            "subseteq": "⊆", "supseteq": "⊇", "in": "∈", "notin": "∉", "ni": "∋",
-            "perp": "⊥", "parallel": "∥", "mid": "∣",
-            // Arrows
-            "to": "→", "rightarrow": "→", "leftarrow": "←", "leftrightarrow": "↔",
-            "Rightarrow": "⇒", "Leftarrow": "⇐", "Leftrightarrow": "⇔",
-            "uparrow": "↑", "downarrow": "↓", "mapsto": "↦", "implies": "⟹",
-            // Misc
-            "infty": "∞", "partial": "∂", "nabla": "∇", "forall": "∀", "exists": "∃",
-            "nexists": "∄", "emptyset": "∅", "varnothing": "∅", "angle": "∠",
-            "triangle": "△", "square": "□", "degree": "°", "prime": "′",
-            "hbar": "ℏ", "ell": "ℓ", "Re": "ℜ", "Im": "ℑ", "aleph": "ℵ",
-            "therefore": "∴", "because": "∵", "checkmark": "✓", "dagger": "†",
-            "%": "%", "&": "&", "#": "#", "{": "{", "}": "}", "|": "|",
-            "langle": "⟨", "rangle": "⟩", "lceil": "⌈", "rceil": "⌉",
-            "lfloor": "⌊", "rfloor": "⌋", "backslash": "\\",
-        ]
-    }
-}
+import AppKit
 
 // MARK: - Layout
 
@@ -588,11 +152,42 @@ struct MathNodeView: View {
         case let .space(width):
             Color.clear.frame(width: size * width, height: 1)
 
-        case let .unknown(command):
-            Text(command)
-                .font(.system(size: size * 0.85, design: .monospaced))
-                .foregroundStyle(.orange)
-                .help("这个 LaTeX 命令暂不支持渲染，已按原文显示")
+        case let .decorated(base, mark, above):
+            // Combining marks do the work where the font has them; where it
+            // does not, the mark is drawn over or under the atom instead.
+            VStack(spacing: 0) {
+                if above {
+                    Text(mark).font(.system(size: size * 0.9))
+                    MathNodeView(node: base, size: size, display: false)
+                } else {
+                    MathNodeView(node: base, size: size, display: false)
+                    Text(mark).font(.system(size: size * 0.9))
+                }
+            }
+            .fixedSize()
+            .alignmentGuide(.mathAxis) { dimensions in
+                above ? dimensions[VerticalAlignment.bottom] - size * 0.3
+                      : dimensions[VerticalAlignment.top] + size * 0.3
+            }
+
+        case let .binomial(top, bottom):
+            HStack(alignment: .mathAxis, spacing: 0) {
+                MathDelimiterView(text: "(", size: size, stretchRows: 2)
+                VStack(spacing: size * 0.1) {
+                    MathNodeView(node: top, size: size * 0.9, display: false)
+                    MathNodeView(node: bottom, size: size * 0.9, display: false)
+                }
+                .fixedSize()
+                .alignmentGuide(.mathAxis) { $0[VerticalAlignment.center] }
+                MathDelimiterView(text: ")", size: size, stretchRows: 2)
+            }
+
+        case let .unknown(name):
+            // The name, set the way a function name is. Never the backslash:
+            // a command this renderer has not heard of is still not something
+            // to show the reader as source.
+            Text(name)
+                .font(.system(size: size, design: .serif))
                 .alignmentGuide(.mathAxis) { $0[.firstTextBaseline] - axisOffset }
         }
     }
@@ -741,6 +336,7 @@ struct MathBlockView: View {
 /// paragraph. That rules out fractions and roots, which need real layout — for
 /// those the source is shown instead, which is what the whole pane used to do.
 struct MathInlineText: View {
+    @Environment(\.colorScheme) private var colorScheme
     let source: String
     var size: CGFloat = 13
 
@@ -749,51 +345,67 @@ struct MathInlineText: View {
     }
 
     private var segments: [Text] {
-        MathInlineText.split(source).map { segment in
+        MathInlineSplitter.split(source).map { segment in
             switch segment {
             case let .prose(text):
                 return Text(MDParser.inline(text))
             case let .math(latex):
-                return MathTextBuilder.text(for: MathParser.parse(latex), size: size)
-                    ?? Text(latex).font(.system(size: size, design: .monospaced))
+                let node = MathParser.parse(latex)
+                // Simple maths is set as text, so the line still wraps and the
+                // glyphs still match the prose around them. Anything
+                // two-dimensional — a fraction, a root — is drawn and embedded
+                // as an image, because the one thing that must never happen is
+                // the LaTeX itself showing up in the middle of a sentence.
+                if let text = MathTextBuilder.text(for: node, size: size) { return text }
+                if let image = MathInlineImage.image(for: node, size: size, scheme: colorScheme) {
+                    return Text(Image(nsImage: image))
+                        .baselineOffset(-MathInlineImage.descent(of: image, size: size))
+                }
+                // Never the source. If it could not be set and could not be
+                // drawn, it is at least read out in characters.
+                return Text(MathLinearizer.text(for: latex)).font(.system(size: size))
             }
         }
-    }
-
-    enum Segment: Equatable {
-        case prose(String)
-        case math(String)
-    }
-
-    /// Splits a paragraph on `$…$`, leaving anything that is not plausibly
-    /// maths — a price, a lone dollar sign — as prose.
-    static func split(_ source: String) -> [Segment] {
-        guard source.contains("$") else { return [.prose(source)] }
-        var segments: [Segment] = []
-        var prose = ""
-        var rest = Substring(source)
-
-        while let open = rest.firstIndex(of: "$") {
-            let after = rest.index(after: open)
-            guard after < rest.endIndex, let close = rest[after...].firstIndex(of: "$") else { break }
-            let body = String(rest[after..<close])
-            if MathParser.looksLikeMath(body) {
-                prose += rest[..<open]
-                if !prose.isEmpty { segments.append(.prose(prose)); prose = "" }
-                segments.append(.math(body))
-            } else {
-                prose += rest[...close]
-            }
-            rest = rest[rest.index(after: close)...]
-        }
-        prose += rest
-        if !prose.isEmpty { segments.append(.prose(prose)) }
-        return segments.isEmpty ? [.prose(source)] : segments
     }
 
     /// True when the paragraph has maths worth setting.
     static func hasInlineMath(_ source: String) -> Bool {
-        split(source).contains { if case .math = $0 { return true } else { return false } }
+        MathInlineSplitter.hasInlineMath(source)
+    }
+}
+
+/// Draws a piece of maths that cannot be a run of text, so it can be embedded
+/// in one anyway.
+///
+/// A fraction has no textual form; `Text` cannot lay one out, and the fallback
+/// of printing its source is exactly the failure this exists to prevent. It is
+/// drawn once and cached — a page has a handful of distinct inline formulas,
+/// and they are re-rendered on every layout pass otherwise.
+@MainActor
+enum MathInlineImage {
+    private static var cache: [String: NSImage] = [:]
+
+    static func image(for node: MathNode, size: CGFloat, scheme: ColorScheme) -> NSImage? {
+        let key = "\(size)#\(scheme)#\(node)"
+        if let cached = cache[key] { return cached }
+        // `ImageRenderer` starts from a blank environment, so the appearance
+        // has to be handed to it: rendered in the light one, a formula on a
+        // dark page comes out black on black.
+        let renderer = ImageRenderer(content:
+            MathNodeView(node: node, size: size, display: false)
+                .padding(.horizontal, 1)
+                .fixedSize()
+                .environment(\.colorScheme, scheme)
+                .foregroundStyle(scheme == .dark ? Color.white : Color.black))
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        guard let image = renderer.nsImage else { return nil }
+        cache[key] = image
+        return image
+    }
+
+    /// How far the image has to drop for its axis to sit on the text baseline.
+    static func descent(of image: NSImage, size: CGFloat) -> CGFloat {
+        max(0, image.size.height / 2 - size * 0.3)
     }
 }
 
@@ -846,12 +458,16 @@ enum MathTextBuilder {
         case let .space(width):
             return Text(String(repeating: " ", count: max(0, Int(width * 2))))
 
-        case let .unknown(command):
-            return Text(command)
-                .font(.system(size: size * 0.9, design: .monospaced))
-                .foregroundColor(.orange)
+        case let .unknown(name):
+            return Text(name).font(.system(size: size, design: .serif))
 
-        case .fraction, .radical, .matrix:
+        case let .decorated(base, mark, _):
+            // A combining mark rides along with the character it marks, so this
+            // one *can* be a run of text.
+            guard let piece = text(for: base, size: size) else { return nil }
+            return piece + Text(mark)
+
+        case .fraction, .radical, .matrix, .binomial:
             // Two-dimensional; it cannot be a run of text in a paragraph.
             return nil
         }

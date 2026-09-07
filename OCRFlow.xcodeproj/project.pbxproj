@@ -50,6 +50,7 @@
 		B100000100000000000000AB /* MathRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AB /* MathRenderer.swift */; };
 		B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010F /* PPLayoutPostProcess.swift */; };
 		B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A08 /* PPDocUnwarper.swift */; };
+		B100000100000000000000AC /* MathSyntax.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AC /* MathSyntax.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -96,6 +97,7 @@
 		B100000200000000000000AB /* MathRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathRenderer.swift; sourceTree = "<group>"; };
 		B1000002000000000000010F /* PPLayoutPostProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutPostProcess.swift; sourceTree = "<group>"; };
 		B10000020000000000000A08 /* PPDocUnwarper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocUnwarper.swift; sourceTree = "<group>"; };
+		B100000200000000000000AC /* MathSyntax.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathSyntax.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +175,7 @@
 				B1000002000000000000000E /* SettingsView.swift */,
 				B1000002000000000000001A /* MarkdownRenderer.swift */,
 				B100000200000000000000AB /* MathRenderer.swift */,
+				B100000200000000000000AC /* MathSyntax.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -361,6 +364,7 @@
 				B100000100000000000000AB /* MathRenderer.swift in Sources */,
 				B1000001000000000000010F /* PPLayoutPostProcess.swift in Sources */,
 				B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */,
+				B100000100000000000000AC /* MathSyntax.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
