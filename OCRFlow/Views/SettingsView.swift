@@ -518,6 +518,9 @@ struct SettingsView: View {
                 toggleRow(isOn: $vm.vlConfig.useImageTextRecognition,
                           title: "图片文字识别",
                           subtitle: "连图片区域里的文字也读出来；关闭时图片只作为插图保留")
+                toggleRow(isOn: $vm.vlConfig.inferHeadingLevels,
+                          title: "段落标题级别识别",
+                          subtitle: "按标题的字号大小推断层级，输出 ##、###、####；关闭后所有小标题同一级")
                 hint("关闭的模块对应的区域仍会出现在预览里，只是不送去识别。")
             }
         }

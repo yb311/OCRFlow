@@ -44,12 +44,19 @@ enum PPDocumentAssembler {
                                           among keep: [Int]) -> Bool {
         let text = blocks[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count >= 3, blocks[index].label.vlTask != nil else { return false }
-        guard let position = keep.firstIndex(of: index) else { return false }
+
+        // Neighbours among the blocks that actually say something: a figure
+        // between two paragraphs contributes no text, and letting it break the
+        // adjacency would hide the very duplicate this is looking for.
+        let speaking = keep.filter {
+            !blocks[$0].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard let position = speaking.firstIndex(of: index) else { return false }
 
         for offset in [-1, 1] {
             let neighbourPosition = position + offset
-            guard keep.indices.contains(neighbourPosition) else { continue }
-            let other = blocks[keep[neighbourPosition]].text
+            guard speaking.indices.contains(neighbourPosition) else { continue }
+            let other = blocks[speaking[neighbourPosition]].text
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             // Only a clearly shorter run counts as an echo; two similar-length
             // blocks are two pieces of content that happen to start alike.
@@ -73,18 +80,60 @@ enum PPDocumentAssembler {
 
     /// The document, in pieces that still know where they came from.
     static func fragments(from blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel> = [],
-                          source: PPTextSource = .visionLanguageModel) -> [Fragment] {
-        contentIndices(blocks, dropping: dropping).compactMap { index in
-            guard let text = fragment(for: blocks[index], source: source) else { return nil }
+                          source: PPTextSource = .visionLanguageModel,
+                          inferHeadingLevels: Bool = true) -> [Fragment] {
+        let levels = inferHeadingLevels ? headingLevels(of: blocks) : [:]
+        return contentIndices(blocks, dropping: dropping).compactMap { index in
+            guard let text = fragment(for: blocks[index], source: source,
+                                      headingLevel: levels[index]) else { return nil }
             return Fragment(source: index, markdown: text)
         }
+    }
+
+    /// Assigns each `paragraph_title` a heading level from how big it is set.
+    ///
+    /// The layout model says "this is a heading", not "this is a level-three
+    /// heading" — but a document sets its levels in type, so the sizes carry
+    /// the hierarchy. Titles are grouped by height, tallest group first, and
+    /// numbered from two, leaving `#` to the document's own title. This is
+    /// PaddleOCR's 段落标题级别识别.
+    static func headingLevels(of blocks: [PPLayoutBlock]) -> [Int: Int] {
+        let titles = blocks.indices.filter { blocks[$0].label == .paragraphTitle }
+        guard titles.count > 1 else {
+            return Dictionary(uniqueKeysWithValues: titles.map { ($0, 2) })
+        }
+
+        // One line of a two-line heading is as tall as half of it, so the
+        // height of a single line is what the levels are compared on.
+        func unitHeight(_ index: Int) -> CGFloat {
+            let block = blocks[index]
+            let lines = max(1, block.text.split(separator: "\n").count)
+            return block.rect.height / CGFloat(lines)
+        }
+
+        var levels: [Int: Int] = [:]
+        var level = 2
+        var currentHeight: CGFloat?
+        for index in titles.sorted(by: { unitHeight($0) > unitHeight($1) }) {
+            let height = unitHeight(index)
+            if let currentHeight {
+                // Within a tenth of each other is the same level; type sizes in
+                // a document step by more than that.
+                if height < currentHeight * 0.9 { level = min(level + 1, 6) }
+            }
+            if currentHeight == nil || height < currentHeight! * 0.9 { currentHeight = height }
+            levels[index] = level
+        }
+        return levels
     }
 
     /// The whole document as one string — the pieces joined, so the text that
     /// is exported and the text that is rendered cannot drift apart.
     static func markdown(from blocks: [PPLayoutBlock], dropping: Set<PPLayoutLabel> = [],
-                         source: PPTextSource = .visionLanguageModel) -> String {
-        fragments(from: blocks, dropping: dropping, source: source)
+                         source: PPTextSource = .visionLanguageModel,
+                         inferHeadingLevels: Bool = true) -> String {
+        fragments(from: blocks, dropping: dropping, source: source,
+                  inferHeadingLevels: inferHeadingLevels)
             .map(\.markdown)
             .joined(separator: "\n\n")
     }
@@ -118,7 +167,8 @@ enum PPDocumentAssembler {
         return result + rest
     }
 
-    private static func fragment(for block: PPLayoutBlock, source: PPTextSource) -> String? {
+    private static func fragment(for block: PPLayoutBlock, source: PPTextSource,
+                                 headingLevel: Int? = nil) -> String? {
         let text = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Plain OCR of a formula or a table is a run of characters, not LaTeX
@@ -134,7 +184,7 @@ enum PPDocumentAssembler {
             case .docTitle:
                 return text.isEmpty ? nil : "# \(text)"
             case .paragraphTitle:
-                return text.isEmpty ? nil : "## \(text)"
+                return text.isEmpty ? nil : "\(String(repeating: "#", count: headingLevel ?? 2)) \(text)"
             case .figureTitle, .visionFootnote:
                 return text.isEmpty ? nil : "*\(text)*"
             case .footnote:
@@ -155,7 +205,7 @@ enum PPDocumentAssembler {
             return text.isEmpty ? nil : "# \(text)"
 
         case .paragraphTitle:
-            return text.isEmpty ? nil : "## \(text)"
+            return text.isEmpty ? nil : "\(String(repeating: "#", count: headingLevel ?? 2)) \(text)"
 
         case .figureTitle, .visionFootnote:
             return text.isEmpty ? nil : "*\(text)*"

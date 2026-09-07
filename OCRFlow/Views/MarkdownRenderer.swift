@@ -573,13 +573,31 @@ struct MarkdownDocumentView: View {
     var labelForSource: (Int) -> String? = { _ in nil }
     var onHover: (Int?) -> Void = { _ in }
     var onTap: (Int) -> Void = { _ in }
+    /// What the model read out of a region, and where a correction goes.
+    var textForSource: (Int) -> String? = { _ in nil }
+    var onCorrect: ((Int, String) -> Void)?
+
+    @State private var editing: Int?
+    @State private var draft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(blocks) { block in
                 let isLit = block.sourceBlock != nil
                     && (block.sourceBlock == highlighted || block.sourceBlock == selected)
-                view(for: block)
+                Group {
+                    // While a region is being corrected its own markup is set
+                    // aside: what is edited is what the model actually wrote,
+                    // not the rendering of it.
+                    if let source = block.sourceBlock, editing == source,
+                       isFirstBlock(of: source, block) {
+                        correctionEditor(for: source)
+                    } else if block.sourceBlock == editing, editing != nil {
+                        EmptyView()
+                    } else {
+                        view(for: block)
+                    }
+                }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
@@ -595,22 +613,68 @@ struct MarkdownDocumentView: View {
                             }
                     }
                     .overlay(alignment: .topTrailing) {
-                        if isLit, let source = block.sourceBlock,
-                           let name = labelForSource(source) {
-                            Text(name)
-                                .font(.caption2)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Color.accentColor, in: Capsule())
-                                .foregroundStyle(.white)
-                                .offset(x: 4, y: -8)
-                                .allowsHitTesting(false)
+                        if isLit, let source = block.sourceBlock, editing == nil {
+                            HStack(spacing: 4) {
+                                if let name = labelForSource(source) {
+                                    Text(name)
+                                        .font(.caption2)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(Color.accentColor, in: Capsule())
+                                        .foregroundStyle(.white)
+                                }
+                                if onCorrect != nil, let text = textForSource(source) {
+                                    Button {
+                                        draft = text
+                                        editing = source
+                                    } label: {
+                                        Label("纠正", systemImage: "pencil").font(.caption2)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
+                                }
+                            }
+                            .offset(x: 4, y: -8)
                         }
                     }
                     .contentShape(Rectangle())
                     .onHover { inside in onHover(inside ? block.sourceBlock : nil) }
                     .onTapGesture { if let source = block.sourceBlock { onTap(source) } }
                     .id(block.id)
+            }
+        }
+    }
+
+    /// True for the first rendered block of a region, which is the one that
+    /// stands in for the whole region while it is edited.
+    private func isFirstBlock(of source: Int, _ block: MDBlock) -> Bool {
+        blocks.first { $0.sourceBlock == source }?.id == block.id
+    }
+
+    private func correctionEditor(for source: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextEditor(text: $draft)
+                .font(.system(.callout, design: .monospaced))
+                .frame(minHeight: 80)
+                .padding(4)
+                .background(Color(nsColor: .textBackgroundColor),
+                            in: RoundedRectangle(cornerRadius: 5))
+                .overlay(RoundedRectangle(cornerRadius: 5)
+                    .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1))
+            HStack {
+                Text("直接修改模型读出的原文；保存后文本、Markdown 与导出都会跟着变")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("取消") { editing = nil }
+                    .controlSize(.small)
+                Button("保存") {
+                    onCorrect?(source, draft)
+                    editing = nil
+                }
+                .keyboardShortcut(.return, modifiers: .command)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
         }
     }

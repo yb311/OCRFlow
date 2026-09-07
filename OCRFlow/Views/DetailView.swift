@@ -95,9 +95,6 @@ struct ItemDetailView: View {
     private enum ResultPane: String, CaseIterable, Identifiable {
         case markdown = "Markdown"
         case plain    = "纯文本"
-        /// One row per recognised line — or per layout block, for an engine
-        /// that produces no lines. This is the pane the preview points into.
-        case regions  = "逐块"
         case source   = "源码"
         var id: String { rawValue }
     }
@@ -108,28 +105,34 @@ struct ItemDetailView: View {
         case block(Int)
     }
 
-    /// The rows the 逐块 pane lists: the text lines when there are any,
-    /// otherwise the layout blocks.
-    private var regionRows: [RegionRow] {
-        if !item.textLines.isEmpty {
-            return item.textLines.enumerated().map { index, line in
-                RegionRow(id: .line(index), text: line.text, confidence: line.confidence,
-                          label: blockLabel(containing: line.boundingBox))
-            }
-        }
-        return item.layoutBlocks.enumerated().map { index, block in
-            RegionRow(id: .block(index), text: block.text, confidence: block.score,
-                      label: block.label)
-        }
+    /// What the pointer is over, in words: the region's kind, how sure the
+    /// model was, and what it read there.
+    ///
+    /// This is what the 逐块 pane used to be for. A list of every line was a
+    /// poor way to answer "what did it make of *this*" — you had to find the
+    /// row — so the answer now appears where the question is asked.
+    struct HoverReading: Equatable {
+        var label: PPLayoutLabel?
+        var confidence: Double
+        var text: String
+        var isDropped = false
     }
 
-    struct RegionRow: Identifiable, Equatable {
-        let id: PreviewSelection
-        var text: String
-        var confidence: Double
-        /// What the layout model called the region this row sits in, which is
-        /// how a header or a page number is recognisable as one.
-        var label: PPLayoutLabel?
+    private var hoverReading: HoverReading? {
+        switch hovered {
+        case let .line(index):
+            guard item.textLines.indices.contains(index) else { return nil }
+            let line = item.textLines[index]
+            return HoverReading(label: blockLabel(containing: line.boundingBox),
+                                confidence: line.confidence, text: line.text)
+        case let .block(index):
+            guard item.layoutBlocks.indices.contains(index) else { return nil }
+            let block = item.layoutBlocks[index]
+            return HoverReading(label: block.label, confidence: block.score, text: block.text,
+                                isDropped: vm.droppedLabels.contains(block.label))
+        case nil:
+            return nil
+        }
     }
 
     private func blockLabel(containing rect: CGRect) -> PPLayoutLabel? {
@@ -144,7 +147,6 @@ struct ItemDetailView: View {
         var panes: [ResultPane] = []
         if item.hasMarkdown { panes.append(.markdown) }
         panes.append(.plain)
-        if !regionRows.isEmpty { panes.append(.regions) }
         if item.hasMarkdown { panes.append(.source) }
         return panes
     }
@@ -324,6 +326,13 @@ struct ItemDetailView: View {
                             .onEnded { _ in zoomAtGestureStart = nil }
                     )
                 }
+                .overlay(alignment: .bottom) {
+                    if let reading = hoverReading {
+                        hoverReadout(reading)
+                            .padding(10)
+                            .transition(.opacity)
+                    }
+                }
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "photo.slash")
@@ -411,6 +420,44 @@ struct ItemDetailView: View {
         // A click on blank paper clears the selection rather than keeping a
         // highlight the user has moved on from.
         return nil
+    }
+
+    /// A strip along the bottom of the preview saying what is under the
+    /// pointer. Fixed in place rather than following the cursor: it has to be
+    /// readable, and a card that moves while you read it is not.
+    private func hoverReadout(_ reading: HoverReading) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            if let label = reading.label {
+                Text(label.label)
+                    .font(.caption2)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(LayoutBlockOverlay.color(for: label).opacity(0.18), in: Capsule())
+                    .foregroundStyle(LayoutBlockOverlay.color(for: label))
+                    .fixedSize()
+            }
+            Text(reading.text.isEmpty ? "（无文字）" : reading.text)
+                .font(.caption)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if reading.isDropped {
+                Text("已排除")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize()
+            }
+            Text("\(Int((reading.confidence * 100).rounded()))%")
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(TextBoxOverlay.color(for: reading.confidence))
+                .fixedSize()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .allowsHitTesting(false)
     }
 
     private static let previewInset: CGFloat = 32
@@ -556,8 +603,6 @@ struct ItemDetailView: View {
                     }
 
                     switch resultPane {
-                    case .regions:
-                        regionList
                     case .markdown:
                         ScrollViewReader { proxy in
                             ScrollView {
@@ -585,7 +630,17 @@ struct ItemDetailView: View {
                                         hoveringPage = false
                                         hovered = source.map { .block($0) }
                                     },
-                                    onTap: { source in selection = .block(source) })
+                                    onTap: { source in selection = .block(source) },
+                                    textForSource: { index in
+                                        item.layoutBlocks.indices.contains(index)
+                                            ? item.layoutBlocks[index].text : nil
+                                    },
+                                    onCorrect: item.derivesFromBlocks
+                                        ? { index, text in
+                                            vm.correctBlock(itemID: item.id, blockIndex: index,
+                                                            text: text)
+                                        }
+                                        : nil)
                                     .textSelection(.enabled)
                                     .padding(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -669,83 +724,6 @@ struct ItemDetailView: View {
                     .disabled(vm.isProcessing)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    /// One row per recognised line (or region), highlighted in step with the
-    /// preview: clicking a box scrolls to its text, clicking the text lights up
-    /// the box. It is also where 页眉/页脚/页码 are visible as such, so the
-    /// decision to drop them is made on something the user can see.
-    private var regionList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(regionRows) { row in
-                        regionRow(row)
-                            .id(row.id)
-                        Divider()
-                    }
-                }
-            }
-            .onChange(of: selection) { _, new in
-                guard let new else { return }
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(new, anchor: .center) }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func regionRow(_ row: RegionRow) -> some View {
-        let isSelected = selection == row.id || hovered == row.id
-        let isDropped = row.label.map(vm.droppedLabels.contains) ?? false
-
-        HStack(alignment: .top, spacing: 8) {
-            if let label = row.label {
-                Text(label.label)
-                    .font(.caption2)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(LayoutBlockOverlay.color(for: label).opacity(0.15), in: Capsule())
-                    .foregroundStyle(LayoutBlockOverlay.color(for: label))
-                    .frame(width: 56, alignment: .leading)
-                    .fixedSize()
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                // Deliberately not selectable: a selectable `Text` takes the
-                // mouse for itself, and this row's whole job is to be clicked.
-                // 复制 lives in the context menu instead.
-                Text(row.text.isEmpty ? "（无文字）" : row.text)
-                    .font(.callout)
-                    .foregroundStyle(isDropped ? .secondary : .primary)
-                    .strikethrough(isDropped, color: .secondary)
-                if isDropped {
-                    Text("按当前设置不会写入结果")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
-            }
-            Spacer(minLength: 0)
-            Text("\(Int((row.confidence * 100).rounded()))%")
-                .font(.caption2)
-                .monospacedDigit()
-                .foregroundStyle(TextBoxOverlay.color(for: row.confidence))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
-        .contentShape(Rectangle())
-        .onTapGesture { selection = isSelected ? nil : row.id }
-        .onHover { inside in
-            hoveringPage = false
-            hovered = inside ? row.id : nil
-        }
-        .contextMenu {
-            Button("复制这一行") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(row.text, forType: .string)
-            }
-            .disabled(row.text.isEmpty)
         }
     }
 

@@ -503,20 +503,41 @@ final class OCRViewModel: ObservableObject {
         }
         return PPDocumentAssembler.fragments(from: item.layoutBlocks,
                                              dropping: droppedLabels,
-                                             source: item.blockSource)
+                                             source: item.blockSource,
+                                             inferHeadingLevels: vlConfig.inferHeadingLevels)
+    }
+
+    /// Replaces what the model read out of one region.
+    ///
+    /// The model gets a word wrong now and then, and the alternative to fixing
+    /// it here is fixing it in the exported file — where the correction is lost
+    /// the next time the file is exported. Editing the region itself means the
+    /// document, the plain text and every future export all carry it.
+    func correctBlock(itemID: UUID, blockIndex: Int, text: String) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].layoutBlocks.indices.contains(blockIndex),
+              items[index].layoutBlocks[blockIndex].text != text else { return }
+        items[index].layoutBlocks[blockIndex].text = text
+        rebuildDocument(at: index)
     }
 
     /// Rebuilds the text and the Markdown of every result that still has the
     /// blocks it was assembled from.
     func rebuildDocuments() {
         for index in items.indices where items[index].derivesFromBlocks {
-            let item = items[index]
-            let recognition = Recognition(lines: item.textLines, blocks: item.layoutBlocks,
-                                          blockSource: item.blockSource)
-            let assembled = Self.assemble(recognition, dropping: droppedLabels)
-            items[index].ocrText = postProcess(assembled.text)
-            items[index].markdown = assembled.markdown
+            rebuildDocument(at: index)
         }
+    }
+
+    private func rebuildDocument(at index: Int) {
+        let item = items[index]
+        guard item.derivesFromBlocks else { return }
+        let recognition = Recognition(lines: item.textLines, blocks: item.layoutBlocks,
+                                      blockSource: item.blockSource)
+        let assembled = Self.assemble(recognition, dropping: droppedLabels,
+                                      inferHeadingLevels: vlConfig.inferHeadingLevels)
+        items[index].ocrText = postProcess(assembled.text)
+        items[index].markdown = assembled.markdown
     }
 
     // MARK: - Computed helpers
@@ -1020,7 +1041,8 @@ final class OCRViewModel: ObservableObject {
                 return
             }
             var updated = items[i]
-            let assembled = Self.assemble(result, dropping: droppedLabels)
+            let assembled = Self.assemble(result, dropping: droppedLabels,
+                                          inferHeadingLevels: vlConfig.inferHeadingLevels)
             updated.status = .completed
             updated.ocrText = postProcess(assembled.text)
             updated.markdown = assembled.markdown
@@ -1082,12 +1104,14 @@ final class OCRViewModel: ObservableObject {
         /// Only used for a multi-page PDF, whose pages are assembled as they
         /// are read because only page one's blocks are kept afterwards.
         var droppedLabels: Set<PPLayoutLabel>
+        var inferHeadingLevels: Bool
     }
 
     private func currentRecognitionSettings() -> RecognitionSettings {
         RecognitionSettings(engine: ocrEngine, visionLanguages: recognitionLanguages,
                             paddleConfig: paddleConfig, vlConfig: vlConfig,
-                            droppedLabels: droppedLabels)
+                            droppedLabels: droppedLabels,
+                            inferHeadingLevels: vlConfig.inferHeadingLevels)
     }
 
     // MARK: - Off-actor recognition
@@ -1169,7 +1193,8 @@ final class OCRViewModel: ObservableObject {
                                        vlPipeline: vlPipeline, isCancelled: isCancelled, progress: nil)
             // Each page is turned into text as it is read: only page one's
             // blocks survive, so there is nothing left to assemble from later.
-            let assembled = assemble(result, dropping: settings.droppedLabels)
+            let assembled = assemble(result, dropping: settings.droppedLabels,
+                                     inferHeadingLevels: settings.inferHeadingLevels)
             if !assembled.text.isEmpty { allText.append(assembled.text) }
             if !assembled.markdown.isEmpty { allMarkdown.append(assembled.markdown) }
             if pageNum == 1 {
@@ -1205,11 +1230,13 @@ final class OCRViewModel: ObservableObject {
     /// calls it per page from the worker thread, and the view model calls it
     /// again whenever the preference changes.
     nonisolated static func assemble(_ result: Recognition,
-                                     dropping: Set<PPLayoutLabel>) -> (text: String, markdown: String) {
+                                     dropping: Set<PPLayoutLabel>,
+                                     inferHeadingLevels: Bool) -> (text: String, markdown: String) {
         guard !result.blocks.isEmpty else { return (result.rawText, result.rawMarkdown) }
         return (PPDocumentAssembler.plainText(from: result.blocks, dropping: dropping),
                 PPDocumentAssembler.markdown(from: result.blocks, dropping: dropping,
-                                             source: result.blockSource))
+                                             source: result.blockSource,
+                                             inferHeadingLevels: inferHeadingLevels))
     }
 
     /// Sends one image to whichever engine is selected.

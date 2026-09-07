@@ -104,7 +104,8 @@ struct ImageItem: Identifiable, Equatable {
     static func == (lhs: ImageItem, rhs: ImageItem) -> Bool {
         lhs.id == rhs.id && lhs.status == rhs.status &&
         lhs.ocrText == rhs.ocrText && lhs.markdown == rhs.markdown &&
-        lhs.processingProgress == rhs.processingProgress
+        lhs.processingProgress == rhs.processingProgress &&
+        lhs.layoutBlocks == rhs.layoutBlocks
     }
 
     init(url: URL) {

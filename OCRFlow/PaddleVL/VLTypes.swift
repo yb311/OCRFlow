@@ -112,6 +112,9 @@ struct VLConfig: Equatable, Codable {
     var useSealRecognition: Bool = true
     /// Also read any text inside a figure, rather than treating it as a picture.
     var useImageTextRecognition: Bool = false
+    /// Work out a heading's level from how large it is set, rather than making
+    /// every heading the same level.
+    var inferHeadingLevels: Bool = true
 
     /// How much wider than the detected region each crop is taken. PaddleOCR
     /// exposes the same knob on its layout stage as `unclip_ratio`.
@@ -147,6 +150,7 @@ extension VLConfig {
         useChartRecognition = value(.useChartRecognition, fallback.useChartRecognition)
         useSealRecognition = value(.useSealRecognition, fallback.useSealRecognition)
         useImageTextRecognition = value(.useImageTextRecognition, fallback.useImageTextRecognition)
+        inferHeadingLevels = value(.inferHeadingLevels, fallback.inferHeadingLevels)
         cropUnclipRatio = value(.cropUnclipRatio, fallback.cropUnclipRatio)
         dropPageFurniture = value(.dropPageFurniture, fallback.dropPageFurniture)
     }
