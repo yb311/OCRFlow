@@ -1020,6 +1020,7 @@ final class OCRViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, let i = self.items.firstIndex(where: { $0.id == id }) else { return }
                 self.items[i].processingProgress = value
+                self.recalcProgress()
             }
         }
 
@@ -1443,12 +1444,21 @@ final class OCRViewModel: ObservableObject {
         return text
     }
 
+    /// Overall progress, counting the file being read as the fraction of it
+    /// that has been read.
+    ///
+    /// Counting only finished files meant a single-file run sat at 0% for its
+    /// whole duration and then jumped to 100% — with the detail pane showing
+    /// 32% right beside it, which is a contradiction rather than a delay.
     private func recalcProgress() {
         guard !items.isEmpty else { totalProgress = 0; return }
-        let done = items.filter {
+        let settled = items.filter {
             $0.status == .completed || $0.status == .failed || $0.status == .cancelled
         }.count
-        totalProgress = Double(done) / Double(items.count)
+        let inFlight = items
+            .filter { $0.status == .processing }
+            .reduce(0.0) { $0 + min(max($1.processingProgress, 0), 1) }
+        totalProgress = min(1, (Double(settled) + inFlight) / Double(items.count))
     }
 }
 

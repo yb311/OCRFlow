@@ -434,6 +434,16 @@ struct ItemDetailView: View {
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
+                } else if item.status == .completed, !item.layoutBlocks.isEmpty {
+                    Text("\(item.layoutBlocks.count) 个区域")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                } else if item.status == .processing {
+                    Text("识别中 \(Int((item.processingProgress * 100).rounded()))%")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
                 }
                 Spacer()
 
@@ -558,6 +568,10 @@ struct ItemDetailView: View {
                                         item.layoutBlocks.indices.contains(index)
                                             ? LayoutBlockOverlay.color(for: item.layoutBlocks[index].label)
                                             : nil
+                                    },
+                                    confidenceForSource: { index in
+                                        item.layoutBlocks.indices.contains(index)
+                                            ? item.layoutBlocks[index].score : nil
                                     },
                                     onHover: { source in
                                         // Only the page scrolls this pane; the

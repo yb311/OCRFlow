@@ -573,6 +573,8 @@ struct MarkdownDocumentView: View {
     var labelForSource: (Int) -> String? = { _ in nil }
     /// What the region *is*, so the text matches its box in the preview.
     var colorForSource: (Int) -> Color? = { _ in nil }
+    /// How sure the model was about this region.
+    var confidenceForSource: (Int) -> Double? = { _ in nil }
     var onHover: (Int?) -> Void = { _ in }
     var onTap: (Int) -> Void = { _ in }
     /// What the model read out of a region, and where a correction goes.
@@ -581,8 +583,6 @@ struct MarkdownDocumentView: View {
 
     @State private var editing: Int?
     @State private var draft = ""
-    /// Formula regions currently showing their LaTeX instead of their maths.
-    @State private var showsSource: Set<Int> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -598,25 +598,17 @@ struct MarkdownDocumentView: View {
                         correctionEditor(for: source)
                     } else if source == editing, editing != nil {
                         EmptyView()
-                    } else if let source, showsSource.contains(source),
-                              isFirstBlock(of: source, block), let latex = textForSource(source) {
-                        // The LaTeX behind a formula, shown in place of it
-                        // rather than beneath it — one thing at a time.
-                        Text(latex)
-                            .font(.system(.callout, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else if let source, showsSource.contains(source), source == block.sourceBlock,
-                              !isFirstBlock(of: source, block) {
-                        EmptyView()
                     } else {
                         view(for: block)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                // Room above for the tag and below for the buttons, kept
+                // whether or not they are showing: chrome that appears on
+                // hover must not move the paragraph it belongs to.
+                .padding(.top, 12)
+                .padding(.bottom, 14)
                 .background {
                     // The page and the document are two views of the same
                     // thing, in the same colours: the tint is what the region
@@ -628,10 +620,14 @@ struct MarkdownDocumentView: View {
                                 .strokeBorder(tint.opacity(isLit ? 0.7 : 0), lineWidth: 1)
                         }
                 }
-                .overlay(alignment: .topTrailing) {
+                .overlay(alignment: .topLeading) {
                     if isLit, let source, editing == nil, isFirstBlock(of: source, block) {
-                        blockControls(for: source, tint: tint, block: block)
-                            .offset(x: 4, y: -9)
+                        regionTag(for: source, tint: tint)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isLit, let source, editing == nil, isFirstBlock(of: source, block) {
+                        blockControls(for: source)
                     }
                 }
                 .contentShape(Rectangle())
@@ -642,55 +638,56 @@ struct MarkdownDocumentView: View {
         }
     }
 
-    /// The one row of controls a block gets: what it is, and what can be done
-    /// with it. Formulas do not get a panel of their own — a formula is a block
-    /// like any other, and its LaTeX is one more thing this row can show.
+    /// What the region is, and how sure the model was — on the top-left corner,
+    /// where the preview puts the same label on the same box.
     @ViewBuilder
-    private func blockControls(for source: Int, tint: Color, block: MDBlock) -> some View {
-        let isFormula = { if case .formula = block.kind { return true } else { return false } }()
+    private func regionTag(for source: Int, tint: Color) -> some View {
         HStack(spacing: 4) {
             if let name = labelForSource(source) {
                 Text(name)
-                    .font(.caption2)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(tint, in: Capsule())
-                    .foregroundStyle(.white)
             }
-            if let text = textForSource(source) {
+            if let confidence = confidenceForSource(source) {
+                Text("\(Int((confidence * 100).rounded()))%").monospacedDigit().opacity(0.85)
+            }
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(tint, in: RoundedRectangle(cornerRadius: 4))
+        .foregroundStyle(.white)
+        .offset(x: 0, y: -1)
+        .allowsHitTesting(false)
+    }
+
+    /// Copy and correct, at the bottom-right corner — inside the block's own
+    /// bounds, so moving the pointer onto a button does not count as leaving
+    /// the block and take the buttons away before they can be clicked.
+    @ViewBuilder
+    private func blockControls(for source: Int) -> some View {
+        if let text = textForSource(source) {
+            HStack(spacing: 6) {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 } label: {
-                    Label("复制", systemImage: "doc.on.doc").font(.caption2)
-                }
-                if isFormula {
-                    Button {
-                        if showsSource.contains(source) {
-                            showsSource.remove(source)
-                        } else {
-                            showsSource.insert(source)
-                        }
-                    } label: {
-                        Label("LaTeX", systemImage: showsSource.contains(source)
-                              ? "function" : "chevron.left.forwardslash.chevron.right")
-                            .font(.caption2)
-                    }
+                    Label("复制", systemImage: "doc.on.doc")
                 }
                 if onCorrect != nil {
                     Button {
                         draft = text
                         editing = source
                     } label: {
-                        Label("纠正", systemImage: "pencil").font(.caption2)
+                        Label("纠正", systemImage: "pencil")
                     }
                 }
             }
+            .font(.caption)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .fixedSize()
+            .padding(.trailing, 4)
+            .offset(y: 3)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.mini)
-        .fixedSize()
-        .labelStyle(.titleAndIcon)
     }
 
     /// True for the first rendered block of a region, which is the one that

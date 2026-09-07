@@ -39,27 +39,33 @@ struct ContentView: View {
     private var toolbarContent: some ToolbarContent {
         // Center: progress
         ToolbarItem(placement: .principal) {
+            // One line, fixed widths. The pieces used to be sized by their
+            // contents, so a long file name pushed the percentage into
+            // whatever was beside it.
             if vm.isProcessing {
-                let processingItems = vm.items.filter { $0.status == .processing }
+                let running = vm.items.filter { $0.status == .processing }
                 HStack(spacing: 8) {
                     ProgressView(value: vm.totalProgress)
+                        .progressViewStyle(.linear)
                         .tint(.accentColor)
-                        .frame(width: 100)
-                    if let current = processingItems.first {
-                        Text(processingItems.count > 1
-                             ? "\(current.fileName) 等 \(processingItems.count) 个"
+                        .frame(width: 120)
+                    Text("\(Int((vm.totalProgress * 100).rounded()))%")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, alignment: .leading)
+                    if let current = running.first {
+                        Text(running.count > 1
+                             ? "\(current.fileName) 等 \(running.count) 个"
                              : current.fileName)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                            .frame(maxWidth: 180, alignment: .leading)
+                            .frame(width: 160, alignment: .leading)
                     }
-                    Text("\(Int(vm.totalProgress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
                 }
+                .fixedSize()
             } else if !vm.items.isEmpty && vm.totalProgress > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
@@ -69,6 +75,7 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .fixedSize()
             }
         }
 
