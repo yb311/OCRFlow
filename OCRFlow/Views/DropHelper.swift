@@ -22,18 +22,11 @@ enum DropHelper {
                 guard let data,
                       let fileURL = URL(dataRepresentation: data, relativeTo: nil) else { return }
 
-                var isDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isDir)
-
+                // Folders are handed over as they are: the view model walks
+                // them, subfolders included, and remembers each one as the
+                // root its files' export paths are relative to.
                 lock.lock()
-                if isDir.boolValue {
-                    let children = (try? FileManager.default.contentsOfDirectory(
-                        at: fileURL, includingPropertiesForKeys: nil,
-                        options: .skipsHiddenFiles)) ?? []
-                    urls.append(contentsOf: children)
-                } else {
-                    urls.append(fileURL)
-                }
+                urls.append(fileURL)
                 lock.unlock()
             }
         }

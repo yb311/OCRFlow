@@ -64,6 +64,17 @@ struct ContentView: View {
                             .truncationMode(.middle)
                             .frame(width: 160, alignment: .leading)
                     }
+                    // Files settled out of the batch, and how long it has run.
+                    if let started = vm.runStartedAt {
+                        TimelineView(.periodic(from: started, by: 1)) { context in
+                            let seconds = Int(context.date.timeIntervalSince(started))
+                            Text("\(vm.completedCount + vm.failedCount)/\(vm.items.count) · "
+                                 + String(format: "%d:%02d", seconds / 60, seconds % 60))
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
                 .fixedSize()
             } else if !vm.items.isEmpty && vm.totalProgress > 0 {

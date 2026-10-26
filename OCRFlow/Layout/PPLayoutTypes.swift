@@ -191,12 +191,47 @@ extension Array where Element == PPLayoutBlock {
 }
 
 /// One block of the page, in source-image pixel coordinates.
-struct PPLayoutBlock: Equatable {
+struct PPLayoutBlock: Equatable, Codable {
     var rect: CGRect
     var label: PPLayoutLabel
     var score: Double
     /// Position in the page's reading order, filled in by `PPReadingOrder`.
     var readingOrder: Int = 0
-    /// What the VLM read out of this block. Empty until recognition runs.
+    /// What was read out of this block. Empty until recognition runs.
     var text: String = ""
+    /// Who read `text`, when it differs from the page as a whole — the layered
+    /// pipeline hands each region to whichever reader suits it, so one page can
+    /// mix all three.
+    var source: PPTextSource?
+    /// Why this region went to the reader it did, when that was a decision
+    /// rather than the default: "PP-OCR 置信度 62%，改由 PaddleOCR-VL 重读".
+    var routing: String?
+    /// What about this region is worth a person's attention, if anything.
+    var review: String?
+    /// How many inline formulas the layout model found inside this region —
+    /// regions it then folded into this one rather than reading twice.
+    var inlineFormulas: Int?
+    /// The text as recognised, before anyone corrected it. Nil until a
+    /// correction is made, so re-recognising never silently replaces an edit.
+    var recognisedText: String?
+
+    var isCorrected: Bool { recognisedText != nil }
+}
+
+extension PPLayoutLabel: Codable {
+    /// Stored by PaddleOCR's own name rather than the class index, so a model
+    /// that renumbers its classes cannot turn a saved table into a footer.
+    init(from decoder: Decoder) throws {
+        let name = try decoder.singleValueContainer().decode(String.self)
+        guard let label = PPLayoutLabel(rawName: name) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "unknown layout label \(name)"))
+        }
+        self = label
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawName)
+    }
 }

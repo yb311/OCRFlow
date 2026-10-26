@@ -18,6 +18,12 @@ enum PPModelStore {
 
     /// `~/Library/Application Support/OCRFlow/Models`
     static var userModelsDirectory: URL {
+        #if DEBUG
+        // Lets the benchmark run against models kept somewhere else.
+        if let override = ProcessInfo.processInfo.environment["OCRFLOW_MODELS_DIR"] {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        #endif
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("OCRFlow/Models", isDirectory: true)

@@ -5,6 +5,12 @@ struct OCRFlowApp: App {
     @StateObject private var viewModel = OCRViewModel()
     @StateObject private var updater = UpdaterController()
 
+    init() {
+        #if DEBUG
+        PipelineBenchmark.runIfRequested()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -27,6 +33,11 @@ struct OCRFlowApp: App {
                     viewModel.openFilePicker()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                Button("截图识别") {
+                    viewModel.captureScreenshot()
+                }
+                .keyboardShortcut("2", modifiers: [.command, .shift])
             }
 
             CommandGroup(after: .newItem) {

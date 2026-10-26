@@ -8,6 +8,9 @@ import OnnxRuntimeBindings
 // MARK: - OCR Engine
 
 enum OCREngine: String, CaseIterable, Identifiable, Codable {
+    /// 智能分层: each region of a page goes to the reader that suits it. See
+    /// `LayeredPipeline`.
+    case auto           = "auto"
     case visionFast     = "vision_fast"
     case visionAccurate = "vision_accurate"
     case paddleOCR      = "paddle_ocr"
@@ -17,6 +20,7 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
+        case .auto:           return "智能分层（推荐）"
         case .visionFast:     return "Apple Vision · 快速模式"
         case .visionAccurate: return "Apple Vision · 精准模式"
         case .paddleOCR:      return "PaddleOCR · PP-OCRv6"
@@ -26,12 +30,29 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
 
     var hint: String {
         switch self {
+        case .auto:
+            return "PDF 原生文字直接提取；正文交给 PP-OCRv6，表格、公式、图表、印章和低置信度区域交给 PaddleOCR-VL"
         case .visionFast:     return "速度快，适合批量快速处理"
         case .visionAccurate: return "识别效果好，速度稍慢"
         case .paddleOCR:      return "PP-OCRv6 模型，单模型覆盖 50 种语言，输出逐行文本框与置信度"
         case .paddleVL:       return "0.9B 视觉语言模型，版面分析 + 逐块识别，输出 Markdown（较慢，需下载模型）"
         }
     }
+
+    /// The short name the file list and the result pane use.
+    var shortLabel: String {
+        switch self {
+        case .auto:           return "智能分层"
+        case .visionFast:     return "Vision 快速"
+        case .visionAccurate: return "Vision 精准"
+        case .paddleOCR:      return "PP-OCRv6"
+        case .paddleVL:       return "PaddleOCR-VL"
+        }
+    }
+
+    /// Engines whose models live on the GPU and serve many regions at once:
+    /// two files in flight keep them fed, more only queue.
+    var prefersFewFilesInFlight: Bool { self == .auto || self == .paddleVL }
 
     /// Vision picks languages from a list; the PaddleOCR engines pick them by
     /// model file, and PaddleOCR-VL is multilingual with no setting at all.
@@ -47,12 +68,13 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
 /// the view model's property initialisers means "restore defaults" and "what a
 /// fresh install looks like" cannot drift apart.
 struct OCRSettings: Codable, Equatable {
-    var engine: OCREngine = .paddleOCR
+    var engine: OCREngine = .auto
     var recognitionLanguages: [String] = ["zh-Hans", "zh-Hant", "en-US"]
     var maxConcurrentTasks: Int = OCRViewModel.defaultConcurrency
     var showTextBoxes = true
     var paddle: PPOCRConfig = .default
     var vl: VLConfig = .default
+    var layered: LayeredConfig = .default
     var mergeLineBreaks = false
     var removeEmptyLines = false
     var trimWhitespace = true
@@ -72,6 +94,9 @@ struct OCRSettings: Codable, Equatable {
     /// unreadable.
     var keptAuxiliary: [String] = []
     var useDocUnwarping = false
+    var watchEnabled = false
+    var watchFolderPath: String?
+    var watchOutputPath: String?
 }
 
 extension OCRSettings {
@@ -91,6 +116,7 @@ extension OCRSettings {
         showTextBoxes = value(.showTextBoxes, fallback.showTextBoxes)
         paddle = value(.paddle, fallback.paddle)
         vl = value(.vl, fallback.vl)
+        layered = value(.layered, fallback.layered)
         mergeLineBreaks = value(.mergeLineBreaks, fallback.mergeLineBreaks)
         removeEmptyLines = value(.removeEmptyLines, fallback.removeEmptyLines)
         trimWhitespace = value(.trimWhitespace, fallback.trimWhitespace)
@@ -112,6 +138,9 @@ extension OCRSettings {
         // Before the switches were split apart there was one of them, and it
         // covered the three that repeat on every page.
         useDocUnwarping = value(.useDocUnwarping, fallback.useDocUnwarping)
+        watchEnabled = value(.watchEnabled, fallback.watchEnabled)
+        watchFolderPath = try? container.decodeIfPresent(String.self, forKey: .watchFolderPath)
+        watchOutputPath = try? container.decodeIfPresent(String.self, forKey: .watchOutputPath)
         keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
             ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
                     .filter { !$0.isPageFurniture }.map(\.rawName)
@@ -179,6 +208,11 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
+    // MARK: - 智能分层 settings
+    @Published var layeredConfig: LayeredConfig = .default {
+        didSet { persistSettings() }
+    }
+
     /// Loaded VLM weights, kept alive across images. Held separately from the
     /// PP-OCR engine because the two can be swapped independently.
     private var vlEngine: VLEngine?
@@ -200,6 +234,12 @@ final class OCRViewModel: ObservableObject {
     private var downloaderObserver: AnyCancellable?
 
     private var terminationObserver: NSObjectProtocol?
+
+    /// The queue and its results on disk, and the recognition cache.
+    let store = ResultStore()
+    /// False until the queue saved by the last session has been read back;
+    /// the list shows nothing actionable before then.
+    @Published private(set) var isRestoringQueue = true
 
     init() {
         restoreSettings()
@@ -223,7 +263,37 @@ final class OCRViewModel: ObservableObject {
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.releaseVLEngine() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.store.saveQueue(self.items)
+                self.releaseVLEngine()
+            }
+        }
+        restoreQueue()
+    }
+
+    /// Reads back the list the last session left: every file, its status and
+    /// its result. A file that was being read when the app went away comes
+    /// back as 待处理, and 开始识别 carries on from there.
+    private func restoreQueue() {
+        let store = self.store
+        Task.detached(priority: .userInitiated) {
+            let restored = store.load()
+            await MainActor.run {
+                // Anything added while the queue was loading goes after it.
+                let added = self.items
+                let restoredURLs = Set(restored.map(\.url))
+                var all = restored
+                all.append(contentsOf: added.filter { !restoredURLs.contains($0.url) })
+                self.items = all
+                self.rebuildDocuments()
+                if self.selectedIDs.isEmpty, let first = all.first { self.selectedIDs = [first.id] }
+                self.isRestoringQueue = false
+                self.recalcProgress()
+                self.updateWatcher()
+                store.pruneResults(keeping: Set(all.map(\.id)))
+                self.loadThumbnails(for: restored.map(\.id))
+            }
         }
     }
 
@@ -248,6 +318,7 @@ final class OCRViewModel: ObservableObject {
                     showTextBoxes: showTextBoxes,
                     paddle: paddleConfig,
                     vl: vlConfig,
+                    layered: layeredConfig,
                     mergeLineBreaks: mergeLineBreaks,
                     removeEmptyLines: removeEmptyLines,
                     trimWhitespace: trimWhitespace,
@@ -263,7 +334,10 @@ final class OCRViewModel: ObservableObject {
                     exportFigures: exportFigures,
                     dropPageFurniture: dropPageFurniture,
                     keptAuxiliary: keptAuxiliary.map(\.rawName),
-                    useDocUnwarping: useDocUnwarping)
+                    useDocUnwarping: useDocUnwarping,
+                    watchEnabled: watchEnabled,
+                    watchFolderPath: watchFolder?.path,
+                    watchOutputPath: watchOutputFolder?.path)
     }
 
     private func persistSettings() {
@@ -291,6 +365,7 @@ final class OCRViewModel: ObservableObject {
         showTextBoxes = settings.showTextBoxes
         paddleConfig = settings.paddle
         vlConfig = settings.vl
+        layeredConfig = settings.layered
         mergeLineBreaks = settings.mergeLineBreaks
         removeEmptyLines = settings.removeEmptyLines
         trimWhitespace = settings.trimWhitespace
@@ -307,12 +382,16 @@ final class OCRViewModel: ObservableObject {
         dropPageFurniture = settings.dropPageFurniture
         keptAuxiliary = Set(settings.keptAuxiliary.compactMap(PPLayoutLabel.init(rawName:)))
         useDocUnwarping = settings.useDocUnwarping
+        watchFolder = settings.watchFolderPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        watchOutputFolder = settings.watchOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        watchEnabled = settings.watchEnabled
     }
 
     func resetAllSettings() {
         apply(OCRSettings())
         validateModelSelections()
         persistSettings()
+        updateWatcher()
     }
 
     /// Drops any selection whose model files are not on disk — deleted from the
@@ -420,22 +499,31 @@ final class OCRViewModel: ObservableObject {
         /// shows, in the shape another program can read. The engines produce a
         /// structured page now, and a `.txt` throws all of it away.
         case json
+        /// The source pages with the text laid invisibly over them, so Preview,
+        /// Spotlight and every other reader can search and copy it.
+        case searchablePDF
+        /// The recognised tables alone, one sheet each, merged cells kept.
+        case excel
 
         var id: String { rawValue }
 
         var label: String {
             switch self {
-            case .markdown:  return "Markdown"
-            case .plainText: return "纯文本"
-            case .json:      return "JSON（含坐标与置信度）"
+            case .markdown:      return "Markdown"
+            case .plainText:     return "纯文本"
+            case .json:          return "JSON（含坐标与置信度）"
+            case .searchablePDF: return "可搜索 PDF"
+            case .excel:         return "Excel 表格（仅导出表格）"
             }
         }
 
         var fileExtension: String {
             switch self {
-            case .markdown:  return "md"
-            case .plainText: return "txt"
-            case .json:      return "json"
+            case .markdown:      return "md"
+            case .plainText:     return "txt"
+            case .json:          return "json"
+            case .searchablePDF: return "pdf"
+            case .excel:         return "xlsx"
             }
         }
     }
@@ -512,50 +600,254 @@ final class OCRViewModel: ObservableObject {
         if kept { keptAuxiliary.insert(label) } else { keptAuxiliary.remove(label) }
     }
 
-    /// The document in pieces that remember which region each came from, for
-    /// the rendered view. Falls back to one nameless piece for a result with no
-    /// regions behind it.
-    func documentFragments(for item: ImageItem) -> [PPDocumentAssembler.Fragment] {
-        guard !item.layoutBlocks.isEmpty, item.derivesFromBlocks else {
+    /// One page of the document in pieces that remember which region each
+    /// came from, for the rendered view. Falls back to one nameless piece for
+    /// a page with no regions behind it.
+    func documentFragments(for item: ImageItem, page index: Int) -> [PPDocumentAssembler.Fragment] {
+        guard item.pages.indices.contains(index) else {
             return [PPDocumentAssembler.Fragment(source: nil, markdown: item.markdown)]
         }
-        return PPDocumentAssembler.fragments(from: item.layoutBlocks,
+        let page = item.pages[index]
+        guard page.derivesFromBlocks else {
+            let text = page.rawMarkdown.isEmpty ? page.rawText : page.rawMarkdown
+            return [PPDocumentAssembler.Fragment(source: nil, markdown: text)]
+        }
+        return PPDocumentAssembler.fragments(from: page.blocks,
                                              dropping: droppedLabels,
-                                             source: item.blockSource,
+                                             source: page.blockSource,
                                              inferHeadingLevels: vlConfig.inferHeadingLevels)
     }
 
-    /// Replaces what the model read out of one region.
+    /// One page's text, assembled and post-processed the way the whole
+    /// document is.
+    func pageText(for item: ImageItem, page index: Int) -> (text: String, markdown: String) {
+        guard item.pages.indices.contains(index) else { return (item.ocrText, item.markdown) }
+        let assembled = item.pages[index].assembled(dropping: droppedLabels,
+                                                    inferHeadingLevels: vlConfig.inferHeadingLevels)
+        return (postProcess(assembled.text), assembled.markdown)
+    }
+
+    /// Replaces what was read out of one region.
     ///
     /// The model gets a word wrong now and then, and the alternative to fixing
     /// it here is fixing it in the exported file — where the correction is lost
     /// the next time the file is exported. Editing the region itself means the
     /// document, the plain text and every future export all carry it.
-    func correctBlock(itemID: UUID, blockIndex: Int, text: String) {
+    ///
+    /// The recognised text is kept beside the correction, so the region can
+    /// show what changed and a correction undone back to it stops counting as
+    /// one.
+    func correctBlock(itemID: UUID, page: Int, blockIndex: Int, text: String) {
         guard let index = items.firstIndex(where: { $0.id == itemID }),
-              items[index].layoutBlocks.indices.contains(blockIndex),
-              items[index].layoutBlocks[blockIndex].text != text else { return }
-        items[index].layoutBlocks[blockIndex].text = text
+              items[index].pages.indices.contains(page),
+              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+        var block = items[index].pages[page].blocks[blockIndex]
+        guard block.text != text else { return }
+        let original = block.recognisedText ?? block.text
+        block.recognisedText = text == original ? nil : original
+        block.text = text
+        // A person has looked at it now; whatever the check flagged is settled.
+        block.review = nil
+        items[index].pages[page].blocks[blockIndex] = block
         rebuildDocument(at: index)
+        store.save(items[index])
     }
 
-    /// Rebuilds the text and the Markdown of every result that still has the
-    /// blocks it was assembled from.
+    /// Whether a region of this result can be read again with PaddleOCR-VL.
+    func canReread(_ item: ImageItem) -> Bool {
+        item.status == .completed && VLModelStore.isInstalled(vlConfig.variant)
+    }
+
+    /// Reads one region again with PaddleOCR-VL — the second opinion the
+    /// layered pipeline asks for on its own when PP-OCR is unsure, asked for
+    /// by hand.
+    func rereadBlock(itemID: UUID, page: Int, blockIndex: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].pages.indices.contains(page),
+              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+        let item = items[index]
+        let block = item.pages[page].blocks[blockIndex]
+        if block.isCorrected {
+            let alert = NSAlert()
+            alert.messageText = "这一区域有手动修改"
+            alert.informativeText = "用 PaddleOCR-VL 重读会替换修改后的文字。"
+            alert.addButton(withTitle: "重读")
+            alert.addButton(withTitle: "取消")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        let task = block.label.vlTask ?? .ocr
+        let config = vlConfig
+        let pageSize = item.pages[page].size
+        // Shown under the region while the model works.
+        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = "正在用 PaddleOCR-VL 重读…" }
+
+        Task {
+            do {
+                let engine = try await loadVLEngine(for: config)
+                guard let image = await PagePreviews.image(for: item, page: page)?
+                    .cgImage(forProposedRect: nil, context: nil, hints: nil) else { throw OCRError.imageLoadFailed }
+                // The preview and the recognised page are the same size; if a
+                // file was replaced on disk since, the box is scaled across.
+                let sx = CGFloat(image.width) / max(pageSize.width, 1)
+                let sy = CGFloat(image.height) / max(pageSize.height, 1)
+                let rect = block.rect.applying(CGAffineTransform(scaleX: sx, y: sy))
+                let crop = PPLayoutPostProcess.expanded(rect, ratio: config.cropUnclipRatio,
+                                                        within: CGSize(width: image.width, height: image.height))
+                let output = try await Task.detached(priority: .userInitiated) {
+                    try engine.recognize([VLRequest(image: image, crop: crop, task: task)])[0].get()
+                }.value
+                updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
+                    block.review = nil
+                    guard !output.text.isEmpty else {
+                        block.review = "PaddleOCR-VL 没有读出内容，保留了原结果"
+                        return
+                    }
+                    block.text = output.text
+                    block.source = .visionLanguageModel
+                    block.recognisedText = nil
+                    block.routing = "手动要求 PaddleOCR-VL 重读"
+                    switch output.ending {
+                    case .lengthLimit:  block.review = "输出达到 \(config.maxOutputTokens) token 上限，内容可能不完整"
+                    case .repetition:   block.review = "模型出现重复输出，已截断，可能漏读"
+                    case .decodeFailed: block.review = "PaddleOCR-VL 推理中断，内容可能不完整"
+                    case .finished, .cancelled: break
+                    }
+                }
+            } catch {
+                updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) {
+                    $0.review = "PaddleOCR-VL 重读失败：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func updateBlock(itemID: UUID, page: Int, blockIndex: Int,
+                             _ change: (inout PPLayoutBlock) -> Void) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].pages.indices.contains(page),
+              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+        change(&items[index].pages[page].blocks[blockIndex])
+        rebuildDocument(at: index)
+        store.save(items[index])
+    }
+
+    /// Marks one page's findings as looked at, without changing any text.
+    func dismissReview(itemID: UUID, page: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].pages.indices.contains(page) else { return }
+        items[index].pages[page].notes.removeAll { $0.severity == .warning }
+        for block in items[index].pages[page].blocks.indices {
+            items[index].pages[page].blocks[block].review = nil
+        }
+        store.save(items[index])
+    }
+
+    /// Rebuilds the text and the Markdown of every finished result.
     func rebuildDocuments() {
-        for index in items.indices where items[index].derivesFromBlocks {
+        for index in items.indices where items[index].status == .completed {
             rebuildDocument(at: index)
         }
     }
 
     private func rebuildDocument(at index: Int) {
-        let item = items[index]
-        guard item.derivesFromBlocks else { return }
-        let recognition = Recognition(lines: item.textLines, blocks: item.layoutBlocks,
-                                      blockSource: item.blockSource)
-        let assembled = Self.assemble(recognition, dropping: droppedLabels,
-                                      inferHeadingLevels: vlConfig.inferHeadingLevels)
-        items[index].ocrText = postProcess(assembled.text)
-        items[index].markdown = assembled.markdown
+        let document = Self.assemble(items[index].pages, dropping: droppedLabels,
+                                     inferHeadingLevels: vlConfig.inferHeadingLevels)
+        items[index].ocrText = postProcess(document.text)
+        items[index].markdown = document.markdown
+    }
+
+    /// The document a file's pages make, honouring the page-furniture
+    /// preference. Pure, and deliberately not on the main actor.
+    nonisolated static func assemble(_ pages: [PageResult], dropping: Set<PPLayoutLabel>,
+                                     inferHeadingLevels: Bool) -> (text: String, markdown: String) {
+        let parts = pages.map { $0.assembled(dropping: dropping, inferHeadingLevels: inferHeadingLevels) }
+        let structured = pages.contains { $0.derivesFromBlocks || !$0.rawMarkdown.isEmpty }
+        let text = parts.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n")
+        let markdown = structured
+            ? parts.map { $0.markdown.isEmpty ? $0.text : $0.markdown }
+                .filter { !$0.isEmpty }.joined(separator: "\n\n---\n\n")
+            : ""
+        return (text, markdown)
+    }
+
+    // MARK: - Folder watching
+
+    /// Watch a folder and read whatever lands in it.
+    @Published var watchEnabled = false {
+        didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
+    }
+    @Published var watchFolder: URL? {
+        didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
+    }
+    /// Where a watched file's result is written, in the export format
+    /// currently chosen. Nil keeps the results in the list only.
+    @Published var watchOutputFolder: URL? {
+        didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
+    }
+
+    private var watcher: FolderWatcher?
+    /// Files the watcher added, exported as each one finishes.
+    private var watchedIDs = Set<UUID>()
+    /// Watched files arrived while a run was going; they get one of their own
+    /// when it ends.
+    private var watchBacklog = false
+
+    var isWatching: Bool { watcher != nil }
+
+    /// Picks a folder for the watcher, or for its results.
+    func chooseWatchFolder(output: Bool) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.message = output ? "选择识别结果的输出文件夹" : "选择要监控的文件夹（包括其中的子文件夹）"
+        panel.prompt = "选择"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if output { watchOutputFolder = url } else { watchFolder = url }
+    }
+
+    private func updateWatcher() {
+        watcher?.stop()
+        watcher = nil
+        guard watchEnabled, !isRestoringQueue, let folder = watchFolder else {
+            objectWillChange.send()
+            return
+        }
+        let output = watchOutputFolder
+        let format = exportFormat
+        watcher = FolderWatcher(
+            folder: folder, excluding: output,
+            shouldTake: { [weak self] url in
+                guard let self, let output else { return true }
+                // A file whose result is already in the output folder was
+                // read in an earlier session.
+                let probe = ImageItem(url: url, root: folder)
+                return !FileManager.default.fileExists(
+                    atPath: self.plannedExportURL(for: probe, format: format, in: output).path)
+            },
+            onFiles: { [weak self] urls in self?.addWatched(urls, root: folder) })
+        watcher?.start()
+        objectWillChange.send()
+    }
+
+    private func addWatched(_ urls: [URL], root: URL) {
+        let before = Set(items.map(\.id))
+        add(urls.map { ($0, root) })
+        let added = items.filter { !before.contains($0.id) }.map(\.id)
+        guard !added.isEmpty else { return }
+        watchedIDs.formUnion(added)
+        if isProcessing || isStopping {
+            watchBacklog = true
+        } else {
+            run(ids: added, useCache: true)
+        }
+    }
+
+    /// Writes a watched file's result next to the others, as soon as it lands.
+    private func exportIfWatched(_ item: ImageItem) {
+        guard watchedIDs.remove(item.id) != nil, let output = watchOutputFolder,
+              item.isExportable else { return }
+        writeSeparately([item], format: resolvedFormat(for: [item]), into: output, reveal: nil)
     }
 
     // MARK: - Computed helpers
@@ -573,6 +865,8 @@ final class OCRViewModel: ObservableObject {
     var completedCount: Int { items.filter { $0.status == .completed }.count }
     var failedCount:    Int { items.filter { $0.status == .failed }.count }
     var cancelledCount: Int { items.filter { $0.status == .cancelled }.count }
+    /// Finished files with something flagged for a person to check.
+    var reviewCount:    Int { items.filter(\.needsReview).count }
 
     /// How many files each export command would actually write, which is what
     /// the export menu's items are labelled and enabled by.
@@ -581,24 +875,121 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - File import
 
+    nonisolated static let supportedExtensions: Set<String> = ["png", "jpg", "jpeg", "tiff", "tif", "bmp", "gif",
+                                                   "heic", "webp", "pdf"]
+
+    /// Adds files, and everything readable inside folders — subfolders
+    /// included. Each file found in a folder remembers that folder, so an
+    /// export can lay the results out the way the sources were.
     func addImages(urls: [URL]) {
-        let supported: Set<String> = ["png", "jpg", "jpeg", "tiff", "tif", "bmp", "gif", "heic", "webp", "pdf"]
+        Task.detached(priority: .userInitiated) {
+            let found = Self.expand(urls)
+            await MainActor.run { self.add(found) }
+        }
+    }
+
+    /// Walks folders on a background thread: a folder of a few thousand scans
+    /// should not freeze the window while it is listed.
+    nonisolated private static func expand(_ urls: [URL]) -> [(url: URL, root: URL?)] {
+        var found: [(url: URL, root: URL?)] = []
+        for url in urls {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            guard isDirectory.boolValue else {
+                found.append((url, nil))
+                continue
+            }
+            guard let walker = FileManager.default.enumerator(
+                at: url, includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { continue }
+            var inFolder: [URL] = []
+            for case let file as URL in walker
+            where supportedExtensions.contains(file.pathExtension.lowercased()) {
+                inFolder.append(file)
+            }
+            // Finder order, so the list reads like the folder does.
+            inFolder.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            found += inFolder.map { ($0, url) }
+        }
+        return found
+    }
+
+    private func add(_ files: [(url: URL, root: URL?)]) {
         // Compared after resolving symlinks: /tmp and /private/tmp name the same
         // file, and a picker and a drag can hand back different spellings of it.
         var seen = Set(items.map { $0.url.resolvingSymlinksInPath().standardizedFileURL })
         var uniqueNew: [ImageItem] = []
-        for url in urls where supported.contains(url.pathExtension.lowercased()) {
+        for file in files where Self.supportedExtensions.contains(file.url.pathExtension.lowercased()) {
             // `seen` grows as we go, so a batch containing the same file twice
             // — an expanded folder overlapping a loose file, say — adds it once.
-            guard seen.insert(url.resolvingSymlinksInPath().standardizedFileURL).inserted else { continue }
-            uniqueNew.append(ImageItem(url: url))
+            guard seen.insert(file.url.resolvingSymlinksInPath().standardizedFileURL).inserted else { continue }
+            uniqueNew.append(ImageItem(url: file.url, root: file.root))
         }
+        guard !uniqueNew.isEmpty else { return }
         items.append(contentsOf: uniqueNew)
         if selectedIDs.isEmpty, let first = uniqueNew.first { selectedIDs = [first.id] }
         recalcProgress()
-        if autoStartOnAdd && !uniqueNew.isEmpty {
+        store.saveQueue(items)
+        loadThumbnails(for: uniqueNew.map(\.id))
+        if autoStartOnAdd {
             Task { @MainActor in self.startProcessing() }
         }
+    }
+
+    /// Makes the file list's pictures in the background, a few at a time.
+    ///
+    /// Decoding every added image in full on the main thread — what the list
+    /// used to do to get a thumbnail — froze the window for a folder of
+    /// photos and held each one in memory for as long as it stayed listed.
+    private func loadThumbnails(for ids: [UUID]) {
+        let targets = items.filter { ids.contains($0.id) }.map { ($0.id, $0.url) }
+        Task.detached(priority: .utility) { [weak self] in
+            for chunk in stride(from: 0, to: targets.count, by: 16).map({ Array(targets[$0..<min($0 + 16, targets.count)]) }) {
+                let made = chunk.compactMap { id, url in
+                    PageImages.thumbnail(of: url).map { (id, ImageItem.page(from: $0)) }
+                }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    for (id, image) in made {
+                        if let index = self.items.firstIndex(where: { $0.id == id }) {
+                            self.items[index].thumbnail = image
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Screenshot
+
+    /// Lets the user drag out a part of the screen, then reads it like any
+    /// other file. The capture is kept in the library folder, so the entry in
+    /// the list keeps working after a relaunch.
+    func captureScreenshot() {
+        let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        let url = folder.appendingPathComponent("截图 \(formatter.string(from: Date())).png")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        // -i: drag out a region (space bar switches to a window); -x: no sound.
+        process.arguments = ["-i", "-x", url.path]
+        process.terminationHandler = { [weak self] _ in
+            // Escape leaves no file behind, and nothing is added.
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                let before = Set(self.items.map(\.id))
+                self.add([(url, nil)])
+                if let new = self.items.first(where: { !before.contains($0.id) }) {
+                    self.selectedIDs = [new.id]
+                    if !self.isProcessing { self.run(ids: [new.id], useCache: false) }
+                }
+            }
+        }
+        try? process.run()
     }
 
     func openFilePicker() {
@@ -608,19 +999,10 @@ final class OCRViewModel: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = [.png, .jpeg, .tiff, .bmp, .gif, .heif, .webP, .pdf,
                                      UTType(filenameExtension: "heic") ?? .heif]
-        panel.message = "选择图片文件或文件夹"
+        panel.message = "选择图片、PDF 或文件夹（包括其中的子文件夹）"
         panel.prompt = "添加"
         if panel.runModal() == .OK {
-            let urls = panel.urls.flatMap { url -> [URL] in
-                var isDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-                if isDir.boolValue {
-                    return (try? FileManager.default.contentsOfDirectory(
-                        at: url, includingPropertiesForKeys: nil)) ?? []
-                }
-                return [url]
-            }
-            addImages(urls: urls)
+            addImages(urls: panel.urls)
         }
     }
 
@@ -646,13 +1028,17 @@ final class OCRViewModel: ObservableObject {
         }
         items.removeAll { ids.contains($0.id) }
         recalcProgress()
+        store.remove(Array(ids))
+        store.saveQueue(items)
     }
 
     func clearAll() {
+        store.remove(items.map(\.id))
         items.removeAll()
         selectedIDs = []
         totalProgress = 0
         isProcessing = false
+        store.saveQueue(items)
     }
 
     // MARK: - OCR processing
@@ -673,43 +1059,77 @@ final class OCRViewModel: ObservableObject {
     /// would work — which is what they each used to do, in opposite directions.
     var actionableCount: Int { items.filter(isActionable).count }
 
+    /// When the run in progress started, for the elapsed time beside the bar.
+    @Published private(set) var runStartedAt: Date?
+
     func startProcessing() {
-        run(ids: items.filter(isActionable).map(\.id))
+        let ids = items.filter(isActionable).map(\.id)
+        // A completed file is only actionable when 「跳过已完成」 is off, and
+        // running it again would throw away any corrections made to it.
+        let corrected = items.filter { ids.contains($0.id) && $0.isCorrected }
+        guard confirmDiscardingCorrections(in: corrected) else { return }
+        run(ids: ids, useCache: true)
     }
 
     /// Re-arms the given items and runs them immediately. A 「重试」 that only
     /// flipped the badge back to pending and waited for a separate
     /// 「开始识别」 read as though nothing had happened.
+    ///
+    /// Asking to read a file again means reading it again: the recognition
+    /// cache is bypassed.
     func retryItems(ids: Set<UUID>) {
+        let corrected = items.filter { ids.contains($0.id) && $0.isCorrected }
+        guard confirmDiscardingCorrections(in: corrected) else { return }
         for id in ids { retryItem(id: id) }
-        run(ids: items.filter { ids.contains($0.id) }.map(\.id))
+        run(ids: items.filter { ids.contains($0.id) }.map(\.id), useCache: false)
     }
 
-    private func run(ids: [UUID]) {
+    /// Hand corrections are the one thing a re-run cannot reproduce, so they
+    /// are never thrown away without asking.
+    private func confirmDiscardingCorrections(in corrected: [ImageItem]) -> Bool {
+        guard !corrected.isEmpty else { return true }
+        let alert = NSAlert()
+        alert.messageText = corrected.count == 1
+            ? "「\(corrected[0].fileName)」有手动修改"
+            : "\(corrected.count) 个文件有手动修改"
+        alert.informativeText = "重新识别会用新的识别结果替换这些修改。要保留修改，请先导出。"
+        alert.addButton(withTitle: "重新识别")
+        alert.addButton(withTitle: "取消")
+        alert.buttons.first?.hasDestructiveAction = true
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func run(ids: [UUID], useCache: Bool) {
         guard !isProcessing, !isStopping, !ids.isEmpty else { return }
         isProcessing = true
+        runStartedAt = Date()
         cancellation.reset()
 
         Task {
-            await processConcurrently(ids)
+            await processConcurrently(ids, useCache: useCache)
             isProcessing = false
             isStopping = false
+            runStartedAt = nil
+            // Files the watcher found while this run was busy.
+            if watchBacklog {
+                watchBacklog = false
+                let waiting = items.filter { watchedIDs.contains($0.id) && $0.status == .pending }.map(\.id)
+                run(ids: waiting, useCache: true)
+            }
         }
     }
 
-    /// Runs up to `maxConcurrentTasks` images at once instead of waiting for
+    /// Runs up to `maxConcurrentTasks` files at once instead of waiting for
     /// each to finish before starting the next. `processItem` moves decoding
-    /// and recognition off the main actor, so several images really do make
-    /// progress at the same time; PaddleOCR's own engine still finishes one
-    /// recognition before starting the next — it serialises internally to
-    /// avoid oversubscribing the CPU — but its decode step no longer sits idle
-    /// while that happens, and Vision benefits in full.
-    private func processConcurrently(_ ids: [UUID]) async {
+    /// and recognition off the main actor, so several files really do make
+    /// progress at the same time.
+    private func processConcurrently(_ ids: [UUID], useCache: Bool) async {
         var iterator = ids.makeIterator()
-        // PaddleOCR-VL holds a single llama context with one KV cache, so extra
-        // workers would only queue up behind its lock while each one pinned a
-        // decoded page in memory.
-        let ceiling = ocrEngine == .paddleVL ? 1 : maxConcurrentTasks
+        // The GPU engines batch every region they are given, from every page
+        // of every file, into one decode; a second file in flight keeps that
+        // batch full while the first one's last regions finish. More only
+        // queue up, each holding a decoded page in memory.
+        let ceiling = ocrEngine.prefersFewFilesInFlight ? min(2, maxConcurrentTasks) : maxConcurrentTasks
         let limit = max(1, min(ceiling, ids.count))
         // `withTaskGroup`'s body closure is not guaranteed to keep the main
         // actor's isolation, so the "still running" check goes through the
@@ -722,7 +1142,7 @@ final class OCRViewModel: ObservableObject {
             func addNext() {
                 guard !cancelToken.isCancelled, let id = iterator.next() else { return }
                 group.addTask { [weak self] in
-                    await self?.processItem(id: id)
+                    await self?.processItem(id: id, useCache: useCache)
                     await self?.recalcProgress()
                 }
             }
@@ -792,50 +1212,72 @@ final class OCRViewModel: ObservableObject {
         panel.prompt = "导出"
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
-        if format == .json {
-            let payload = targets.map { Self.exportPayload(for: $0) }
-            try? Self.jsonData(payload).write(to: url)
-            return
+        switch format {
+        case .json:
+            try? Self.jsonData(targets.map(exportPayload(for:))).write(to: url)
+        case .searchablePDF:
+            writeSearchablePDFs([(targets, url)], reveal: url)
+        case .excel:
+            writeWorkbooks([(targets, url)], reveal: url)
+        case .markdown, .plainText:
+            let text = targets
+                .map { item -> String in
+                    let body = self.body(of: item, format: format, alongside: url)
+                    guard exportIncludeFilename else { return body }
+                    return format == .markdown ? "# \(item.fileName)\n\n\(body)"
+                                               : "=== \(item.fileName) ===\n\(body)"
+                }
+                .joined(separator: exportSeparator.separator)
+            try? text.write(to: url, atomically: true, encoding: .utf8)
         }
-
-        let text = targets
-            .map { item -> String in
-                let body = self.body(of: item, format: format, alongside: url)
-                guard exportIncludeFilename else { return body }
-                return format == .markdown ? "# \(item.fileName)\n\n\(body)"
-                                           : "=== \(item.fileName) ===\n\(body)"
-            }
-            .joined(separator: exportSeparator.separator)
-        try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    /// One file per image, into a folder the user picks. A batch of scans is
+    /// One file per source, into a folder the user picks. A batch of scans is
     /// usually wanted as a batch of documents, not as one long one.
+    ///
+    /// Files that came in through a folder are laid out the way that folder
+    /// was — `合同/2024/扫描001_OCR.md` — so a thousand results do not land
+    /// in one flat heap with their organisation thrown away.
     private func exportSeparately(_ targets: [ImageItem], format: ExportFormat) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "选择导出位置，\(targets.count) 个文件将各自保存为 .\(format.fileExtension)"
+        panel.message = "选择导出位置，\(targets.count) 个文件将各自保存为 .\(format.fileExtension)，并保留原文件夹结构"
         panel.prompt = "导出到此处"
         guard panel.runModal() == .OK, let folder = panel.url else { return }
+        writeSeparately(targets, format: format, into: folder, reveal: folder)
+    }
 
+    /// One result file per item, laid out under `folder` as the sources were.
+    /// `reveal` is shown in Finder when the writing is done; nil writes
+    /// silently, which is how a watched folder's results are exported.
+    private func writeSeparately(_ targets: [ImageItem], format: ExportFormat, into folder: URL, reveal: URL?) {
         var used = Set<String>()
+        var pdfJobs: [([ImageItem], URL)] = []
+        var workbookJobs: [([ImageItem], URL)] = []
         for item in targets {
+            let directory = Self.exportDirectory(for: item, in: folder)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let stem = (item.fileName as NSString).deletingPathExtension
             var name = "\(stem)_OCR"
             var suffix = 2
             // Two source files can share a stem — `scan.png` and `scan.pdf` —
             // and the second must not overwrite the first.
-            while !used.insert(name).inserted {
+            while !used.insert(directory.appendingPathComponent(name).path).inserted {
                 name = "\(stem)_OCR-\(suffix)"
                 suffix += 1
             }
-            let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
-            if format == .json {
-                try? Self.jsonData([Self.exportPayload(for: item)]).write(to: url)
-            } else {
+            let url = directory.appendingPathComponent("\(name).\(format.fileExtension)")
+            switch format {
+            case .json:
+                try? Self.jsonData([exportPayload(for: item)]).write(to: url)
+            case .searchablePDF:
+                pdfJobs.append(([item], url))
+            case .excel:
+                workbookJobs.append(([item], url))
+            case .markdown, .plainText:
                 let body = self.body(of: item, format: format, alongside: url)
                 let text = exportIncludeFilename && format == .markdown
                     ? "# \(item.fileName)\n\n\(body)"
@@ -843,98 +1285,213 @@ final class OCRViewModel: ObservableObject {
                 try? text.write(to: url, atomically: true, encoding: .utf8)
             }
         }
-        NSWorkspace.shared.open(folder)
+        if !pdfJobs.isEmpty {
+            writeSearchablePDFs(pdfJobs, reveal: reveal)
+        } else if !workbookJobs.isEmpty {
+            writeWorkbooks(workbookJobs, reveal: reveal)
+        } else if let reveal {
+            NSWorkspace.shared.open(reveal)
+        }
+    }
+
+    /// Where `writeSeparately` puts an item's result when no other file
+    /// competes for the name.
+    private func plannedExportURL(for item: ImageItem, format: ExportFormat, in folder: URL) -> URL {
+        let stem = (item.fileName as NSString).deletingPathExtension
+        return Self.exportDirectory(for: item, in: folder)
+            .appendingPathComponent("\(stem)_OCR.\(format.fileExtension)")
+    }
+
+    /// Writes each group's tables to a workbook. A group with no recognised
+    /// table writes nothing — an empty workbook would only look like a loss.
+    private func writeWorkbooks(_ jobs: [([ImageItem], URL)], reveal: URL?) {
+        var written = 0
+        for (items, url) in jobs {
+            let sheets = TableWorkbook.sheets(from: items)
+            guard !sheets.isEmpty else { continue }
+            do {
+                try TableWorkbook.write(sheets, to: url)
+                written += 1
+            } catch {
+                continue
+            }
+        }
+        guard let reveal else { return }
+        if written == 0 {
+            let alert = NSAlert()
+            alert.messageText = "没有可导出的表格"
+            alert.informativeText = "只有由 PaddleOCR-VL（或智能分层中的 VL 层）识别出结构的表格才能导出到 Excel；"
+                + "PP-OCRv6 按普通文字读出的表格没有单元格信息。"
+            alert.runModal()
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([reveal])
+        }
+    }
+
+    /// Where a file's result goes: under the folder it came in through, at
+    /// the same place it sat in that folder.
+    private static func exportDirectory(for item: ImageItem, in folder: URL) -> URL {
+        guard let root = item.root else { return folder }
+        let relative = (item.relativePath as NSString).deletingLastPathComponent
+        let base = folder.appendingPathComponent(root.lastPathComponent, isDirectory: true)
+        return relative.isEmpty ? base : base.appendingPathComponent(relative, isDirectory: true)
+    }
+
+    /// Writes PDFs off the main thread — redrawing a few hundred pages takes a
+    /// while — and says so if any could not be written.
+    private func writeSearchablePDFs(_ jobs: [([ImageItem], URL)], reveal: URL?) {
+        Task.detached(priority: .userInitiated) {
+            let failures = jobs.compactMap { items, url -> String? in
+                do {
+                    try SearchablePDFWriter.write(items, to: url)
+                    return nil
+                } catch {
+                    return "\(url.lastPathComponent)：\(error.localizedDescription)"
+                }
+            }
+            await MainActor.run {
+                guard let reveal else { return }
+                if failures.isEmpty {
+                    NSWorkspace.shared.activateFileViewerSelecting([reveal])
+                } else {
+                    let alert = NSAlert()
+                    alert.messageText = "有 \(failures.count) 个 PDF 未能写入"
+                    alert.informativeText = failures.prefix(8).joined(separator: "\n")
+                    alert.runModal()
+                }
+            }
+        }
     }
 
     private func body(of item: ImageItem, format: ExportFormat, alongside file: URL) -> String {
         switch format {
-        case .plainText, .json:
+        case .plainText, .json, .searchablePDF, .excel:
             return item.ocrText
         case .markdown:
             guard item.hasMarkdown else { return item.ocrText }
             guard exportFigures else { return item.markdown }
-            return Self.writingFigures(of: item, from: item.markdown, alongside: file)
+            return writingFigures(of: item, from: item.markdown, alongside: file)
         }
     }
 
     private static func contentType(for format: ExportFormat) -> UTType {
         switch format {
-        case .markdown:  return UTType(filenameExtension: "md") ?? .plainText
-        case .plainText: return .plainText
-        case .json:      return .json
+        case .markdown:      return UTType(filenameExtension: "md") ?? .plainText
+        case .plainText:     return .plainText
+        case .json:          return .json
+        case .searchablePDF: return .pdf
+        case .excel:         return UTType(filenameExtension: "xlsx") ?? .data
         }
     }
 
     // MARK: - JSON export
 
     /// The structured result, in the shape the rest of the world can read:
-    /// every line with its box and confidence, every layout region with its
-    /// label and its place in the reading order.
-    private struct ExportedPage: Encodable {
-        struct Line: Encodable {
+    /// every page, every line with its box and confidence, every region with
+    /// its label, its place in the reading order, who read it and why.
+    private struct ExportedFile: Encodable {
+        struct Page: Encodable {
+            struct Line: Encodable {
+                var text: String
+                var confidence: Double
+                /// Four corner points, clockwise from the top left, in image pixels.
+                var quad: [[Double]]
+            }
+            struct Region: Encodable {
+                var label: String
+                var readingOrder: Int
+                var score: Double
+                /// `[x, y, width, height]` in image pixels.
+                var box: [Double]
+                var text: String
+                var isPageFurniture: Bool
+                /// `vlm`, `ppocr` or `pdf_text`.
+                var source: String
+                var routing: String?
+                var review: String?
+                /// What the engine read, when the text has been corrected since.
+                var recognisedText: String?
+            }
+            var index: Int
+            var width: Double
+            var height: Double
             var text: String
-            var confidence: Double
-            /// Four corner points, clockwise from the top left, in image pixels.
-            var quad: [[Double]]
+            var markdown: String?
+            var lines: [Line]
+            var regions: [Region]
+            var notes: [String]
         }
-        struct Region: Encodable {
-            var label: String
-            var readingOrder: Int
-            var score: Double
-            /// `[x, y, width, height]` in image pixels.
-            var box: [Double]
-            var text: String
-            var isPageFurniture: Bool
-        }
+        var schemaVersion = 2
         var file: String
+        var path: String
         var engine: String?
-        var width: Double
-        var height: Double
         var text: String
         var markdown: String?
-        var lines: [Line]
-        var regions: [Region]
+        var pages: [Page]
     }
 
-    private static func exportPayload(for item: ImageItem) -> ExportedPage {
-        let size = item.pixelSize
-        return ExportedPage(
-            file: item.fileName,
-            engine: item.engine?.rawValue,
-            width: size.width, height: size.height,
-            text: item.ocrText,
-            markdown: item.hasMarkdown ? item.markdown : nil,
-            lines: item.textLines.map { line in
-                ExportedPage.Line(text: line.text, confidence: line.confidence,
-                                  quad: line.quad.map { [Double($0.x), Double($0.y)] })
-            },
-            regions: item.layoutBlocks.map { block in
-                ExportedPage.Region(label: block.label.rawName,
-                                    readingOrder: block.readingOrder,
-                                    score: block.score,
-                                    box: [Double(block.rect.minX), Double(block.rect.minY),
-                                          Double(block.rect.width), Double(block.rect.height)],
-                                    text: block.text,
-                                    isPageFurniture: block.label.isPageFurniture)
-            })
+    private func exportPayload(for item: ImageItem) -> ExportedFile {
+        let pages = item.pages.enumerated().map { index, page -> ExportedFile.Page in
+            let assembled = pageText(for: item, page: index)
+            return ExportedFile.Page(
+                index: index + 1,
+                width: page.size.width, height: page.size.height,
+                text: assembled.text,
+                markdown: assembled.markdown.isEmpty ? nil : assembled.markdown,
+                lines: page.lines.map { line in
+                    .init(text: line.text, confidence: line.confidence,
+                          quad: line.quad.map { [Double($0.x), Double($0.y)] })
+                },
+                regions: page.blocks.map { block in
+                    .init(label: block.label.rawName, readingOrder: block.readingOrder,
+                          score: block.score,
+                          box: [Double(block.rect.minX), Double(block.rect.minY),
+                                Double(block.rect.width), Double(block.rect.height)],
+                          text: block.text, isPageFurniture: block.label.isPageFurniture,
+                          source: Self.exportName(for: block.source ?? page.blockSource),
+                          routing: block.routing, review: block.review,
+                          recognisedText: block.recognisedText)
+                },
+                notes: page.notes.map(\.message))
+        }
+        return ExportedFile(file: item.fileName, path: item.url.path, engine: item.engine?.rawValue,
+                            text: item.ocrText, markdown: item.hasMarkdown ? item.markdown : nil,
+                            pages: pages)
     }
 
-    private static func jsonData(_ pages: [ExportedPage]) -> Data {
+    private static func exportName(for source: PPTextSource) -> String {
+        switch source {
+        case .visionLanguageModel: return "vlm"
+        case .plainOCR:            return "ppocr"
+        case .pdfTextLayer:        return "pdf_text"
+        }
+    }
+
+    private static func jsonData(_ files: [ExportedFile]) -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        return (try? encoder.encode(pages)) ?? Data()
+        return (try? encoder.encode(files)) ?? Data()
     }
 
     /// Saves the figures a document points at into a folder beside the exported
     /// file and rewrites the placeholders to reference them.
     ///
     /// Without this the `![图片]()` placeholders leave the export with broken
-    /// images: the pictures only exist inside the source page. Figures the crop
-    /// could not be taken from — a PDF's later pages, whose blocks are not kept
-    /// — keep their empty placeholder.
-    private static func writingFigures(of item: ImageItem, from markdown: String,
-                                       alongside file: URL) -> String {
-        let crops = DocumentFigures.crops(for: item)
+    /// images: the pictures only exist inside the source page. Every page's
+    /// figures are written — each page is decoded again for it — and a
+    /// figure that cannot be cropped keeps its empty placeholder.
+    private func writingFigures(of item: ImageItem, from markdown: String,
+                                alongside file: URL) -> String {
+        var crops: [NSImage?] = []
+        let pdf = item.isPDF ? PDFSource(url: item.url) : nil
+        for (index, page) in item.pages.enumerated() {
+            let figureCount = PPDocumentAssembler.contentIndices(page.blocks, dropping: droppedLabels)
+                .filter { page.blocks[$0].label.producesFigure }.count
+            guard figureCount > 0 else { continue }
+            let image = page.rectified?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                ?? (pdf.flatMap { $0.render(page: index)?.image } ?? PageImages.image(at: item.url, frame: index))
+            crops += DocumentFigures.crops(for: page, image: image, dropping: droppedLabels)
+        }
         guard crops.contains(where: { $0 != nil }) else { return markdown }
 
         let stem = file.deletingPathExtension().lastPathComponent
@@ -944,7 +1501,7 @@ final class OCRViewModel: ObservableObject {
                                                         withIntermediateDirectories: true)) != nil
         else { return markdown }
 
-        let prefix = sanitizedFileStem((item.fileName as NSString).deletingPathExtension)
+        let prefix = Self.sanitizedFileStem((item.fileName as NSString).deletingPathExtension)
         var links: [String] = []
         for (index, crop) in crops.enumerated() {
             guard let data = crop?.pngData else {
@@ -1007,45 +1564,52 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private func processItem(id: UUID) async {
+    private func processItem(id: UUID, useCache: Bool) async {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].status = .processing
         items[idx].processingProgress = 0
+        items[idx].reusedCachedResult = false
 
         let url = items[idx].url
         let settings = currentRecognitionSettings()
         let cancelToken = cancellation
+        let store = self.store
+        let started = Date()
 
         let reportProgress: @Sendable (Double) -> Void = { [weak self] value in
             Task { @MainActor [weak self] in
-                guard let self, let i = self.items.firstIndex(where: { $0.id == id }) else { return }
+                guard let self, let i = self.items.firstIndex(where: { $0.id == id }),
+                      self.items[i].status == .processing else { return }
                 self.items[i].processingProgress = value
                 self.recalcProgress()
             }
         }
 
         do {
-            var paddleEngine: PPOCREngine?
-            var vlPipeline: VLDocumentPipeline?
-            let unwarper = await loadDocUnwarper()
-            switch settings.engine {
-            case .paddleOCR:
-                paddleEngine = try await loadPaddleEngine(for: settings.paddleConfig)
-            case .paddleVL:
-                vlPipeline = try await loadVLPipeline(for: settings.vlConfig)
-            case .visionFast, .visionAccurate:
-                break
-            }
+            let engines = try await loadEngines(for: settings)
+            let fingerprint = settings.fingerprint(
+                vlAvailable: engines.layered?.vl != nil || engines.vlPipeline != nil,
+                layoutAvailable: engines.paddle?.hasLayoutAnalysis ?? false,
+                unwarping: engines.unwarper != nil)
 
             // Decoding and recognition run entirely off the main actor, so
-            // several images make real progress at once when `startProcessing`
+            // several files make real progress at once when `startProcessing`
             // fans a batch out across a task group, instead of each one
             // blocking the actor in turn.
-            let result = try await Task.detached(priority: .userInitiated) {
-                try Self.recognizeDocument(at: url, settings: settings, paddleEngine: paddleEngine,
-                                           vlPipeline: vlPipeline, unwarper: unwarper,
-                                           isCancelled: { cancelToken.isCancelled },
-                                           progress: reportProgress)
+            let outcome = try await Task.detached(priority: .userInitiated) { () -> (pages: [PageResult], cached: Bool) in
+                let key = ResultStore.cacheKey(for: url, fingerprint: fingerprint)
+                if useCache, let key, let pages = store.cachedPages(for: key) {
+                    return (pages, true)
+                }
+                let pages = try DocumentRecognizer.recognize(url: url, settings: settings, engines: engines,
+                                                             isCancelled: { cancelToken.isCancelled },
+                                                             progress: reportProgress)
+                // Only a complete, clean reading is worth serving again.
+                let failedPage = pages.contains { $0.size == .zero }
+                if let key, !cancelToken.isCancelled, !failedPage {
+                    store.cache(pages, for: key)
+                }
+                return (pages, false)
             }.value
 
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
@@ -1053,27 +1617,30 @@ final class OCRViewModel: ObservableObject {
             // stopped run comes back like any other — just with part of the
             // page missing. Saving that as a result is what made a stopped
             // newspaper look like a page of nothing but image placeholders.
-            guard !cancelToken.isCancelled else {
+            guard !cancelToken.isCancelled || outcome.cached else {
                 var stopped = items[i]
                 stopped.clearResults()
                 stopped.status = .cancelled
                 items[i] = stopped
+                store.saveQueue(items)
                 return
             }
             var updated = items[i]
-            let assembled = Self.assemble(result, dropping: droppedLabels,
-                                          inferHeadingLevels: vlConfig.inferHeadingLevels)
+            let document = Self.assemble(outcome.pages, dropping: droppedLabels,
+                                         inferHeadingLevels: vlConfig.inferHeadingLevels)
             updated.status = .completed
-            updated.ocrText = postProcess(assembled.text)
-            updated.markdown = assembled.markdown
-            updated.textLines = result.lines
-            updated.layoutBlocks = result.blocks
-            updated.blockSource = result.blockSource
-            updated.derivesFromBlocks = result.derivesFromBlocks && !result.blocks.isEmpty
+            updated.pages = outcome.pages
+            updated.ocrText = postProcess(document.text)
+            updated.markdown = document.markdown
             updated.engine = settings.engine
-            updated.rectifiedImage = result.rectified.map(ImageItem.page(from:))
+            updated.errorMessage = nil
+            updated.elapsed = Date().timeIntervalSince(started)
+            updated.reusedCachedResult = outcome.cached
             updated.processingProgress = 1.0
             items[i] = updated          // single assignment → one objectWillChange
+            store.save(updated)
+            store.saveQueue(items)
+            exportIfWatched(updated)
         } catch {
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
             var updated = items[i]
@@ -1086,283 +1653,90 @@ final class OCRViewModel: ObservableObject {
             updated.status = cancelToken.isCancelled ? .cancelled : .failed
             updated.errorMessage = cancelToken.isCancelled ? nil : error.localizedDescription
             items[i] = updated
+            store.save(updated)
+            store.saveQueue(items)
         }
     }
 
-    /// Text plus whatever structure the engine managed to produce: per-line
-    /// boxes from PP-OCRv6, a Markdown document from PaddleOCR-VL.
-    /// What one file yielded.
+    private func currentRecognitionSettings() -> DocumentRecognizer.Settings {
+        DocumentRecognizer.Settings(engine: ocrEngine, visionLanguages: recognitionLanguages,
+                                    paddleConfig: paddleConfig, vlConfig: vlConfig,
+                                    layered: layeredConfig)
+    }
+
+    // MARK: - Engines
+
+    /// The engine load in progress, which the next one waits for.
+    private var engineLoading: Task<DocumentRecognizer.Engines, Error>?
+
+    /// Loads what the selected engine needs, reusing whatever is already
+    /// loaded and still matches the settings.
     ///
-    /// When `blocks` is non-empty the text and the Markdown are *derived* from
-    /// it rather than stored, which is what lets 「保留页眉页脚」 be flipped after
-    /// the fact instead of only before a run.
-    struct Recognition: Sendable {
-        var lines: [PPTextLine] = []
-        var blocks: [PPLayoutBlock] = []
-        /// Used when there are no blocks: Apple Vision, and PaddleOCR-VL's
-        /// whole-page pass.
-        var rawText: String = ""
-        var rawMarkdown: String = ""
-        /// Whether the block text is the VLM's markup-aware output or plain
-        /// OCR lines. The assembler needs to know: wrapping a PP-OCR formula
-        /// block in `$$` would claim a LaTeX transcription it never made.
-        var blockSource: PPTextSource = .plainOCR
-        /// The page after unwarping, when it ran: the boxes describe this
-        /// image rather than the file on disk.
-        var rectified: CGImage?
-        /// False for a multi-page PDF, whose blocks only describe page one
-        /// while the text covers the whole file. Re-deriving from those blocks
-        /// would throw every page but the first away.
-        var derivesFromBlocks: Bool = true
-    }
-
-    /// A snapshot of the state that affects recognition, read on the main
-    /// actor before the work moves to a background task. Reading
-    /// `self.ocrEngine` and friends from inside that task would just bounce
-    /// back to the main actor on every access, defeating the detach.
-    private struct RecognitionSettings: Sendable {
-        var engine: OCREngine
-        var visionLanguages: [String]
-        var paddleConfig: PPOCRConfig
-        var vlConfig: VLConfig
-        /// Only used for a multi-page PDF, whose pages are assembled as they
-        /// are read because only page one's blocks are kept afterwards.
-        var droppedLabels: Set<PPLayoutLabel>
-        var inferHeadingLevels: Bool
-        var useDocUnwarping: Bool
-    }
-
-    private func currentRecognitionSettings() -> RecognitionSettings {
-        RecognitionSettings(engine: ocrEngine, visionLanguages: recognitionLanguages,
-                            paddleConfig: paddleConfig, vlConfig: vlConfig,
-                            droppedLabels: droppedLabels,
-                            inferHeadingLevels: vlConfig.inferHeadingLevels,
-                            useDocUnwarping: useDocUnwarping)
-    }
-
-    // MARK: - Off-actor recognition
-    //
-    // Everything from here to `performVisionOCR` runs off the main actor.
-    // `nonisolated` is required even though these are plain synchronous
-    // functions that touch no actor state: being static members of a
-    // `@MainActor` class would otherwise still bind them to it, and calling
-    // one from `Task.detached` would just hop back onto the main actor —
-    // silently undoing the detach and putting batch processing right back to
-    // taking turns on a single thread.
-
-    nonisolated private static func recognizeDocument(at url: URL, settings: RecognitionSettings,
-                                                      paddleEngine: PPOCREngine?,
-                                                      vlPipeline: VLDocumentPipeline?,
-                                                      unwarper: PPDocUnwarper?,
-                                                      isCancelled: @escaping () -> Bool,
-                                                      progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
-        if url.pathExtension.lowercased() == "pdf" {
-            return try recognizePDF(at: url, settings: settings, paddleEngine: paddleEngine,
-                                    vlPipeline: vlPipeline, unwarper: unwarper,
-                                    isCancelled: isCancelled, progress: progress)
+    /// Loads happen one after another. Two files start together, and both
+    /// would otherwise find nothing loaded and each load the models — a
+    /// second gigabyte-and-a-half copy of the VLM, and its shaders compiled
+    /// twice. Waiting for the first means the second finds them loaded.
+    private func loadEngines(for settings: DocumentRecognizer.Settings) async throws -> DocumentRecognizer.Engines {
+        let previous = engineLoading
+        let load = Task { @MainActor in
+            _ = try? await previous?.value
+            return try await self.loadEnginesNow(for: settings)
         }
-        return try recognizeImage(at: url, settings: settings, paddleEngine: paddleEngine,
-                                  vlPipeline: vlPipeline, unwarper: unwarper,
-                                  isCancelled: isCancelled, progress: progress)
+        engineLoading = load
+        defer { if engineLoading == load { engineLoading = nil } }
+        return try await load.value
     }
 
-    nonisolated private static func recognizeImage(at url: URL, settings: RecognitionSettings,
-                                                   paddleEngine: PPOCREngine?,
-                                                   vlPipeline: VLDocumentPipeline?,
-                                                   unwarper: PPDocUnwarper?,
-                                                   isCancelled: @escaping () -> Bool,
-                                                   progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw OCRError.imageLoadFailed
-        }
-        progress(0.2)
-        let result = try recognize(cgImage: cgImage, settings: settings, paddleEngine: paddleEngine,
-                                   vlPipeline: vlPipeline, unwarper: unwarper,
-                                   isCancelled: isCancelled, progress: progress)
-        progress(1.0)
-        return result
-    }
-
-    nonisolated private static func recognizePDF(at url: URL, settings: RecognitionSettings,
-                                                 paddleEngine: PPOCREngine?,
-                                                 vlPipeline: VLDocumentPipeline?,
-                                                 unwarper: PPDocUnwarper?,
-                                                 isCancelled: @escaping () -> Bool,
-                                                 progress: @escaping @Sendable (Double) -> Void) throws -> Recognition {
-        // Rasterise each page, then run the selected engine over it.
-        guard let provider = CGDataProvider(url: url as CFURL),
-              let pdfDoc = CGPDFDocument(provider) else {
-            throw OCRError.imageLoadFailed
-        }
-        let pageCount = pdfDoc.numberOfPages
-        var allText: [String] = []
-        var allMarkdown: [String] = []
-        // The preview shows page one, so that is the page the overlay describes.
-        var firstPage = Recognition()
-        let scale: CGFloat = 2.0
-
-        for pageNum in 1...max(1, pageCount) {
-            if isCancelled() { break }
-            guard let page = pdfDoc.page(at: pageNum) else { continue }
-            let mediaBox = page.getBoxRect(.mediaBox)
-            let size = CGSize(width: mediaBox.width * scale, height: mediaBox.height * scale)
-            guard let context = CGContext(
-                data: nil,
-                width: Int(size.width), height: Int(size.height),
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { continue }
-            context.setFillColor(CGColor.white)
-            context.fill(CGRect(origin: .zero, size: size))
-            context.scaleBy(x: scale, y: scale)
-            context.drawPDFPage(page)
-            guard let cgImage = context.makeImage() else { continue }
-
-            let result = try recognize(cgImage: cgImage, settings: settings, paddleEngine: paddleEngine,
-                                       vlPipeline: vlPipeline, unwarper: unwarper,
-                                       isCancelled: isCancelled, progress: nil)
-            // Each page is turned into text as it is read: only page one's
-            // blocks survive, so there is nothing left to assemble from later.
-            let assembled = assemble(result, dropping: settings.droppedLabels,
-                                     inferHeadingLevels: settings.inferHeadingLevels)
-            if !assembled.text.isEmpty { allText.append(assembled.text) }
-            if !assembled.markdown.isEmpty { allMarkdown.append(assembled.markdown) }
-            if pageNum == 1 {
-                // Boxes come back in rendered-page pixels; scale them down to the
-                // page size the preview is drawn from.
-                let shrink = CGAffineTransform(scaleX: 1 / scale, y: 1 / scale)
-                firstPage = result
-                firstPage.blocks = result.blocks.map { block in
-                    var block = block
-                    block.rect = block.rect.applying(shrink)
-                    return block
-                }
-                firstPage.lines = result.lines.map { line in
-                    PPTextLine(quad: line.quad.map { CGPoint(x: $0.x / scale, y: $0.y / scale) },
-                               text: line.text, confidence: line.confidence,
-                               wasRotated: line.wasRotated)
-                }
-            }
-            progress(Double(pageNum) / Double(pageCount))
-        }
-
-        var document = firstPage
-        document.rawText = allText.joined(separator: "\n\n")
-        document.rawMarkdown = allMarkdown.joined(separator: "\n\n---\n\n")
-        // Page one's blocks describe page one only; the text above covers the
-        // whole file, so it must not be rebuilt from them.
-        document.derivesFromBlocks = pageCount <= 1
-        return document
-    }
-
-    /// Text and Markdown for one recognition, honouring the page-furniture
-    /// preference. Pure, and deliberately not on the main actor: the PDF path
-    /// calls it per page from the worker thread, and the view model calls it
-    /// again whenever the preference changes.
-    nonisolated static func assemble(_ result: Recognition,
-                                     dropping: Set<PPLayoutLabel>,
-                                     inferHeadingLevels: Bool) -> (text: String, markdown: String) {
-        guard !result.blocks.isEmpty else { return (result.rawText, result.rawMarkdown) }
-        return (PPDocumentAssembler.plainText(from: result.blocks, dropping: dropping),
-                PPDocumentAssembler.markdown(from: result.blocks, dropping: dropping,
-                                             source: result.blockSource,
-                                             inferHeadingLevels: inferHeadingLevels))
-    }
-
-    /// Sends one image to whichever engine is selected.
-    nonisolated private static func recognize(cgImage source: CGImage, settings: RecognitionSettings,
-                                              paddleEngine: PPOCREngine?,
-                                              vlPipeline: VLDocumentPipeline?,
-                                              unwarper: PPDocUnwarper?,
-                                              isCancelled: @escaping () -> Bool,
-                                              progress: (@Sendable (Double) -> Void)?) throws -> Recognition {
-        // Flattening comes first, exactly as it does upstream: everything after
-        // it — layout, detection, recognition — assumes text runs in straight
-        // lines. A failure here is not fatal; the page is read as photographed.
-        var cgImage = source
-        var rectified: CGImage?
-        if let unwarper, let buffer = PPImageBuffer(cgImage: source),
-           let flattened = try? unwarper.rectify(buffer), let image = flattened.cgImage {
-            cgImage = image
-            rectified = image
-        }
-
+    private func loadEnginesNow(for settings: DocumentRecognizer.Settings) async throws -> DocumentRecognizer.Engines {
+        var engines = DocumentRecognizer.Engines()
+        engines.unwarper = await loadDocUnwarper()
         switch settings.engine {
         case .visionFast, .visionAccurate:
-            return Recognition(rawText: try performVisionOCR(on: cgImage, settings: settings),
-                               rectified: rectified)
-        case .paddleVL:
-            guard let vlPipeline else {
-                throw VLError.backendFailed("PaddleOCR-VL 模型未加载")
-            }
-            let document = try vlPipeline.parse(image: cgImage, config: settings.vlConfig,
-                                                progress: { fraction, _ in progress?(fraction) },
-                                                isCancelled: isCancelled)
-            return Recognition(blocks: document.blocks,
-                               rawText: document.plainText,
-                               rawMarkdown: document.markdown,
-                               blockSource: .visionLanguageModel,
-                               rectified: rectified)
+            break
         case .paddleOCR:
-            guard let paddleEngine else {
-                throw PPOCRError.sessionFailed("PaddleOCR 模型未加载")
+            engines.paddle = try await loadPaddleEngine(for: settings.paddleConfig)
+        case .paddleVL:
+            engines.vlPipeline = try await loadVLPipeline(for: settings.vlConfig)
+        case .auto:
+            // The layout model is what the routing is decided on, so the PP-OCR
+            // engine is built with it whenever it is installed.
+            var paddle = settings.paddleConfig
+            if VLModelStore.isLayoutModelInstalled { paddle.readingOrder = .layout }
+            let engine = try await loadPaddleEngine(for: paddle)
+            var vl: VLEngine?
+            if VLModelStore.isInstalled(settings.vlConfig.variant) {
+                do {
+                    vl = try await loadVLEngine(for: settings.vlConfig)
+                } catch {
+                    engines.vlUnavailable = "PaddleOCR-VL 加载失败（\(error.localizedDescription)）"
+                }
             }
-            let page = try paddleEngine.recognize(
-                image: cgImage, config: settings.paddleConfig,
-                // Loading and decoding already covered the first fifth of the
-                // bar; map the engine onto the rest.
-                progress: progress.map { report in { report(0.2 + $0 * 0.8) } },
-                isCancelled: isCancelled)
-            return Recognition(lines: page.lines, blocks: page.blocks,
-                               rawText: page.lines.plainText,
-                               rectified: rectified)
+            engines.paddle = engine
+            engines.layered = LayeredPipeline(paddle: engine, vl: vl, paddleConfig: paddle,
+                                              vlConfig: settings.vlConfig, config: settings.layered)
         }
+        return engines
     }
 
-    /// `VNImageRequestHandler.perform(_:)` is synchronous — it blocks the
-    /// calling thread until every request's completion handler has already
-    /// run — so plain local variables are enough here. The previous
-    /// continuation-based version blocked the *main actor* for that same
-    /// duration for no benefit, which was the main reason Vision batches never
-    /// actually overlapped.
-    nonisolated private static func performVisionOCR(on cgImage: CGImage, settings: RecognitionSettings) throws -> String {
-        var text = ""
-        var requestError: Error?
-        let request = VNRecognizeTextRequest { req, err in
-            if let err {
-                requestError = err
-                return
-            }
-            let observations = req.results as? [VNRecognizedTextObservation] ?? []
-            text = observations
-                .compactMap { $0.topCandidates(1).first?.string }
-                .joined(separator: "\n")
-        }
-        request.recognitionLevel = settings.engine == .visionFast ? .fast : .accurate
-        request.usesLanguageCorrection = true
-        request.recognitionLanguages = settings.visionLanguages
-
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        try handler.perform([request])
-        if let requestError { throw requestError }
-        return text
+    /// The VLM on its own, reusing the loaded weights when the configuration
+    /// has not changed. Loading costs seconds and a gigabyte or more, so this
+    /// is deliberately sticky.
+    private func loadVLEngine(for config: VLConfig) async throws -> VLEngine {
+        if let vlEngine, vlEngine.matchesModelConfiguration(config) { return vlEngine }
+        // Drop the old weights before loading new ones, rather than holding
+        // both for the length of the load.
+        vlEngine = nil
+        let engine = try await Task.detached(priority: .userInitiated) {
+            try VLEngine(config: config)
+        }.value
+        vlEngine = engine
+        return engine
     }
 
-    // MARK: - PaddleOCR
-
-    /// Reuses the loaded ONNX sessions unless the model files or backend changed.
-    /// Builds the PaddleOCR-VL pipeline, reusing the loaded weights when the
-    /// configuration has not changed. Loading costs seconds and a gigabyte or
-    /// more, so this is deliberately sticky.
+    /// Builds the PaddleOCR-VL pipeline: the VLM, and the layout stage in
+    /// front of it.
     private func loadVLPipeline(for config: VLConfig) async throws -> VLDocumentPipeline {
-        if vlEngine == nil || !(vlEngine!.matchesModelConfiguration(config)) {
-            vlEngine = try await Task.detached(priority: .userInitiated) {
-                try VLEngine(config: config)
-            }.value
-        }
+        let engine = try await loadVLEngine(for: config)
 
         var detector: PPLayoutDetector?
         if config.useLayoutDetection {
@@ -1377,7 +1751,7 @@ final class OCRViewModel: ObservableObject {
             detector = vlLayoutSession.map(PPLayoutDetector.init)
         }
 
-        return VLDocumentPipeline(layout: detector, vl: vlEngine!)
+        return VLDocumentPipeline(layout: detector, vl: engine)
     }
 
     /// Loads UVDoc if the setting asks for it and the file is there. A missing
@@ -1396,6 +1770,7 @@ final class OCRViewModel: ObservableObject {
         return docUnwarper
     }
 
+    /// Reuses the loaded ONNX sessions unless the model files or backend changed.
     private func loadPaddleEngine(for config: PPOCRConfig) async throws -> PPOCREngine {
         if let engine = paddleEngine, engine.matchesModelConfiguration(config) { return engine }
         // Building an engine reads ~29 MB of model files; keep it off the main
@@ -1464,10 +1839,12 @@ final class OCRViewModel: ObservableObject {
 
 enum OCRError: LocalizedError {
     case imageLoadFailed
+    case pdfOpenFailed
 
     var errorDescription: String? {
         switch self {
         case .imageLoadFailed: return "无法加载图片文件"
+        case .pdfOpenFailed:   return "无法打开 PDF（文件损坏，或设有打开密码）"
         }
     }
 }

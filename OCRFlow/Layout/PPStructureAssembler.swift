@@ -23,6 +23,10 @@ enum PPStructureAssembler {
         /// The regions the layout model found, in reading order, each carrying
         /// the text of the lines that fell inside it.
         var blocks: [PPLayoutBlock] = []
+        /// For each block, the indices into `lines` of the lines poured into
+        /// it — how the layered pipeline judges one region's recognition on
+        /// its own.
+        var members: [[Int]] = []
     }
 
     /// A line belongs to a region when most of it is inside that region.
@@ -37,7 +41,7 @@ enum PPStructureAssembler {
             return Page(lines: lines, blocks: [])
         }
         guard !lines.isEmpty else {
-            return Page(lines: [], blocks: blocks)
+            return Page(lines: [], blocks: blocks, members: blocks.map { _ in [] })
         }
 
         let unit = medianHeight(of: lines)
@@ -64,6 +68,8 @@ enum PPStructureAssembler {
         ordered.reserveCapacity(lines.count)
         var filled: [PPLayoutBlock] = []
         filled.reserveCapacity(blocks.count)
+        var members: [[Int]] = []
+        members.reserveCapacity(blocks.count)
 
         for (blockIndex, block) in blocks.enumerated() {
             let inside = sortWithinRegion(buckets[blockIndex], lines: lines, unit: unit)
@@ -73,10 +79,11 @@ enum PPStructureAssembler {
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             filled.append(block)
+            members.append(Array(ordered.count..<(ordered.count + inside.count)))
             ordered.append(contentsOf: inside.map { lines[$0] })
         }
 
-        return Page(lines: ordered, blocks: filled)
+        return Page(lines: ordered, blocks: filled, members: members)
     }
 
     // MARK: - Assignment

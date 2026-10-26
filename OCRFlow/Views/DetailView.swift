@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DetailView: View {
     @EnvironmentObject var vm: OCRViewModel
+    @State private var translating = false
 
     var body: some View {
         if vm.selectedIDs.count > 1 {
@@ -37,6 +38,10 @@ struct DetailView: View {
                         .buttonStyle(.borderedProminent)
                     Button("复制所有文本") { vm.copySelectedText() }
                         .buttonStyle(.bordered)
+                    if #available(macOS 15.0, *) {
+                        Button("翻译这 \(exportable) 个文件…") { translating = true }
+                            .buttonStyle(.bordered)
+                    }
                 }
             }
             if !rerunnable.isEmpty {
@@ -51,6 +56,11 @@ struct DetailView: View {
                 .foregroundStyle(.red)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $translating) {
+            if #available(macOS 15.0, *) {
+                TranslationSheet(items: vm.selectedItems.filter(\.isExportable))
+            }
+        }
     }
 }
 
@@ -69,6 +79,7 @@ struct ItemDetailView: View {
     /// snapping back to 1× on every gesture update.
     @State private var zoomAtGestureStart: CGFloat?
     @State private var showCopied = false
+    @State private var translating = false
     /// Which pane the result is shown in.
     @State private var resultPane: ResultPane = .markdown
     /// What the user clicked in the preview, echoed in the result list — and
@@ -89,6 +100,42 @@ struct ItemDetailView: View {
     @State private var renderedBlocks: [MDBlock] = []
     @State private var figures: [NSImage?] = []
 
+    /// The page on show. A multi-page file is looked at, corrected and
+    /// reviewed one page at a time, the preview and the text side by side.
+    @State private var pageIndex = 0
+    /// How many pages the file has, known before it has been read.
+    @State private var sourcePageCount = 1
+    /// The page as an image, decoded when it is shown rather than kept for
+    /// every file in the list.
+    @State private var pageImage: NSImage?
+    @State private var showingNotes = true
+
+    private var pageCount: Int { max(item.pages.count, sourcePageCount) }
+
+    private var page: PageResult? {
+        item.pages.indices.contains(pageIndex) ? item.pages[pageIndex] : nil
+    }
+
+    private var blocks: [PPLayoutBlock] { page?.blocks ?? [] }
+    private var lines: [PPTextLine] { page?.lines ?? [] }
+
+    /// The size the boxes are expressed in: the page as it was read.
+    private var pixelSize: CGSize {
+        if let size = page?.size, size.width > 0, size.height > 0 { return size }
+        guard let rep = pageImage?.representations.first else { return pageImage?.size ?? .zero }
+        return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
+    }
+
+    /// This page's text and Markdown, as the document has them.
+    private var pageText: (text: String, markdown: String) {
+        item.pages.count > 1 ? vm.pageText(for: item, page: pageIndex) : (item.ocrText, item.markdown)
+    }
+
+    /// Changes whenever a different picture belongs in the preview.
+    private var previewKey: String {
+        "\(item.id)#\(pageIndex)#\(page?.rectified.map { ObjectIdentifier($0).hashValue } ?? 0)"
+    }
+
     private static let minZoom: CGFloat = 0.25
     private static let maxZoom: CGFloat = 8.0
 
@@ -105,19 +152,13 @@ struct ItemDetailView: View {
         case block(Int)
     }
 
-    private func blockLabel(containing rect: CGRect) -> PPLayoutLabel? {
-        item.layoutBlocks
-            .filter { $0.rect.intersects(rect) }
-            .min { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }?
-            .label
-    }
-
     /// Panes worth offering for this result.
     private var availablePanes: [ResultPane] {
+        let structured = !pageText.markdown.isEmpty
         var panes: [ResultPane] = []
-        if item.hasMarkdown { panes.append(.markdown) }
+        if structured { panes.append(.markdown) }
         panes.append(.plain)
-        if item.hasMarkdown { panes.append(.source) }
+        if structured { panes.append(.source) }
         return panes
     }
 
@@ -141,11 +182,12 @@ struct ItemDetailView: View {
                 Text("预览")
                     .font(.headline)
                     .foregroundStyle(.secondary)
+                if pageCount > 1 { pageStepper }
                 Spacer()
                 // Both engines draw boxes now, so both can hide them; the
                 // button used to appear only when there were text lines, which
                 // left the VL pipeline's blocks stuck on screen.
-                if !item.textLines.isEmpty || !item.layoutBlocks.isEmpty {
+                if !lines.isEmpty || !blocks.isEmpty {
                     Button {
                         vm.showTextBoxes.toggle()
                     } label: {
@@ -221,13 +263,13 @@ struct ItemDetailView: View {
 
             Divider()
 
-            if let thumb = item.displayImage {
+            if let thumb = pageImage ?? item.thumbnail {
                 GeometryReader { geo in
                     // The size the image would take at 1× — what `scaledToFit`
                     // used to work out on its own — scaled by the zoom, so the
                     // frame really grows and the scroll view has somewhere to
                     // scroll to.
-                    let fitted = Self.fittedSize(for: item.pixelSize, in: geo.size,
+                    let fitted = Self.fittedSize(for: pixelSize, in: geo.size,
                                                  inset: Self.previewInset)
                     ScrollView([.horizontal, .vertical]) {
                         Image(nsImage: thumb)
@@ -239,17 +281,17 @@ struct ItemDetailView: View {
                                 // Only a finished run's boxes belong on the
                                 // image. With the toggle off they appear one at
                                 // a time, under the pointer.
-                                if item.status == .completed, !item.layoutBlocks.isEmpty {
-                                    LayoutBlockOverlay(blocks: item.layoutBlocks,
-                                                       imageSize: item.pixelSize,
+                                if item.status == .completed, !blocks.isEmpty {
+                                    LayoutBlockOverlay(blocks: blocks,
+                                                       imageSize: pixelSize,
                                                        selected: selectedBlockIndex,
                                                        highlighted: hoveredBlockIndex,
                                                        showsAll: vm.showTextBoxes,
                                                        dropped: vm.droppedLabels)
                                 }
-                                if item.status == .completed, !item.textLines.isEmpty {
-                                    TextBoxOverlay(lines: item.textLines,
-                                                   imageSize: item.pixelSize,
+                                if item.status == .completed, !lines.isEmpty {
+                                    TextBoxOverlay(lines: lines,
+                                                   imageSize: pixelSize,
                                                    selected: selectedLineIndex,
                                                    highlighted: hoveredLineIndex,
                                                    showsAll: vm.showTextBoxes)
@@ -319,13 +361,56 @@ struct ItemDetailView: View {
         .onChange(of: item.id) { _, _ in
             imageZoom = 1.0
             selection = nil
+            pageIndex = 0
+            showingNotes = true
         }
+        .onChange(of: pageIndex) { _, _ in
+            selection = nil
+            hovered = nil
+        }
+        .task(id: previewKey) {
+            let index = pageIndex
+            pageImage = nil
+            async let count = PagePreviews.pageCount(of: item)
+            pageImage = await PagePreviews.image(for: item, page: index)
+            sourcePageCount = await count
+        }
+    }
+
+    /// Previous and next page, with the page's number between them — orange
+    /// when the page has something flagged for review.
+    private var pageStepper: some View {
+        HStack(spacing: 2) {
+            Button {
+                pageIndex = max(0, pageIndex - 1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .keyboardShortcut(.leftArrow, modifiers: .option)
+            .disabled(pageIndex == 0)
+
+            Text("\(pageIndex + 1) / \(pageCount)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(page?.needsReview == true ? Color.orange : .secondary)
+                .frame(minWidth: 44)
+
+            Button {
+                pageIndex = min(pageCount - 1, pageIndex + 1)
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .keyboardShortcut(.rightArrow, modifiers: .option)
+            .disabled(pageIndex >= pageCount - 1)
+        }
+        .buttonStyle(.borderless)
+        .help("翻页（⌥← / ⌥→）")
     }
 
     /// The auxiliary regions this page actually contains, in the order the
     /// settings pane lists them.
     private var presentAuxiliaryLabels: [PPLayoutLabel] {
-        let present = Set(item.layoutBlocks.map(\.label))
+        let present = Set(blocks.map(\.label))
         return PPLayoutLabel.auxiliary.filter(present.contains)
     }
 
@@ -353,13 +438,13 @@ struct ItemDetailView: View {
         if case let .block(index) = selection { return index }
         // A selected line lights up the region it belongs to as well, which is
         // what makes "this line is part of the footer" visible at a glance.
-        if case let .line(index) = selection, item.textLines.indices.contains(index) {
-            let box = item.textLines[index].boundingBox
-            return item.layoutBlocks.indices
-                .filter { item.layoutBlocks[$0].rect.intersects(box) }
+        if case let .line(index) = selection, lines.indices.contains(index) {
+            let box = lines[index].boundingBox
+            return blocks.indices
+                .filter { blocks[$0].rect.intersects(box) }
                 .min { a, b in
-                    let areaA = item.layoutBlocks[a].rect.width * item.layoutBlocks[a].rect.height
-                    let areaB = item.layoutBlocks[b].rect.width * item.layoutBlocks[b].rect.height
+                    let areaA = blocks[a].rect.width * blocks[a].rect.height
+                    let areaB = blocks[b].rect.width * blocks[b].rect.height
                     return areaA < areaB
                 }
         }
@@ -369,19 +454,19 @@ struct ItemDetailView: View {
     /// Maps a click on the preview back to the box under it: a text line if
     /// there is one, otherwise the smallest layout region that contains it.
     private func hitTest(_ point: CGPoint, renderedSize: CGSize) -> PreviewSelection? {
-        let pixel = item.pixelSize
+        let pixel = pixelSize
         guard renderedSize.width > 0, renderedSize.height > 0,
               pixel.width > 0, pixel.height > 0 else { return nil }
         let inImage = CGPoint(x: point.x / renderedSize.width * pixel.width,
                               y: point.y / renderedSize.height * pixel.height)
 
-        if let index = item.textLines.firstIndex(where: { $0.boundingBox.contains(inImage) }) {
+        if let index = lines.firstIndex(where: { $0.boundingBox.contains(inImage) }) {
             return .line(index)
         }
-        let containing = item.layoutBlocks.indices.filter { item.layoutBlocks[$0].rect.contains(inImage) }
+        let containing = blocks.indices.filter { blocks[$0].rect.contains(inImage) }
         if let smallest = containing.min(by: { a, b in
-            let areaA = item.layoutBlocks[a].rect.width * item.layoutBlocks[a].rect.height
-            let areaB = item.layoutBlocks[b].rect.width * item.layoutBlocks[b].rect.height
+            let areaA = blocks[a].rect.width * blocks[a].rect.height
+            let areaB = blocks[b].rect.width * blocks[b].rect.height
             return areaA < areaB
         }) {
             return .block(smallest)
@@ -429,16 +514,14 @@ struct ItemDetailView: View {
                 Text("识别结果")
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                if item.status == .completed, let confidence = item.averageConfidence {
-                    Text("\(item.textLines.count) 行 · 置信度 \(Int((confidence * 100).rounded()))%")
+                if item.status == .completed, let summary = resultSummary {
+                    Text(summary)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
-                } else if item.status == .completed, !item.layoutBlocks.isEmpty {
-                    Text("\(item.layoutBlocks.count) 个区域")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(summary)
                 } else if item.status == .processing {
                     Text("识别中 \(Int((item.processingProgress * 100).rounded()))%")
                         .font(.caption)
@@ -446,6 +529,21 @@ struct ItemDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
+
+                if item.isExportable, #available(macOS 15.0, *) {
+                    Button {
+                        translating = true
+                    } label: {
+                        Label("翻译…", systemImage: "character.bubble")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("用 macOS 内置翻译在本机翻译识别结果")
+                    .sheet(isPresented: $translating) {
+                        TranslationSheet(items: [item])
+                    }
+                }
 
                 if item.isExportable {
                     Button {
@@ -485,6 +583,11 @@ struct ItemDetailView: View {
 
             Divider()
 
+            if item.status == .completed, let page, !page.allNotes.isEmpty {
+                notesBanner(for: page)
+                Divider()
+            }
+
             // Content
             textContent
         }
@@ -521,11 +624,12 @@ struct ItemDetailView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .completed:
-            if item.ocrText.isEmpty {
+            if pageText.text.isEmpty && pageText.markdown.isEmpty {
                 statusPlaceholder(
                     icon: "text.slash",
                     title: "未识别到文字",
-                    subtitle: "该图片可能不含可识别的文字内容",
+                    subtitle: pageCount > 1 ? "这一页可能不含可识别的文字内容"
+                                            : "该图片可能不含可识别的文字内容",
                     color: .orange
                 )
             } else {
@@ -560,18 +664,15 @@ struct ItemDetailView: View {
                                     renderTables: vm.renderTables,
                                     highlighted: hoveredBlockIndex,
                                     selected: selectedBlockIndex,
-                                    labelForSource: { index in
-                                        item.layoutBlocks.indices.contains(index)
-                                            ? item.layoutBlocks[index].label.label : nil
-                                    },
+                                    labelForSource: regionTag(for:),
                                     colorForSource: { index in
-                                        item.layoutBlocks.indices.contains(index)
-                                            ? LayoutBlockOverlay.color(for: item.layoutBlocks[index].label)
+                                        blocks.indices.contains(index)
+                                            ? LayoutBlockOverlay.color(for: blocks[index].label)
                                             : nil
                                     },
                                     confidenceForSource: { index in
-                                        item.layoutBlocks.indices.contains(index)
-                                            ? item.layoutBlocks[index].score : nil
+                                        blocks.indices.contains(index)
+                                            ? blocks[index].score : nil
                                     },
                                     onHover: { source in
                                         // Only the page scrolls this pane; the
@@ -582,13 +683,22 @@ struct ItemDetailView: View {
                                     },
                                     onTap: { source in selection = .block(source) },
                                     textForSource: { index in
-                                        item.layoutBlocks.indices.contains(index)
-                                            ? item.layoutBlocks[index].text : nil
+                                        blocks.indices.contains(index)
+                                            ? blocks[index].text : nil
                                     },
-                                    onCorrect: item.derivesFromBlocks
-                                        ? { index, text in
-                                            vm.correctBlock(itemID: item.id, blockIndex: index,
-                                                            text: text)
+                                    onCorrect: page?.derivesFromBlocks == true
+                                        ? { [pageIndex] index, text in
+                                            vm.correctBlock(itemID: item.id, page: pageIndex,
+                                                            blockIndex: index, text: text)
+                                        }
+                                        : nil,
+                                    noteForSource: { index in
+                                        blocks.indices.contains(index) ? blocks[index].review : nil
+                                    },
+                                    onReread: vm.canReread(item)
+                                        ? { [pageIndex] index in
+                                            vm.rereadBlock(itemID: item.id, page: pageIndex,
+                                                           blockIndex: index)
                                         }
                                         : nil)
                                     .textSelection(.enabled)
@@ -609,12 +719,12 @@ struct ItemDetailView: View {
                         ScrollView {
                             Group {
                                 if resultPane == .source {
-                                    Text(item.markdown)
+                                    Text(pageText.markdown)
                                         .font(.system(.callout, design: .monospaced))
                                         .textSelection(.enabled)
                                         .lineSpacing(3)
                                 } else {
-                                    Text(item.ocrText)
+                                    Text(pageText.text)
                                         .font(.body)
                                         .textSelection(.enabled)
                                         .lineSpacing(4)
@@ -677,6 +787,110 @@ struct ItemDetailView: View {
         }
     }
 
+    /// What the header says about the page: who read it, and how sure they
+    /// were — the layered routing, at a glance.
+    private var resultSummary: String? {
+        var parts: [String] = []
+        if let page {
+            let readers = page.readers
+            if readers.count > 1 || item.engine == .auto {
+                parts += readers.map { "\($0.source.label) \($0.count) 块" }
+            } else if !page.blocks.isEmpty {
+                parts.append("\(page.blocks.count) 个区域")
+            }
+            // Vision's confidences are coarse steps, not a measure worth
+            // averaging; PP-OCRv6's are per-character probabilities.
+            if !page.lines.isEmpty, item.engine == .paddleOCR || item.engine == .auto {
+                let mean = page.lines.reduce(0) { $0 + $1.confidence } / Double(page.lines.count)
+                parts.append("\(page.lines.count) 行 · 置信度 \(Int((mean * 100).rounded()))%")
+            } else if !page.lines.isEmpty, page.blocks.isEmpty {
+                parts.append("\(page.lines.count) 行")
+            }
+        }
+        if item.reusedCachedResult {
+            parts.append("复用此前结果")
+        } else if let elapsed = item.elapsed {
+            parts.append(elapsed < 60 ? String(format: "%.1f 秒", elapsed)
+                                      : "\(Int(elapsed) / 60) 分 \(Int(elapsed) % 60) 秒")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// What the quality check found on this page, said as what was observed.
+    private func notesBanner(for page: PageResult) -> some View {
+        let notes = page.allNotes
+        let warnings = notes.filter { $0.severity == .warning }
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: warnings.isEmpty ? "info.circle" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(warnings.isEmpty ? Color.secondary : Color.orange)
+                Text(warnings.isEmpty ? "说明" : "\(warnings.count) 处待复核")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                if !warnings.isEmpty {
+                    if let next = nextPageNeedingReview {
+                        Button("下一处 →") { pageIndex = next }
+                            .help("跳到第 \(next + 1) 页")
+                    }
+                    Button("标记为已复核") { vm.dismissReview(itemID: item.id, page: pageIndex) }
+                        .help("确认这一页已经核对过；不改动任何文字")
+                }
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { showingNotes.toggle() }
+                } label: {
+                    Image(systemName: showingNotes ? "chevron.up" : "chevron.down")
+                }
+                .help(showingNotes ? "收起" : "展开")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            if showingNotes {
+                ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
+                    noteRow(note, in: page)
+                }
+            }
+        }
+        .font(.caption)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background((warnings.isEmpty ? Color.secondary : Color.orange).opacity(0.08))
+    }
+
+    private func noteRow(_ note: ReviewNote, in page: PageResult) -> some View {
+        let region = note.block.flatMap { index in
+            page.blocks.indices.contains(index) ? page.blocks[index] : nil
+        }
+        return Button {
+            if let index = note.block { selection = .block(index) }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let region {
+                    Text("\(region.readingOrder + 1) \(region.label.label)")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 4)
+                        .background(LayoutBlockOverlay.color(for: region.label).opacity(0.2),
+                                    in: RoundedRectangle(cornerRadius: 3))
+                }
+                Text(note.message)
+                    .foregroundStyle(note.severity == .warning ? Color.primary : Color.secondary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(note.block == nil)
+        .help(note.block == nil ? "" : "在预览中定位这一区域")
+    }
+
+    /// The next page after this one with something flagged, wrapping round.
+    private var nextPageNeedingReview: Int? {
+        let count = item.pages.count
+        guard count > 1 else { return nil }
+        return (1..<count).map { (pageIndex + $0) % count }
+            .first { item.pages[$0].needsReview }
+    }
+
     /// Keeps `resultPane` on something this result actually has.
     private func normalisePane() {
         let panes = availablePanes
@@ -684,16 +898,30 @@ struct ItemDetailView: View {
         resultPane = panes.first ?? .plain
     }
 
+    /// What a region is, and — when a page mixes readers — who read it, so
+    /// the layered routing shows on the region itself.
+    private func regionTag(for index: Int) -> String? {
+        guard blocks.indices.contains(index) else { return nil }
+        let block = blocks[index]
+        var tag = block.label.label
+        if item.engine == .auto, let page {
+            tag += " · \((block.source ?? page.blockSource).label)"
+        }
+        if block.isCorrected { tag += " · 已修改" }
+        return tag
+    }
+
     private func refreshDocument() async {
-        renderedBlocks = MDParser.parse(fragments: vm.documentFragments(for: item))
-        figures = DocumentFigures.crops(for: item)
+        renderedBlocks = MDParser.parse(fragments: vm.documentFragments(for: item, page: pageIndex))
+        let image = pageImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        figures = page.map { DocumentFigures.crops(for: $0, image: image, dropping: vm.droppedLabels) } ?? []
     }
 
     /// Changes whenever the pane has a different document to show — a new
     /// selection, a result that has just finished, or the page-furniture switch
     /// having added or removed regions.
     private var renderKey: String {
-        "\(item.id)#\(item.markdown.count)#\(item.layoutBlocks.count)#\(vm.keptAuxiliary.count)"
+        "\(item.id)#\(pageIndex)#\(pageText.markdown.count)#\(blocks.count)#\(vm.keptAuxiliary.count)#\(pageImage != nil)"
     }
 
     private func statusPlaceholder(icon: String, title: String, subtitle: String, color: Color) -> some View {
@@ -898,5 +1126,43 @@ struct LayoutBlockOverlay: View {
         case .header, .footer, .number:                 return .gray
         default:                                        return .green
         }
+    }
+}
+
+// MARK: - Page previews
+
+/// Decodes the page shown in the preview, on demand.
+///
+/// The list used to keep every file's full image in memory as its thumbnail.
+/// Now only the pages actually looked at are decoded, rendered the same way
+/// the recogniser rendered them — so the boxes fit — and a handful are kept.
+enum PagePreviews {
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 24
+        return cache
+    }()
+
+    static func image(for item: ImageItem, page: Int) async -> NSImage? {
+        if item.pages.indices.contains(page), let rectified = item.pages[page].rectified {
+            return rectified
+        }
+        let key = "\(item.url.path)#\(page)" as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        let url = item.url, isPDF = item.isPDF
+        let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            let decoded = isPDF ? PDFSource(url: url)?.render(page: page)?.image
+                                : PageImages.image(at: url, frame: page)
+            return decoded.map(ImageItem.page(from:))
+        }.value
+        if let image { cache.setObject(image, forKey: key) }
+        return image
+    }
+
+    static func pageCount(of item: ImageItem) async -> Int {
+        let url = item.url, isPDF = item.isPDF
+        return await Task.detached(priority: .utility) {
+            isPDF ? (PDFSource(url: url)?.pageCount ?? 1) : max(1, PageImages.frameCount(of: url))
+        }.value
     }
 }

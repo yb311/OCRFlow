@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-enum ProcessingStatus: String, Equatable {
+enum ProcessingStatus: String, Equatable, Codable {
     case pending = "pending"
     case processing = "processing"
     case completed = "completed"
@@ -25,39 +25,49 @@ enum ProcessingStatus: String, Equatable {
 struct ImageItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
+    /// The folder this file was added through, when it came in as part of
+    /// one. A separate export recreates the tree below it.
+    var root: URL?
+    /// A small picture for the file list, made in the background.
     var thumbnail: NSImage?
     var status: ProcessingStatus
+    /// The whole document, assembled from the pages and post-processed.
     var ocrText: String
+    /// The whole document as Markdown. Empty for a result with no structure.
+    var markdown: String
+    var pages: [PageResult]
     var errorMessage: String?
     var processingProgress: Double   // 0.0 – 1.0, used when status == .processing
-    /// Per-line boxes from PaddleOCR, used to draw the detection overlay.
-    /// Empty for Vision, which this app only asks for plain text.
-    var textLines: [PPTextLine]
-    /// Structured output from the PaddleOCR-VL pipeline. Empty for the other
-    /// engines, which produce plain text and per-line boxes instead.
-    var markdown: String
-    var layoutBlocks: [PPLayoutBlock]
     /// Which engine produced the result currently attached, so an export can
     /// say where the text came from.
     var engine: OCREngine?
-    /// The page after 图片扭曲矫正 flattened it.
-    ///
-    /// Kept because the boxes belong to *this* image, not to the original: the
-    /// rectification is a per-pixel warp, so there is no way to map a box back
-    /// onto the photograph. The preview shows this one, which is also the
-    /// honest thing to show — it is what was read.
-    var rectifiedImage: NSImage?
-    /// Where the block text came from, so `ocrText` and `markdown` can be built
-    /// again from the blocks when a document setting changes.
-    var blockSource: PPTextSource
-    /// True when the text and the Markdown cover exactly what `layoutBlocks`
-    /// describes, and can therefore be rebuilt from them. False for a
-    /// multi-page PDF, whose blocks are page one's while its text is the whole
-    /// file.
-    var derivesFromBlocks: Bool
+    /// How long the last run took.
+    var elapsed: TimeInterval?
+    /// True when the last run found this file, read the same way, in the
+    /// recognition cache instead of reading it again.
+    var reusedCachedResult = false
 
-    /// The page the result describes: the rectified one when there is one.
-    var displayImage: NSImage? { rectifiedImage ?? thumbnail }
+    var fileName: String { url.lastPathComponent }
+    var fileExtension: String { url.pathExtension.uppercased() }
+    var isPDF: Bool { url.pathExtension.lowercased() == "pdf" }
+
+    /// The path below the folder it was added through, for an export that
+    /// keeps the source's structure: `2024/合同/扫描001.pdf`.
+    var relativePath: String {
+        guard let root else { return fileName }
+        let base = root.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(base + "/") else { return fileName }
+        return String(path.dropFirst(base.count + 1))
+    }
+
+    var fileSizeString: String {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64 else { return "—" }
+        let kb = Double(size) / 1024
+        if kb < 1024 { return String(format: "%.1f KB", kb) }
+        return String(format: "%.1f MB", kb / 1024)
+    }
 
     /// Wraps a decoded page so its pixel dimensions survive.
     ///
@@ -73,49 +83,23 @@ struct ImageItem: Identifiable, Equatable {
         return page
     }
 
-    /// Pixel dimensions of the page the boxes are expressed in. `NSImage.size`
-    /// is in points and can differ.
-    var pixelSize: CGSize {
-        guard let rep = displayImage?.representations.first else { return displayImage?.size ?? .zero }
-        return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
-    }
-
-    /// Mean confidence across recognised lines, or nil when there are none.
-    var averageConfidence: Double? {
-        guard !textLines.isEmpty else { return nil }
-        return textLines.reduce(0) { $0 + $1.confidence } / Double(textLines.count)
-    }
-
-    var fileName: String { url.lastPathComponent }
-    var fileExtension: String { url.pathExtension.uppercased() }
-
-    var fileSizeString: String {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attrs[.size] as? Int64 else { return "—" }
-        let kb = Double(size) / 1024
-        if kb < 1024 { return String(format: "%.1f KB", kb) }
-        return String(format: "%.1f MB", kb / 1024)
-    }
-
     /// Drops everything a previous run produced.
     ///
     /// A retry or a failed re-run must not leave the last result attached: the
-    /// preview overlay draws `textLines` and `layoutBlocks` from whatever the
-    /// item currently holds, so stale boxes would be painted over an image that
-    /// has not been recognised — or has just failed.
+    /// preview overlay draws whatever the item currently holds, so stale boxes
+    /// would be painted over an image that has not been recognised — or has
+    /// just failed.
     mutating func clearResults() {
         ocrText = ""
-        textLines = []
         markdown = ""
-        layoutBlocks = []
-        derivesFromBlocks = false
+        pages = []
         engine = nil
-        rectifiedImage = nil
         errorMessage = nil
         processingProgress = 0
+        elapsed = nil
     }
 
-    /// True when the VL pipeline produced a structured document for this item.
+    /// True when the result has structure worth rendering as Markdown.
     var hasMarkdown: Bool { !markdown.isEmpty }
 
     /// Anything worth copying or exporting.
@@ -126,27 +110,45 @@ struct ImageItem: Identifiable, Equatable {
     /// not drift apart.
     var isExportable: Bool { status == .completed && hasContent }
 
+    /// Every note on every page, with the page it belongs to.
+    var reviewNotes: [(page: Int, note: ReviewNote)] {
+        pages.enumerated().flatMap { index, page in page.allNotes.map { (index, $0) } }
+    }
+
+    /// A finished result something in which is worth checking.
+    var needsReview: Bool {
+        status == .completed && pages.contains(where: \.needsReview)
+    }
+
+    /// True once any region has been corrected by hand.
+    var isCorrected: Bool {
+        pages.contains { $0.blocks.contains(where: \.isCorrected) }
+    }
+
+    /// Mean confidence across recognised lines, or nil when there are none.
+    var averageConfidence: Double? {
+        let lines = pages.flatMap(\.lines)
+        guard !lines.isEmpty else { return nil }
+        return lines.reduce(0) { $0 + $1.confidence } / Double(lines.count)
+    }
+
     static func == (lhs: ImageItem, rhs: ImageItem) -> Bool {
         lhs.id == rhs.id && lhs.status == rhs.status &&
         lhs.ocrText == rhs.ocrText && lhs.markdown == rhs.markdown &&
         lhs.processingProgress == rhs.processingProgress &&
-        lhs.layoutBlocks == rhs.layoutBlocks &&
-        lhs.rectifiedImage === rhs.rectifiedImage
+        lhs.pages == rhs.pages && lhs.thumbnail === rhs.thumbnail &&
+        lhs.errorMessage == rhs.errorMessage
     }
 
-    init(url: URL) {
-        self.id = UUID()
+    init(url: URL, root: URL? = nil, id: UUID = UUID()) {
+        self.id = id
         self.url = url
+        self.root = root
         self.status = .pending
         self.ocrText = ""
-        self.processingProgress = 0
-        self.textLines = []
         self.markdown = ""
-        self.layoutBlocks = []
-        self.blockSource = .plainOCR
-        self.derivesFromBlocks = false
+        self.pages = []
+        self.processingProgress = 0
         self.engine = nil
-        self.rectifiedImage = nil
-        self.thumbnail = NSImage(contentsOf: url)
     }
 }

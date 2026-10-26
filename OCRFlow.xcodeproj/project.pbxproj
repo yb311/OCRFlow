@@ -54,6 +54,16 @@
 		B100000100000000000000AC /* MathSyntax.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000200000000000000AC /* MathSyntax.swift */; };
 		B1000001000000000000040A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B1000010000000000000BB05 /* Sparkle */; };
 		B1000001000000000000040B /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000040B /* UpdaterController.swift */; };
+		C10100000000000000000000 /* PageResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000000 /* PageResult.swift */; };
+		C10100000000000000000001 /* PDFPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000001 /* PDFPages.swift */; };
+		C10100000000000000000002 /* LayeredPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000002 /* LayeredPipeline.swift */; };
+		C10100000000000000000003 /* DocumentRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000003 /* DocumentRecognizer.swift */; };
+		C10100000000000000000004 /* ResultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000004 /* ResultStore.swift */; };
+		C10100000000000000000005 /* SearchablePDFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000005 /* SearchablePDFWriter.swift */; };
+		C10100000000000000000006 /* PipelineBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000006 /* PipelineBenchmark.swift */; };
+		C10100000000000000000007 /* TableWorkbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000007 /* TableWorkbook.swift */; };
+		C10100000000000000000008 /* FolderWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000008 /* FolderWatcher.swift */; };
+		C10100000000000000000009 /* TranslationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000009 /* TranslationSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -103,6 +113,16 @@
 		B10000020000000000000A08 /* PPDocUnwarper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocUnwarper.swift; sourceTree = "<group>"; };
 		B100000200000000000000AC /* MathSyntax.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathSyntax.swift; sourceTree = "<group>"; };
 		B1000002000000000000040B /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
+		C10200000000000000000000 /* PageResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageResult.swift; sourceTree = "<group>"; };
+		C10200000000000000000001 /* PDFPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPages.swift; sourceTree = "<group>"; };
+		C10200000000000000000002 /* LayeredPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayeredPipeline.swift; sourceTree = "<group>"; };
+		C10200000000000000000003 /* DocumentRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentRecognizer.swift; sourceTree = "<group>"; };
+		C10200000000000000000004 /* ResultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultStore.swift; sourceTree = "<group>"; };
+		C10200000000000000000005 /* SearchablePDFWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchablePDFWriter.swift; sourceTree = "<group>"; };
+		C10200000000000000000006 /* PipelineBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineBenchmark.swift; sourceTree = "<group>"; };
+		C10200000000000000000007 /* TableWorkbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableWorkbook.swift; sourceTree = "<group>"; };
+		C10200000000000000000008 /* FolderWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderWatcher.swift; sourceTree = "<group>"; };
+		C10200000000000000000009 /* TranslationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -140,6 +160,8 @@
 				B10000040000000000000A01 /* PaddleOCR */,
 				B1000004000000000000010A /* Layout */,
 				B1000004000000000000020A /* PaddleVL */,
+				C10400000000000000000000 /* Pipeline */,
+				C10400000000000000000001 /* Diagnostics */,
 				B10000040000000000000A02 /* Resources */,
 				A1000002000000000000AA08 /* Assets.xcassets */,
 				A1000002000000000000AA0B /* AppIcon.icon */,
@@ -175,6 +197,7 @@
 		A1000004000000000000AA05 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				C10200000000000000000009 /* TranslationSheet.swift */,
 				A1000002000000000000AA05 /* SidebarView.swift */,
 				A1000002000000000000AA06 /* DetailView.swift */,
 				A1000002000000000000AA07 /* DropZoneView.swift */,
@@ -249,6 +272,29 @@
 				B10000020000000000000A03 /* PaddleOCR */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		C10400000000000000000000 /* Pipeline */ = {
+			isa = PBXGroup;
+			children = (
+				C10200000000000000000008 /* FolderWatcher.swift */,
+				C10200000000000000000007 /* TableWorkbook.swift */,
+				C10200000000000000000005 /* SearchablePDFWriter.swift */,
+				C10200000000000000000004 /* ResultStore.swift */,
+				C10200000000000000000003 /* DocumentRecognizer.swift */,
+				C10200000000000000000002 /* LayeredPipeline.swift */,
+				C10200000000000000000001 /* PDFPages.swift */,
+				C10200000000000000000000 /* PageResult.swift */,
+			);
+			path = Pipeline;
+			sourceTree = "<group>";
+		};
+		C10400000000000000000001 /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				C10200000000000000000006 /* PipelineBenchmark.swift */,
+			);
+			path = Diagnostics;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -345,6 +391,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10100000000000000000009 /* TranslationSheet.swift in Sources */,
+				C10100000000000000000008 /* FolderWatcher.swift in Sources */,
+				C10100000000000000000007 /* TableWorkbook.swift in Sources */,
+				C10100000000000000000006 /* PipelineBenchmark.swift in Sources */,
+				C10100000000000000000005 /* SearchablePDFWriter.swift in Sources */,
+				C10100000000000000000004 /* ResultStore.swift in Sources */,
+				C10100000000000000000003 /* DocumentRecognizer.swift in Sources */,
+				C10100000000000000000002 /* LayeredPipeline.swift in Sources */,
+				C10100000000000000000001 /* PDFPages.swift in Sources */,
+				C10100000000000000000000 /* PageResult.swift in Sources */,
 				A1000001000000000000AA01 /* OCRFlowApp.swift in Sources */,
 				A1000001000000000000AA02 /* ContentView.swift in Sources */,
 				A1000001000000000000AA03 /* ImageItem.swift in Sources */,

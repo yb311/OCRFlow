@@ -518,30 +518,34 @@ enum DocumentFigures {
     /// the placeholders appear in — which is how a figure in the results pane
     /// finds the pixels it stands for.
     ///
-    /// Empty when the document came from a whole-page pass, which has no layout
-    /// blocks to crop from, and short of the placeholder count for a PDF, where
-    /// only page one's blocks are kept.
-    static func crops(for item: ImageItem) -> [NSImage?] {
-        guard !item.layoutBlocks.isEmpty,
-              let page = item.displayImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        else { return [] }
+    /// Taken from the same list of regions the assembler emits, so a region
+    /// the document leaves out — a header image with 页眉图 switched off —
+    /// takes its crop out with it instead of shifting every later figure onto
+    /// the wrong picture.
+    ///
+    /// Empty when the page came from a whole-page pass, which has no layout
+    /// blocks to crop from.
+    static func crops(for page: PageResult, image: CGImage?,
+                      dropping: Set<PPLayoutLabel>) -> [NSImage?] {
+        guard page.derivesFromBlocks else { return [] }
+        let figures = PPDocumentAssembler.contentIndices(page.blocks, dropping: dropping)
+            .filter { page.blocks[$0].label.producesFigure }
+        guard let image else { return figures.map { _ in nil } }
 
-        let pixel = item.pixelSize
-        let sx = pixel.width > 0 ? CGFloat(page.width) / pixel.width : 1
-        let sy = pixel.height > 0 ? CGFloat(page.height) / pixel.height : 1
-        let bounds = CGRect(x: 0, y: 0, width: page.width, height: page.height)
+        let sx = page.size.width > 0 ? CGFloat(image.width) / page.size.width : 1
+        let sy = page.size.height > 0 ? CGFloat(image.height) / page.size.height : 1
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
 
-        return item.layoutBlocks
-            .filter { $0.label.producesFigure }
-            .map { block -> NSImage? in
-                let scaled = CGRect(x: block.rect.minX * sx, y: block.rect.minY * sy,
-                                    width: block.rect.width * sx, height: block.rect.height * sy)
-                let rect = scaled.integral.intersection(bounds)
-                guard rect.width >= 8, rect.height >= 8,
-                      let cropped = page.cropping(to: rect) else { return nil }
-                return NSImage(cgImage: cropped,
-                               size: NSSize(width: cropped.width, height: cropped.height))
-            }
+        return figures.map { index -> NSImage? in
+            let block = page.blocks[index]
+            let scaled = CGRect(x: block.rect.minX * sx, y: block.rect.minY * sy,
+                                width: block.rect.width * sx, height: block.rect.height * sy)
+            let rect = scaled.integral.intersection(bounds)
+            guard rect.width >= 8, rect.height >= 8,
+                  let cropped = image.cropping(to: rect) else { return nil }
+            return NSImage(cgImage: cropped,
+                           size: NSSize(width: cropped.width, height: cropped.height))
+        }
     }
 }
 
@@ -580,6 +584,12 @@ struct MarkdownDocumentView: View {
     /// What the model read out of a region, and where a correction goes.
     var textForSource: (Int) -> String? = { _ in nil }
     var onCorrect: ((Int, String) -> Void)?
+    /// Why a region is flagged for review. Shown under the region whether or
+    /// not it is being pointed at: a flag that only appears on hover is one
+    /// nobody finds.
+    var noteForSource: (Int) -> String? = { _ in nil }
+    /// Reads one region again with PaddleOCR-VL.
+    var onReread: ((Int) -> Void)?
 
     @State private var editing: Int?
     @State private var draft = ""
@@ -599,7 +609,15 @@ struct MarkdownDocumentView: View {
                     } else if source == editing, editing != nil {
                         EmptyView()
                     } else {
-                        view(for: block)
+                        VStack(alignment: .leading, spacing: 6) {
+                            view(for: block)
+                            if let source, isLastBlock(of: source, block), let note = noteForSource(source) {
+                                Label(note, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .textSelection(.disabled)
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -680,6 +698,14 @@ struct MarkdownDocumentView: View {
                         Label("纠正", systemImage: "pencil")
                     }
                 }
+                if let onReread {
+                    Button {
+                        onReread(source)
+                    } label: {
+                        Label("VL 重读", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .help("用 PaddleOCR-VL 重新识别这一区域")
+                }
             }
             .font(.caption)
             .buttonStyle(.bordered)
@@ -688,6 +714,11 @@ struct MarkdownDocumentView: View {
             .padding(.trailing, 4)
             .offset(y: 3)
         }
+    }
+
+    /// True for the last rendered block of a region, under which its note goes.
+    private func isLastBlock(of source: Int, _ block: MDBlock) -> Bool {
+        blocks.last { $0.sourceBlock == source }?.id == block.id
     }
 
     /// True for the first rendered block of a region, which is the one that

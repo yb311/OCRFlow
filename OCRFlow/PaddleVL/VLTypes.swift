@@ -88,6 +88,9 @@ struct VLConfig: Equatable, Codable {
     /// 0 = as many as the system offers; PaddleOCR-VL runs on Metal by default.
     var threadCount: Int = 0
     var useGPU: Bool = true
+    /// How many regions are decoded side by side. 0 picks from the machine's
+    /// memory. Changes how fast a page is read, never what is read out of it.
+    var parallelSequences: Int = 0
     /// Prompt used when layout analysis is off and the whole image goes to the
     /// model in one shot.
     var wholeImageTask: VLTask = .ocr
@@ -126,6 +129,39 @@ struct VLConfig: Equatable, Codable {
     var dropPageFurniture: Bool = true
 
     static let `default` = VLConfig()
+
+    /// The choices offered for `parallelSequences`, besides automatic.
+    static let parallelismChoices = [1, 2, 4, 6, 8, 12, 16]
+
+    /// The number of sequences the engine actually runs.
+    ///
+    /// Each one holds its own share of the KV cache while it runs — about
+    /// 18 KB per token, so sixteen sequences cost roughly 600 MB more than one
+    /// — and the automatic choice follows the machine's memory. Sixteen is
+    /// worth reaching for: llama.cpp's Metal backend reads the weights once
+    /// per row for up to eight rows, and only past that switches to the
+    /// matrix kernels that make a wide step nearly as cheap as a narrow one.
+    var resolvedParallelism: Int {
+        if parallelSequences > 0 { return min(16, parallelSequences) }
+        let gigabytes = ProcessInfo.processInfo.physicalMemory >> 30
+        switch gigabytes {
+        case 24...: return 16
+        case 14...: return 8
+        default:    return 4
+        }
+    }
+
+    /// KV cells for the whole batch.
+    ///
+    /// A typical region — a paragraph, a table, a formula — needs a few hundred
+    /// to a couple of thousand cells for its image plus room for its answer, so
+    /// about 2.5 K per sequence keeps the batch full without reserving a whole
+    /// page's worth for every one of them. Never less than one request's own
+    /// context, so a single full-page read still fits.
+    static func contextBudget(perRequest: Int, parallelism: Int) -> Int {
+        guard parallelism > 1 else { return perRequest }
+        return min(65_536, max(perRequest, parallelism * 2_560))
+    }
 }
 
 extension VLConfig {
@@ -142,6 +178,7 @@ extension VLConfig {
         maxOutputTokens = value(.maxOutputTokens, fallback.maxOutputTokens)
         threadCount = value(.threadCount, fallback.threadCount)
         useGPU = value(.useGPU, fallback.useGPU)
+        parallelSequences = value(.parallelSequences, fallback.parallelSequences)
         wholeImageTask = value(.wholeImageTask, fallback.wholeImageTask)
         useLayoutDetection = value(.useLayoutDetection, fallback.useLayoutDetection)
         temperature = value(.temperature, fallback.temperature)

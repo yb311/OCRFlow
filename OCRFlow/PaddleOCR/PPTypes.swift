@@ -4,7 +4,7 @@ import CoreGraphics
 // MARK: - Results
 
 /// One recognised text line: where it is, what it says, how sure the model is.
-struct PPTextLine: Equatable {
+struct PPTextLine: Equatable, Codable {
     /// Corners in source-image pixel coordinates, clockwise from top-left.
     var quad: [CGPoint]
     var text: String

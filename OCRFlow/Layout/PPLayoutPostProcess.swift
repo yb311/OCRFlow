@@ -26,13 +26,32 @@ enum PPLayoutPostProcess {
         var kept = Array(blocks.indices)
         kept = survivingNMS(kept, blocks: blocks, threshold: nmsThreshold,
                             crossClassThreshold: crossClassThreshold)
+        let beforeContainment = kept
         kept = survivingContainment(kept, blocks: blocks, threshold: containmentThreshold)
         let order = Set(kept)
+        // An inline formula dropped for sitting inside a paragraph still says
+        // something about that paragraph: it has maths in it, which plain OCR
+        // cannot write down. The paragraph remembers.
+        var marked = blocks
+        for index in beforeContainment where !order.contains(index) && blocks[index].label == .inlineFormula {
+            let formula = blocks[index].rect
+            let container = kept.filter { blocks[$0].label != .inlineFormula }
+                .max { a, b in
+                    area(blocks[a].rect.intersection(formula)) < area(blocks[b].rect.intersection(formula))
+                }
+            if let container, area(blocks[container].rect.intersection(formula)) > 0 {
+                marked[container].inlineFormulas = (marked[container].inlineFormulas ?? 0) + 1
+            }
+        }
         // The reading-order keys are positional, so they have to be filtered in
         // step with the blocks rather than re-derived.
         let indices = blocks.indices.filter(order.contains)
-        return (indices.map { blocks[$0] },
+        return (indices.map { marked[$0] },
                 indices.compactMap { keys.indices.contains($0) ? keys[$0] : nil })
+    }
+
+    private static func area(_ rect: CGRect) -> CGFloat {
+        rect.isNull ? 0 : rect.width * rect.height
     }
 
     // MARK: - Non-maximum suppression

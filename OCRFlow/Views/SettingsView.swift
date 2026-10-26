@@ -63,6 +63,8 @@ struct SettingsView: View {
                 visionSettings
             } else if vm.ocrEngine == .paddleOCR {
                 paddleSettings
+            } else if vm.ocrEngine == .auto {
+                layeredSettings
             } else {
                 vlSettings
             }
@@ -272,6 +274,82 @@ struct SettingsView: View {
         ("de-DE",   "德文"),
         ("es-ES",   "西班牙文"),
     ]
+
+    // MARK: - Engine settings: 智能分层
+
+    @AppStorage("settings.layeredPaddleExpanded") private var showLayeredPaddle = false
+    @AppStorage("settings.layeredVLExpanded") private var showLayeredVL = false
+
+    @ViewBuilder
+    private var layeredSettings: some View {
+        settingSection("分层组件") {
+            VStack(alignment: .leading, spacing: 8) {
+                componentRow("PDF 原生文字层", detail: "直接提取，不经 OCR", ready: true)
+                componentRow("PP-DocLayoutV3 版面分析",
+                             detail: "按区域分配识别引擎的依据；未安装时整页只用 PP-OCRv6",
+                             ready: VLModelStore.isLayoutModelInstalled)
+                componentRow("PP-OCRv6 \(vm.paddleConfig.tier.label)", detail: "正文、标题等普通文字",
+                             ready: PPModelStore.isInstalled(vm.paddleConfig.tier))
+                componentRow("PaddleOCR-VL \(vm.vlConfig.variant.label)",
+                             detail: "表格、公式、图表、印章，以及置信度低的区域；未安装时只标记待复核",
+                             ready: VLModelStore.isInstalled(vm.vlConfig.variant))
+                let missing = [PPModelCatalog.layoutModel, PPModelCatalog.vlQuantized]
+                    .filter { !$0.isInstalled }
+                if !missing.isEmpty, !VLModelStore.isInstalled(vm.vlConfig.variant) || !VLModelStore.isLayoutModelInstalled {
+                    Divider().padding(.vertical, 2)
+                    HStack {
+                        Text("尚未安装").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        downloadSourceControl
+                    }
+                    ForEach(missing) { inlineDownloadRow($0) }
+                }
+            }
+        }
+
+        settingSection("路由策略") {
+            VStack(alignment: .leading, spacing: 10) {
+                toggleRow(isOn: $vm.layeredConfig.escalateLowConfidence,
+                          title: "低置信度区域交给 PaddleOCR-VL 重读",
+                          subtitle: "PP-OCRv6 读得没把握的段落改由视觉语言模型重新识别；关闭后只标记为待复核")
+                valueSlider("重读阈值（平均置信度）", value: $vm.layeredConfig.escalationConfidence,
+                            range: 0.5...0.98, step: 0.01,
+                            hint: "一个区域内 PP-OCRv6 各行的平均置信度低于此值，或四分之一以上的行"
+                                + "低于「最低置信度」，就交给 PaddleOCR-VL。调高更准但更慢")
+                    .disabled(!vm.layeredConfig.escalateLowConfidence)
+                Picker("PDF 已有文字层时", selection: $vm.layeredConfig.pdfText) {
+                    ForEach(PDFTextPolicy.allCases) { Text($0.label).tag($0) }
+                }
+                hint("原生 PDF 的文字本身就是准确的，直接取用最快也最准；扫描件上由其他软件生成的"
+                     + "隐藏 OCR 文字层质量未知，默认会重新识别。")
+            }
+        }
+
+        DisclosureGroup(isExpanded: $showLayeredPaddle) {
+            VStack(alignment: .leading, spacing: 16) { paddleSettings }
+                .padding(.top, 8)
+        } label: {
+            Text("PP-OCRv6 参数").font(.headline)
+        }
+
+        DisclosureGroup(isExpanded: $showLayeredVL) {
+            VStack(alignment: .leading, spacing: 16) { vlSettings }
+                .padding(.top, 8)
+        } label: {
+            Text("PaddleOCR-VL 参数").font(.headline)
+        }
+    }
+
+    private func componentRow(_ title: String, detail: String, ready: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(ready ? Color.green : Color.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.callout)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
 
     // MARK: - Engine settings: PaddleOCR
 
@@ -579,6 +657,13 @@ struct SettingsView: View {
                     Text("单块最大输出：\(vm.vlConfig.maxOutputTokens) token").font(.callout)
                 }
                 hint("上下文要装得下一块图像的视觉 token 加上它的输出；单块输出上限防止某一块卡住整页。")
+                Divider().padding(.vertical, 2)
+                Picker("并行识别的区域数", selection: $vm.vlConfig.parallelSequences) {
+                    Text("自动（本机 \(VLConfig().resolvedParallelism) 路）").tag(0)
+                    ForEach(VLConfig.parallelismChoices, id: \.self) { Text("\($0) 路").tag($0) }
+                }
+                hint("同一页、相邻页面和相邻文件的多个区域在 GPU 上一起解码。每个区域的裁剪、提示词和"
+                     + "解码方式都不变，识别结果与逐块识别一致，只是更快。每多一路约多占 45 MB 内存。")
             }
         }
     }
@@ -719,19 +804,42 @@ struct SettingsView: View {
                 }
             }
 
+            settingSection("监控文件夹") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.watchEnabled,
+                              title: "自动识别放进文件夹的新文件",
+                              subtitle: "包括子文件夹。文件写入完成后才会读取，原文件不会被移动或删除")
+                    folderRow("监控", url: vm.watchFolder) { vm.chooseWatchFolder(output: false) }
+                    folderRow("输出到", url: vm.watchOutputFolder) { vm.chooseWatchFolder(output: true) }
+                    if vm.watchEnabled, vm.watchFolder == nil {
+                        Label("请先选择要监控的文件夹", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    hint("每个文件识别完成后，按「文本与导出」里选择的格式写入输出文件夹，并保留子文件夹结构；"
+                         + "输出文件已存在的源文件视为已处理，不会重复识别。不选输出文件夹时，结果只留在列表里。")
+                }
+            }
+
+            settingSection("识别缓存") {
+                VStack(alignment: .leading, spacing: 10) {
+                    hint("同一个文件（按内容判断，与文件名和位置无关）用同样的设置识别过，就直接复用上次的结果。"
+                         + "「重新识别」总是重新读取。列表和识别结果在退出后保留，下次打开继续。")
+                    Button("清空识别缓存") { vm.store.clearCache() }
+                        .controlSize(.small)
+                }
+            }
+
             settingSection("批量并发") {
                 VStack(alignment: .leading, spacing: 10) {
-                    // PaddleOCR-VL keeps a single llama context with one KV cache,
-                    // so `processConcurrently` pins it to one image at a time no
-                    // matter what this says.
-                    let lockedToSingle = vm.ocrEngine == .paddleVL
+                    // The GPU engines batch regions across files themselves, so
+                    // `processConcurrently` caps them at two files in flight.
+                    let capped = vm.ocrEngine.prefersFewFilesInFlight
                     Stepper(value: $vm.maxConcurrentTasks, in: 1...8) {
-                        Text(lockedToSingle
-                             ? "同时处理 1 个文件"
+                        Text(capped
+                             ? "同时处理 \(min(2, vm.maxConcurrentTasks)) 个文件"
                              : "同时处理 \(vm.maxConcurrentTasks) 个文件")
                             .font(.callout)
                     }
-                    .disabled(lockedToSingle)
                     hint(concurrencyHint)
                 }
             }
@@ -786,15 +894,22 @@ struct SettingsView: View {
         case .plainText:
             return "只写出识别到的文字，不带任何结构。"
         case .json:
-            return "写出每一行的文字、四点坐标与置信度，以及版面区域的类别、阅读顺序和位置，"
-                 + "供其他程序继续处理。"
+            return "按页写出每一行的文字、四点坐标与置信度，以及版面区域的类别、阅读顺序、位置、"
+                 + "由哪个引擎识别和待复核原因，供其他程序继续处理。"
+        case .excel:
+            return "把识别出结构的表格写成 Excel 工作簿，每个表格一个工作表，合并单元格保持合并，"
+                 + "纯数字写成数值。表格结构来自 PaddleOCR-VL，PP-OCRv6 读成文字的表格不会导出。"
+        case .searchablePDF:
+            return "保留原页面外观（PDF 原页面以矢量形式保留，不重新栅格化），把识别文字以不可见文字层"
+                 + "叠在原位置上，可在预览、聚焦等程序里搜索和复制。原本就有文字层的页面不重复添加。"
         }
     }
 
     private var concurrencyHint: String {
         switch vm.ocrEngine {
-        case .paddleVL:
-            return "PaddleOCR-VL 只有一份 KV 缓存，始终逐张处理，这项设置对它不起作用。"
+        case .paddleVL, .auto:
+            return "GPU 模型会把多个文件、多个页面的区域合并成批一起解码，"
+                 + "最多同时处理 2 个文件就足以让 GPU 满载，再多只会多占内存。"
         case .paddleOCR:
             return "图片解码会真正并行；PaddleOCR 的模型推理仍逐张进行"
                  + "（避免多份模型抢占同一颗 CPU），但下一张的解码不再等待。"
@@ -804,6 +919,20 @@ struct SettingsView: View {
     }
 
     // MARK: - Building blocks
+
+    private func folderRow(_ title: String, url: URL?, choose: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Text(title).font(.callout).frame(width: 44, alignment: .leading)
+            Text(url?.path(percentEncoded: false) ?? "未选择")
+                .font(.caption)
+                .foregroundStyle(url == nil ? .tertiary : .secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(url?.path(percentEncoded: false) ?? "")
+            Button("选择…", action: choose).controlSize(.small)
+        }
+    }
 
     private func settingsScroll<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         ScrollView {

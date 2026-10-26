@@ -5,17 +5,21 @@ struct SidebarView: View {
     @State private var isEmptyStateTargeted = false
     @State private var showClearAllConfirm = false
     @State private var filter: StatusFilter = .all
+    /// Searches file names and everything recognised in them. The results are
+    /// kept between launches, so this searches every batch still listed.
+    @State private var query = ""
 
     /// Narrows the list to one status. In a batch of a few hundred files the
     /// failures are the ones worth looking at, and scrolling for them is the
     /// main thing the list makes hard.
     fileprivate enum StatusFilter {
-        case all, completed, failed, cancelled
+        case all, completed, review, failed, cancelled
 
         var label: String {
             switch self {
             case .all:       return "全部"
             case .completed: return "已完成"
+            case .review:    return "待复核"
             case .failed:    return "失败"
             case .cancelled: return "已取消"
             }
@@ -23,11 +27,19 @@ struct SidebarView: View {
     }
 
     private var visibleItems: [ImageItem] {
+        let byStatus: [ImageItem]
         switch filter {
-        case .all:       return vm.items
-        case .completed: return vm.items.filter { $0.status == .completed }
-        case .failed:    return vm.items.filter { $0.status == .failed }
-        case .cancelled: return vm.items.filter { $0.status == .cancelled }
+        case .all:       byStatus = vm.items
+        case .completed: byStatus = vm.items.filter { $0.status == .completed }
+        case .review:    byStatus = vm.items.filter(\.needsReview)
+        case .failed:    byStatus = vm.items.filter { $0.status == .failed }
+        case .cancelled: byStatus = vm.items.filter { $0.status == .cancelled }
+        }
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return byStatus }
+        return byStatus.filter {
+            $0.relativePath.localizedCaseInsensitiveContains(needle)
+                || $0.ocrText.localizedCaseInsensitiveContains(needle)
         }
     }
 
@@ -48,7 +60,7 @@ struct SidebarView: View {
                 filteredEmptyState
             } else {
                 List(visibleItems, selection: selectionBinding) { item in
-                    SidebarRowView(item: item)
+                    SidebarRowView(item: item, query: query)
                         .tag(item.id)
                         .contextMenu {
                             // If right-clicked item is not in selection, switch to it alone
@@ -102,6 +114,7 @@ struct SidebarView: View {
             Divider()
             bottomToolbar
         }
+        .searchable(text: $query, placement: .sidebar, prompt: "搜索文件名或识别内容")
         .onChange(of: filter) { _, _ in
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
@@ -117,13 +130,18 @@ struct SidebarView: View {
 
     private var filteredEmptyState: some View {
         VStack(spacing: 10) {
-            Image(systemName: filter == .failed ? "checkmark.circle" : "line.3.horizontal.decrease.circle")
+            Image(systemName: !query.isEmpty ? "magnifyingglass"
+                  : filter == .failed ? "checkmark.circle" : "line.3.horizontal.decrease.circle")
                 .font(.system(size: 26))
                 .foregroundStyle(Color(.tertiaryLabelColor))
-            Text(filter == .failed ? "没有失败的文件" : "没有\(filter.label)的文件")
+            Text(!query.isEmpty ? "没有包含「\(query)」的文件"
+                 : filter == .failed ? "没有失败的文件" : "没有\(filter.label)的文件")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button("显示全部") { filter = .all }
+            Button("显示全部") {
+                filter = .all
+                query = ""
+            }
                 .buttonStyle(.link)
                 .controlSize(.small)
         }
@@ -240,6 +258,11 @@ struct SidebarView: View {
                                    icon: "checkmark.circle.fill", tint: .green,
                                    help: "只看已完成的 \(vm.completedCount) 个")
                     }
+                    if vm.reviewCount > 0 {
+                        filterChip(.review, count: vm.reviewCount,
+                                   icon: "exclamationmark.triangle.fill", tint: .orange,
+                                   help: "只看有待复核内容的 \(vm.reviewCount) 个")
+                    }
                     if vm.failedCount > 0 {
                         filterChip(.failed, count: vm.failedCount,
                                    icon: "xmark.circle.fill", tint: .red,
@@ -290,7 +313,21 @@ extension SidebarView {
 struct SidebarRowView: View {
     @EnvironmentObject var vm: OCRViewModel
     let item: ImageItem
+    var query = ""
     @State private var isHovering = false
+
+    /// The words around the first match in the recognised text, when the
+    /// search found the file by what it says rather than by its name.
+    private var snippet: String? {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty, !item.relativePath.localizedCaseInsensitiveContains(needle),
+              let range = item.ocrText.range(of: needle, options: .caseInsensitive) else { return nil }
+        let start = item.ocrText.index(range.lowerBound, offsetBy: -12, limitedBy: item.ocrText.startIndex)
+            ?? item.ocrText.startIndex
+        let end = item.ocrText.index(range.upperBound, offsetBy: 24, limitedBy: item.ocrText.endIndex)
+            ?? item.ocrText.endIndex
+        return "…" + item.ocrText[start..<end].replacingOccurrences(of: "\n", with: " ") + "…"
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -301,6 +338,12 @@ struct SidebarRowView: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                if let snippet {
+                    Text(snippet)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
                 HStack(spacing: 6) {
                     Text(item.fileExtension)
                         .font(.caption2)
@@ -312,6 +355,7 @@ struct SidebarRowView: View {
                     Text(item.fileSizeString)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
                 }
             }
             Spacer(minLength: 0)
@@ -381,6 +425,11 @@ struct SidebarRowView: View {
         case .processing:
             ProcessingRingView(progress: item.processingProgress)
                 .frame(width: 16, height: 16)
+        case .completed where item.needsReview:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .font(.callout)
+                .help("识别完成，有内容待复核")
         case .completed:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)

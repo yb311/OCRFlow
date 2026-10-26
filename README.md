@@ -13,8 +13,14 @@ A native macOS app for batch OCR (Optical Character Recognition) and document pa
 
 ## Features
 
-- **Batch processing** — drag and drop multiple images or entire folders at once
-- **Three OCR engines** — Apple Vision (fast / accurate), PaddleOCR PP-OCRv6, or PaddleOCR-VL-1.6
+- **Batch processing** — drag and drop multiple images or entire folders, subfolders included; PDFs and multi-page TIFFs are read page by page
+- **智能分层 (layered recognition)** — the default engine. A born-digital PDF's own text is used as it is; every other page is split into regions by the layout model, prose goes to PP-OCRv6, and tables, formulas, charts, seals and any region PP-OCR is unsure of go to PaddleOCR-VL. See [Layered recognition](#layered-recognition)
+- **Four engines** — 智能分层, Apple Vision (fast / accurate), PaddleOCR PP-OCRv6, or PaddleOCR-VL-1.6
+- **Batched VLM inference** — PaddleOCR-VL decodes many regions side by side, across pages and files
+- **Quality review** — regions are flagged with the specific reason they deserve a look (low confidence, output cut off by the token limit, a decoder loop, two readers disagreeing); a 待复核 filter collects them, each region can be corrected or re-read with the VLM, and corrections are never overwritten without asking
+- **Persistent queue and result cache** — the list, every result and every correction survive quitting; a file already read with the same settings (matched by content, not name) is not read again
+- **Watched folder** — files that land in a folder are read once they have finished copying, and their results exported to an output folder in the same structure
+- **Full-text search** across everything recognised
 - **Document parsing** — the PaddleOCR-VL engine runs the official two-stage pipeline: layout analysis finds the blocks and their reading order, the VLM reads each one with the prompt that suits it (text, table, formula, chart, seal), and the results are reassembled as Markdown
 - **Full PaddleOCR pipeline** — text detection, document and text-line orientation correction, and CTC recognition, with per-line boxes and confidence scores drawn over the preview
 - **Three model tiers** — tiny / small / medium, from 6 MB to 139 MB, swappable without restarting
@@ -22,7 +28,8 @@ A native macOS app for batch OCR (Optical Character Recognition) and document pa
 - **Multi-language** — one PP-OCRv6 model reads 50 languages: Simplified and Traditional Chinese, English, Japanese and 46 Latin-script languages. Korean, Arabic, Cyrillic, Thai, Greek and Devanagari install in one click from the built-in model manager
 - **In-app model manager** — download the `medium` tier and extra language models from inside the app, with a mainland-China mirror
 - **Text post-processing** — merge line breaks, remove empty lines, trim whitespace, fix hyphenated words
-- **Flexible export** — export all results as a single text file with configurable separators
+- **Flexible export** — Markdown, plain text, per-page JSON, **searchable PDF** (invisible text layer over the original page, vectors untouched) and **Excel** (each recognised table one sheet, merged cells kept); combined into one file or one per source with the folder structure kept
+- **Screenshot recognition** (⌘⇧2) and **on-device translation** of results (macOS 15+, Apple's Translation framework)
 - **Fully offline** — the PaddleOCR models ship inside the app; images are never uploaded and nothing leaves your machine. The only network access is the optional model download you start yourself
 - **macOS-native** — built with SwiftUI, feels right at home on macOS
 
@@ -156,6 +163,42 @@ Scripts/fetch-paddleocr-models.sh bundled
 Delete the files from that folder — or press 删除 in the model manager — to fall
 back to the built-in models.
 
+## Layered recognition
+
+智能分层 reads each region of a page with the reader that suits it, and records
+on the region why:
+
+1. **The PDF's own text.** A born-digital page is not OCR'd at all: its regions
+   take their text from the text layer. A scan carrying another program's
+   hidden OCR layer is detected (invisible text, or text under a page-sized
+   image) and read again; so is a text layer that does not decode.
+2. **Layout.** PP-DocLayoutV3 splits the page into regions and orders them. All
+   routing is per region: one table does not send thirty paragraphs to the VLM.
+3. **PP-OCRv6** reads prose, with a box and confidence for every line.
+4. **PaddleOCR-VL** reads tables, display and inline formulas, charts, seals,
+   vertical text, and any text region whose PP-OCR confidence is low (threshold
+   in Settings) — all of a page's VL regions in one batch.
+5. **Quality check.** VL output that hit the token limit, was cut out of a loop,
+   or disagrees sharply with the other reader is flagged for review.
+
+Measured on an M4 Pro (10 pages: two arXiv papers with formulas, tables and two
+columns, a 300 dpi scan, and a Chinese page with a table). Accuracy is agreement
+with the PDF's own text (or the known text, for the images):
+
+| Engine | Time | Accuracy |
+| --- | --- | --- |
+| PaddleOCR-VL, one region at a time (before) | 53.1 s | baseline |
+| PaddleOCR-VL, batched | 46.9 s | identical scores |
+| 智能分层, PDFs treated as scans | 31.8 s | within ±0.001 of PaddleOCR-VL on every file |
+| 智能分层 | 22.3 s | within ±0.001 of PaddleOCR-VL on every file |
+
+Debug builds include the harness that produced this table:
+
+```bash
+OCRFLOW_MODELS_DIR=<models folder> OCRFlow.app/Contents/MacOS/OCRFlow \
+    --benchmark <output folder> vision,ppocr,vl1,vl,auto-ocr,auto <files…>
+```
+
 ## PaddleOCR-VL
 
 PaddleOCR-VL-1.6 is a 0.9B vision-language model. It reads handwriting, tables,
@@ -199,6 +242,27 @@ Downloaded from **Settings → VL → 模型管理**; nothing is bundled.
 The VLM runs on Metal through llama.cpp. On an Apple Silicon Mac a 31-block
 newspaper page parses in about 10 seconds.
 
+### Batching
+
+Generating a region's text is hundreds of small steps, each reading every
+weight of the model to produce one token. The engine keeps up to 16 sequences in
+one llama context (8 on 16 GB Macs, 4 on 8 GB; **Settings → VL → 推理**) and
+decodes them together, refilling a slot as soon as a region finishes —
+regions from several pages and files share the batch. The vision encoder runs on
+its own thread, a region ahead.
+
+Crops, prompts and greedy decoding are unchanged, so nothing about *what* is
+computed changes. The GPU kernels for a multi-row step sum in a different order
+than the one-row kernels, so on rare near-ties a token can flip: on the test set
+above 126 of 129 regions came out byte-identical, the other three differed by
+one token (`•` vs `-`, for instance), and the accuracy scores were identical. The
+gain is bounded by the vision encoder, which costs ~190 ms per region and cannot
+be batched across different crop sizes; the larger speed-up comes from not
+sending prose to the VLM at all, which is what 智能分层 does.
+
+PaddleOCR-VL writes tables in OTSL (`<fcel>`, `<lcel>`, `<ucel>`, `<nl>`…); the
+app converts them to HTML with `colspan`/`rowspan`, as PaddleOCR does.
+
 ### Compute backend
 
 CPU is the default and the recommended setting. A Core ML backend is available
@@ -237,6 +301,17 @@ OCRFlow/
 │   ├── PPImageBuffer.swift            # BGR buffer, resize, perspective crop
 │   ├── PPGeometry.swift               # Convex hull, min-area rect
 │   └── PPConnectedComponents.swift    # Region extraction for DB
+├── Pipeline/
+│   ├── DocumentRecognizer.swift       # One file, page by page, with any engine
+│   ├── LayeredPipeline.swift          # 智能分层 routing + batched VL region reading
+│   ├── PDFPages.swift                 # PDF rendering, text-layer trust verdict
+│   ├── PageResult.swift               # Per-page result and review notes
+│   ├── ResultStore.swift              # Persistent queue, results, recognition cache
+│   ├── SearchablePDFWriter.swift      # Invisible text layer over source pages
+│   ├── TableWorkbook.swift            # Tables → .xlsx
+│   └── FolderWatcher.swift            # FSEvents-driven watched folder
+├── Diagnostics/
+│   └── PipelineBenchmark.swift        # --benchmark (Debug builds only)
 ├── Layout/                   # Stage 1 of PaddleOCR-VL
 │   ├── PPLayoutTypes.swift            # 25 block classes, label → prompt routing
 │   ├── PPLayoutDetector.swift         # PP-DocLayoutV3 pre/post-processing
@@ -246,7 +321,7 @@ OCRFlow/
 │   ├── VLTypes.swift                  # Tasks, model variants, config
 │   ├── VLModelStore.swift             # GGUF + layout model lookup
 │   ├── VLImageBuffer.swift            # CGImage → RGB8 for mtmd
-│   ├── VLEngine.swift                 # llama.cpp + mtmd wrapper
+│   ├── VLEngine.swift                 # llama.cpp + mtmd, batched decoding
 │   └── VLDocumentPipeline.swift       # Layout → per-block VLM → assembly
 ├── Updates/
 │   └── UpdaterController.swift        # Sparkle updater, menu and settings state

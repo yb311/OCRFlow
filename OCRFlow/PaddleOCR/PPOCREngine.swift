@@ -28,6 +28,8 @@ final class PPOCREngine: @unchecked Sendable {
     struct Page {
         var lines: [PPTextLine] = []
         var blocks: [PPLayoutBlock] = []
+        /// Which of `lines` each block holds, when layout analysis ran.
+        var members: [[Int]] = []
     }
 
     convenience init(config: PPOCRConfig) throws {
@@ -106,7 +108,11 @@ final class PPOCREngine: @unchecked Sendable {
         // lines will be sorted into, and they are cheap next to recognition.
         var regions: [PPLayoutBlock] = []
         if cfg.readingOrder.needsLayoutModel, let layout {
-            regions = (try? layout.detect(page)) ?? []
+            // The same correction the VL pipeline applies: a "header" halfway
+            // down the page is a paragraph the classifier misnamed, and leaving
+            // it labelled as furniture would drop it from the document.
+            regions = ((try? layout.detect(page)) ?? [])
+                .reclassifyingFalsePageFurniture(pageHeight: CGFloat(page.height))
             regions = Self.mappedBack(regions, orientation: orientation,
                                       originalWidth: buffer.width, originalHeight: buffer.height)
         }
@@ -114,7 +120,7 @@ final class PPOCREngine: @unchecked Sendable {
 
         let quads = try detector.detect(page, config: cfg)
         progress?(0.35)
-        guard !quads.isEmpty else { return Page(lines: [], blocks: regions) }
+        guard !quads.isEmpty else { return Page(lines: [], blocks: regions, members: regions.map { _ in [] }) }
         if isCancelled?() == true { return Page() }
 
         var crops: [PPImageBuffer] = []
@@ -130,7 +136,7 @@ final class PPOCREngine: @unchecked Sendable {
                                                    originalHeight: buffer.height)
             })
         }
-        guard !crops.isEmpty else { return Page(lines: [], blocks: regions) }
+        guard !crops.isEmpty else { return Page(lines: [], blocks: regions, members: regions.map { _ in [] }) }
         progress?(0.45)
         if isCancelled?() == true { return Page() }
 
@@ -160,9 +166,23 @@ final class PPOCREngine: @unchecked Sendable {
         // back to reading the geometry of the lines themselves.
         if !regions.isEmpty {
             let page = PPStructureAssembler.assemble(lines: lines, blocks: regions)
-            return Page(lines: page.lines, blocks: page.blocks)
+            return Page(lines: page.lines, blocks: page.blocks, members: page.members)
         }
         return Page(lines: Self.inReadingOrder(lines, mode: cfg.readingOrder), blocks: [])
+    }
+
+    /// Layout analysis alone, for a page whose text comes from somewhere else
+    /// — a PDF's own text layer. Nil when the engine was built without the
+    /// layout model.
+    func layout(image: CGImage) throws -> [PPLayoutBlock]? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let layout else { return nil }
+        guard let buffer = PPImageBuffer(cgImage: image) else {
+            throw PPOCRError.imageDecodeFailed
+        }
+        return try layout.detect(buffer)
+            .reclassifyingFalsePageFurniture(pageHeight: CGFloat(buffer.height))
     }
 
     /// Detection hands its boxes back in PaddleOCR's `sorted_boxes` order,
