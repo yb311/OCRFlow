@@ -377,6 +377,15 @@ enum PPDocumentAssembler {
     /// The OTSL cell tokens PaddleOCR-VL writes a table in.
     static let otslTokens = ["<fcel>", "<ecel>", "<lcel>", "<ucel>", "<xcel>", "<nl>"]
 
+    /// One cell of an OTSL table, with the merges folded into its spans.
+    struct OTSLCell: Equatable {
+        var row: Int
+        var column: Int
+        var rowSpan = 1
+        var columnSpan = 1
+        var text: String
+    }
+
     /// Turns PaddleOCR-VL's OTSL table into HTML.
     ///
     /// PaddleOCR-VL-1.6 does not answer Table Recognition with HTML: it writes
@@ -389,6 +398,26 @@ enum PPDocumentAssembler {
     ///
     /// Nil when the text is not OTSL, so HTML or a pipe table passes through.
     static func htmlTable(fromOTSL text: String) -> String? {
+        guard let table = otslCells(text) else { return nil }
+        var html = "<table>"
+        var cells = table.cells[...]
+        for r in 0..<table.rows {
+            html += "<tr>"
+            while let cell = cells.first, cell.row == r {
+                html += "<td"
+                if cell.columnSpan > 1 { html += " colspan=\"\(cell.columnSpan)\"" }
+                if cell.rowSpan > 1 { html += " rowspan=\"\(cell.rowSpan)\"" }
+                html += ">\(cell.text)</td>"
+                cells = cells.dropFirst()
+            }
+            html += "</tr>"
+        }
+        return html + "</table>"
+    }
+
+    /// The cells of an OTSL table in reading order, empty ones included, and
+    /// how many rows it has. Nil when the text is not OTSL.
+    static func otslCells(_ text: String) -> (rows: Int, cells: [OTSLCell])? {
         guard text.contains("<fcel>") || text.contains("<ecel>") else { return nil }
 
         // Split into (tag, text) cells, row by row.
@@ -433,9 +462,8 @@ enum PPDocumentAssembler {
             return (tag == direction || tag == "<xcel>") && blank(r, c)
         }
 
-        var html = "<table>"
+        var cells: [OTSLCell] = []
         for r in rows.indices {
-            html += "<tr>"
             for c in 0..<width {
                 // A merge marker with nothing to merge into — the first row or
                 // column — is a cell of its own rather than a lost one.
@@ -447,14 +475,11 @@ enum PPDocumentAssembler {
                 while c + columns < width, merged(r, c + columns, into: "<lcel>") { columns += 1 }
                 var spannedRows = 1
                 while r + spannedRows < rows.count, merged(r + spannedRows, c, into: "<ucel>") { spannedRows += 1 }
-                html += "<td"
-                if columns > 1 { html += " colspan=\"\(columns)\"" }
-                if spannedRows > 1 { html += " rowspan=\"\(spannedRows)\"" }
-                html += ">\(rows[r][c].text.trimmingCharacters(in: .whitespacesAndNewlines))</td>"
+                cells.append(OTSLCell(row: r, column: c, rowSpan: spannedRows, columnSpan: columns,
+                                      text: rows[r][c].text.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-            html += "</tr>"
         }
-        return html + "</table>"
+        return (rows.count, cells)
     }
 
     /// Turns the pipe-separated rows the model writes into a valid GitHub

@@ -103,7 +103,7 @@ struct LayeredPipeline {
             case let .vl(task, reason):
                 blocks[index].routing = reason
                 regions.append(.init(block: index, task: task, fallback: blocks[index].text,
-                                     isEscalation: reason != nil))
+                                     isEscalation: reason != nil, lines: members))
             case let .keep(review):
                 blocks[index].review = review
             }
@@ -296,6 +296,9 @@ enum RegionReader {
         /// True when the VLM is a second opinion on a region PP-OCR doubted,
         /// rather than the region's natural reader.
         var isEscalation: Bool
+        /// PP-OCRv6's lines inside the region, in page coordinates, when it
+        /// read the region too. A table's layout is checked against them.
+        var lines: [PPTextLine] = []
     }
 
     static func read(_ regions: [Region], of image: CGImage, blocks: inout [PPLayoutBlock],
@@ -371,7 +374,8 @@ enum RegionReader {
             block.review = "PaddleOCR-VL 推理中断，内容可能不完整"
         case .finished, .cancelled:
             if let finding = crossCheck(block.text, against: fallback, readBy: otherReader,
-                                        task: region.task, isEscalation: region.isEscalation) {
+                                        task: region.task, isEscalation: region.isEscalation)
+                ?? (region.task == .table ? layoutCheck(table: text, against: region.lines) : nil) {
                 block.review = finding
             }
         }
@@ -408,6 +412,121 @@ enum RegionReader {
         return agreement < 0.6
             ? "与\(otherReader?.label ?? "另一引擎")的结果差异较大（字符重合 \(Int((agreement * 100).rounded()))%），请核对"
             : nil
+    }
+
+    /// What PP-OCRv6's view of a table says about where PaddleOCR-VL put
+    /// its cells.
+    ///
+    /// The character comparison cannot see a value written into the wrong
+    /// row: the characters are all there. On a sparse table — a grid of
+    /// ablations where most cells are blank — the VLM does exactly that, and
+    /// does it erratically: the same table read from a crop a few pixels
+    /// wider can come out right, or with a whole block of values pulled up a
+    /// row and two rows swapped. Full-precision weights do no better, and no
+    /// crop size reads it right every time, so the result is checked instead.
+    ///
+    /// PP-OCRv6 read the same region line by line, and in a table a line is
+    /// almost always one cell, with a box that says where on the page it is.
+    /// A text that appears exactly once in both readings pins a cell to a
+    /// place. Two such cells whose rows or columns are in one order in the
+    /// table and the other order on the page — or that share a row in the
+    /// table but not on the page — cannot both be right. Lines PP-OCRv6 read
+    /// with confidence that the table has fewer of, or lacks, were dropped or
+    /// overwritten.
+    static func layoutCheck(table otsl: String, against lines: [PPTextLine]) -> String? {
+        guard let table = PPDocumentAssembler.otslCells(otsl) else { return nil }
+        let readable = lines.filter { $0.confidence >= 0.8 && !layoutKey($0.text).isEmpty }
+        guard readable.count >= 6 else { return nil }
+        let heights = readable.map(\.boundingBox.height).sorted()
+        let lineHeight = heights[heights.count / 2]
+        // A box over several stacked cells — PP-OCR joins a column of single
+        // digits into one line — places none of them.
+        let placed = readable.filter { $0.boundingBox.height <= lineHeight * 1.6 }
+
+        let cells = table.cells.filter { !layoutKey($0.text).isEmpty }
+        let cellsByKey = Dictionary(grouping: cells) { layoutKey($0.text) }
+        let linesByKey = Dictionary(grouping: placed) { layoutKey($0.text) }
+
+        let anchors: [(cell: PPDocumentAssembler.OTSLCell, at: CGPoint)] = cellsByKey.compactMap { key, cells in
+            guard cells.count == 1, let lines = linesByKey[key], lines.count == 1 else { return nil }
+            let box = lines[0].boundingBox
+            return (cells[0], CGPoint(x: box.midX, y: box.midY))
+        }
+        // Cells in different rows must be that far apart, in that order; cells
+        // in the same row no further apart than this.
+        let rowGap = lineHeight * 0.25, sameRow = lineHeight * 0.6
+        var contradictions = 0
+        for i in anchors.indices {
+            for j in anchors.indices where j > i {
+                let (a, p) = anchors[i], (b, q) = anchors[j]
+                var wrong = false
+                if a.row + a.rowSpan <= b.row {
+                    wrong = p.y > q.y - rowGap
+                } else if b.row + b.rowSpan <= a.row {
+                    wrong = q.y > p.y - rowGap
+                } else if a.rowSpan == 1, b.rowSpan == 1 {
+                    wrong = abs(p.y - q.y) > sameRow
+                }
+                if a.column + a.columnSpan <= b.column {
+                    wrong = wrong || p.x > q.x
+                } else if b.column + b.columnSpan <= a.column {
+                    wrong = wrong || q.x > p.x
+                }
+                if wrong { contradictions += 1 }
+            }
+        }
+        if contradictions >= 3 {
+            return "表格中 \(contradictions) 组单元格的行列顺序与 PP-OCRv6 看到的版面不符，可能有内容错行错列，请核对"
+        }
+
+        // A cell PP-OCRv6 split over two lines is still there; so is a long
+        // one the two readers spell a letter apart — the paper that says
+        // "el al." comes back from the VLM as "et al.". A short value must
+        // match exactly: "0.3" and "0.2" are different cells.
+        let everything = cells.map { layoutKey($0.text) }.joined()
+        func isInTable(_ key: String) -> Bool {
+            everything.contains(key)
+                || key.count >= 6 && cellsByKey.keys.contains { editDistance(key, $0) <= key.count / 5 }
+        }
+        var missing: [String] = []
+        for (key, lines) in linesByKey where lines.contains(where: { $0.confidence >= 0.9 }) {
+            let shortfall = cellsByKey[key].map { lines.count - $0.count }
+                ?? (isInTable(key) ? 0 : lines.count)
+            missing += Array(repeating: lines[0].text, count: max(0, shortfall))
+        }
+        guard missing.count >= 2 else { return nil }
+        let examples = missing.sorted().prefix(3).map { "“\($0)”" }.joined(separator: "、")
+        return "PP-OCRv6 在表格中读到的 \(missing.count) 处内容（\(examples)\(missing.count > 3 ? " 等" : "")）不在表格里，可能有单元格漏读或错位，请核对"
+    }
+
+    /// Letters and digits, case-folded, with LaTeX commands left out — what a
+    /// cell and PP-OCRv6's reading of it have in common: `d_{model}` and
+    /// "dmodel" are the same cell, and so are `10^{6}` and "10⁶".
+    private static func layoutKey(_ text: String) -> String {
+        let stripped = text.replacingOccurrences(of: "\\\\[a-zA-Z]+", with: " ", options: .regularExpression)
+        var key = ""
+        for character in stripped.lowercased() where character.isLetter || character.isNumber {
+            if let digit = character.wholeNumberValue, (0...9).contains(digit) {
+                key += String(digit)
+            } else {
+                key.append(character)
+            }
+        }
+        return key
+    }
+
+    private static func editDistance(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        var previous = Array(0...b.count)
+        for i in a.indices {
+            var current = [i + 1]
+            for j in b.indices {
+                current.append(min(previous[j + 1] + 1, current[j] + 1,
+                                   previous[j] + (a[i] == b[j] ? 0 : 1)))
+            }
+            previous = current
+        }
+        return previous[b.count]
     }
 
     private static func looksLikeTable(_ text: String) -> Bool {
