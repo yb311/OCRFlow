@@ -82,6 +82,14 @@ final class PDFSource: @unchecked Sendable {
         context.setFillColor(CGColor.white)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         context.scaleBy(x: scale, y: scale)
+        // Link annotations are drawn as the red or blue boxes LaTeX's hyperref
+        // puts round every citation and reference. They are not on the page a
+        // reader prints, they look like the app's own markings in the preview,
+        // and they are noise to OCR — so they are left out. Every other
+        // annotation, a filled-in form field above all, is drawn as it is.
+        let links = page.annotations.filter { $0.type == "Link" && $0.shouldDisplay }
+        links.forEach { $0.shouldDisplay = false }
+        defer { links.forEach { $0.shouldDisplay = true } }
         // `draw(with:to:)` applies `transform(for:)` — crop and rotation — so
         // that same transform maps text positions onto these pixels.
         page.draw(with: .cropBox, to: context)

@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!--
+  The rendered Markdown pane. markdown-it lays out the document — tables with
+  their merged cells included, since recognised tables arrive as HTML — and
+  KaTeX sets every formula. Both ship inside the app: nothing is fetched.
+-->
+<link rel="stylesheet" href="katex.min.css">
+<style>
+  :root {
+    color-scheme: light dark;
+    --text: -apple-system-label;
+    --secondary: -apple-system-secondary-label;
+    --rule: rgba(127, 127, 127, 0.28);
+    --header: rgba(127, 127, 127, 0.12);
+    --accent: #0D9888;
+    --accent-soft: rgba(13, 152, 136, 0.16);
+    --flag: rgba(255, 149, 0, 0.15);
+  }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body {
+    font: 13px/1.65 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: text;
+  }
+  main { padding: 14px 20px 40px; max-width: 920px; }
+  section { padding: 2px 8px; margin: 0 -8px; border-radius: 6px; cursor: default; }
+  section.flagged { background: var(--flag); }
+  section.selected { background: var(--accent-soft); }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.3; margin: 1.1em 0 0.45em; font-weight: 650; }
+  h1 { font-size: 1.6em; } h2 { font-size: 1.35em; } h3 { font-size: 1.15em; } h4, h5, h6 { font-size: 1em; }
+  p { margin: 0.55em 0; }
+  ul, ol { padding-left: 1.6em; margin: 0.5em 0; }
+  blockquote { margin: 0.6em 0; padding: 0 0 0 12px; border-left: 3px solid var(--rule); color: var(--secondary); }
+  code { font: 12px "SF Mono", Menlo, monospace; background: var(--header); padding: 1px 4px; border-radius: 4px; }
+  pre { background: var(--header); padding: 10px 12px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 1em 0; }
+  a { color: var(--accent); }
+  .table-wrap { overflow-x: auto; margin: 0.7em 0; }
+  table { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--rule); padding: 5px 9px; text-align: left; vertical-align: top; }
+  th, table.implicit-header tr:first-child > td { background: var(--header); font-weight: 600; }
+  .katex { font-size: 1.08em; }
+  .katex-display { margin: 0.7em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  img.figure { display: block; max-width: 100%; max-height: 460px; border-radius: 4px; margin: 0.6em 0; }
+  .figure-missing { color: var(--secondary); font-size: 12px; border: 1px dashed var(--rule);
+                    border-radius: 6px; padding: 8px 12px; margin: 0.6em 0; }
+  .math-error { color: var(--secondary); font-family: "SF Mono", Menlo, monospace; font-size: 12px; }
+</style>
+<script src="markdown-it.min.js"></script>
+<script src="katex.min.js"></script>
+</head>
+<body>
+<main id="doc"></main>
+<script>
+(function () {
+  "use strict";
+
+  const md = window.markdownit({ html: true, linkify: true, breaks: false, typographer: false });
+  let figures = [];
+  let figureOrdinal = 0;
+
+  // Figures are placeholders `![标签]()` in document order; each takes the
+  // crop for its ordinal, or says what it stood for when there is none.
+  md.renderer.rules.image = function (tokens, index) {
+    const alt = tokens[index].content || "图片";
+    const source = figures[figureOrdinal++];
+    if (source) return '<img class="figure" alt="' + md.utils.escapeHtml(alt) + '" src="' + source + '">';
+    return '<span class="figure-missing">' + md.utils.escapeHtml(alt) + "</span>";
+  };
+
+  // --- Maths ------------------------------------------------------------------
+  // Formulas are lifted out before Markdown sees them — an underscore in
+  // `d_{k}` would otherwise turn into emphasis — and set by KaTeX afterwards.
+
+  function looksLikeMath(body) {
+    const t = body.trim();
+    if (!t) return false;
+    if (/[\\^_]/.test(t) || /[+\-=<>*/]/.test(t)) return true;
+    // `$f$` is a variable; `$2 and $3` are prices.
+    return !/\s/.test(t) && t.length <= 24;
+  }
+
+  function renderMath(tex, display) {
+    try {
+      return katex.renderToString(tex, { displayMode: display, throwOnError: false, strict: "ignore",
+                                         trust: false, output: "html" });
+    } catch (error) {
+      return '<span class="math-error">' + md.utils.escapeHtml(tex) + "</span>";
+    }
+  }
+
+  function liftMath(source, store) {
+    const keep = (tex, display) => {
+      store.push({ tex: tex, display: display });
+      return "OCRMATH" + (store.length - 1) + "X";
+    };
+    let text = source;
+    text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => "\n\n" + keep(tex, true) + "\n\n");
+    text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => "\n\n" + keep(tex, true) + "\n\n");
+    // A display formula the model began and never closed — cut off by the
+    // token limit — is still a formula.
+    text = text.replace(/\\\[([\s\S]+)$/g, (_, tex) => "\n\n" + keep(tex, true) + "\n\n");
+    text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, tex) => keep(tex, false));
+    text = text.replace(/\$([^$\n]+?)\$/g, (whole, tex) => looksLikeMath(tex) ? keep(tex, false) : whole);
+    return text;
+  }
+
+  function restoreMath(html, store) {
+    return html.replace(/OCRMATH(\d+)X/g, (_, n) => {
+      const item = store[Number(n)];
+      return item ? renderMath(item.tex, item.display) : "";
+    });
+  }
+
+  // In table cells the model writes LaTeX bare: `d_{model}`, `\epsilon _{ls}`,
+  // `params \times 10^{6}`. A word with a command, subscript or superscript in
+  // it is set as maths; a `_{ls}` set apart by a space joins the word before.
+  function setBareCellMath(cell) {
+    if (cell.querySelector(".katex")) return;
+    const text = cell.textContent;
+    if (!/[\\^_]/.test(text)) return;
+    const words = [];
+    for (const word of text.split(/\s+/).filter(Boolean)) {
+      const last = words[words.length - 1];
+      if (last && (/^[_^]/.test(word) || /[_^]$/.test(last))) words[words.length - 1] = last + word;
+      else words.push(word);
+    }
+    cell.innerHTML = words.map(word => /[\\^_]/.test(word)
+      ? renderMath(word, false) : md.utils.escapeHtml(word)).join(" ");
+  }
+
+  // Bare commands in prose — "\left\lfloor\frac{n-1}{2}\right\rfloor players
+  // remain" — are maths too; the run ends at the first plain word.
+  function setBareProseMath(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: node => node.parentElement.closest(".katex, code, pre, td, th")
+        ? NodeFilter.FILTER_REJECT
+        : (/\\[a-zA-Z]+/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT)
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    const run = /\\[a-zA-Z]+(?:\s*(?:\{[^{}]*\}|[_^](?:\{[^{}]*\}|[A-Za-z0-9])|\\[a-zA-Z]+|[()\[\]|.,+\-=0-9]))*/g;
+    for (const node of nodes) {
+      const span = document.createElement("span");
+      span.innerHTML = md.utils.escapeHtml(node.nodeValue).replace(run, tex => renderMath(tex, false));
+      node.replaceWith(span);
+    }
+  }
+
+  // --- Document ---------------------------------------------------------------
+
+  function render(payload) {
+    figures = payload.figures || [];
+    figureOrdinal = 0;
+    if (payload.accent) {
+      const root = document.documentElement.style;
+      root.setProperty("--accent", payload.accent);
+      root.setProperty("--accent-soft", payload.accent + "29");
+    }
+
+    const doc = document.getElementById("doc");
+    const parts = (payload.fragments || []).map(fragment => {
+      const store = [];
+      const html = restoreMath(md.render(liftMath(fragment.markdown || "", store)), store);
+      const attributes = fragment.block === null || fragment.block === undefined
+        ? "" : ' data-block="' + fragment.block + '"';
+      return "<section" + attributes + (fragment.flagged ? ' class="flagged"' : "") + ">" + html + "</section>";
+    });
+    doc.innerHTML = parts.join("");
+
+    for (const table of doc.querySelectorAll("table")) {
+      if (!table.querySelector("th") && table.rows.length > 1) table.classList.add("implicit-header");
+      const wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      table.replaceWith(wrap);
+      wrap.appendChild(table);
+      for (const cell of table.querySelectorAll("td, th")) setBareCellMath(cell);
+    }
+    setBareProseMath(doc);
+    select(payload.selected);
+  }
+
+  function select(block) {
+    for (const section of document.querySelectorAll("section.selected")) section.classList.remove("selected");
+    if (block === null || block === undefined) return;
+    const section = document.querySelector('section[data-block="' + block + '"]');
+    if (!section) return;
+    section.classList.add("selected");
+    const box = section.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) section.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  function post(message) {
+    if (window.webkit && window.webkit.messageHandlers.ocrflow) window.webkit.messageHandlers.ocrflow.postMessage(message);
+  }
+
+  // A click selects a region; a second click on the same one soon after is
+  // "change this", and the native pane opens the region's editor. Counted
+  // here rather than left to `dblclick`, which a slow or unsteady double
+  // click — and some input methods — never produce.
+  let lastClick = { block: null, time: 0 };
+  document.addEventListener("click", event => {
+    const section = event.target.closest("section[data-block]");
+    if (!section) return;
+    const block = Number(section.dataset.block);
+    const now = Date.now();
+    if (lastClick.block === block && now - lastClick.time < 450) {
+      lastClick = { block: null, time: 0 };
+      window.getSelection().removeAllRanges();
+      post({ edit: block });
+      return;
+    }
+    lastClick = { block: block, time: now };
+    if (window.getSelection().isCollapsed) post({ select: block });
+  });
+
+  window.OCRFlow = { render: render, select: select };
+  post({ ready: true });
+})();
+</script>
+</body>
+</html>

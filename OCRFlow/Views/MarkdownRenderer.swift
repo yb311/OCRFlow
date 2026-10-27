@@ -573,12 +573,12 @@ struct MarkdownDocumentView: View {
     /// The region the user has clicked, which stays lit when the pointer moves
     /// away.
     var selected: Int?
-    /// What the region is called, for the tag shown beside it.
+    /// What the region is: its number in reading order and its kind.
     var labelForSource: (Int) -> String? = { _ in nil }
-    /// What the region *is*, so the text matches its box in the preview.
-    var colorForSource: (Int) -> Color? = { _ in nil }
-    /// How sure the model was about this region.
-    var confidenceForSource: (Int) -> Double? = { _ in nil }
+    /// Who read it, and how sure they were when they say: "PP-OCRv6 · 96%".
+    var readerForSource: (Int) -> String? = { _ in nil }
+    /// How the region's text is shown and edited.
+    var kindForSource: (Int) -> RegionContentKind = { _ in .text }
     var onHover: (Int?) -> Void = { _ in }
     var onTap: (Int) -> Void = { _ in }
     /// What the model read out of a region, and where a correction goes.
@@ -588,132 +588,162 @@ struct MarkdownDocumentView: View {
     /// not it is being pointed at: a flag that only appears on hover is one
     /// nobody finds.
     var noteForSource: (Int) -> String? = { _ in nil }
+    /// Opens the flagged region in review.
+    var onReview: ((Int) -> Void)?
     /// Reads one region again with PaddleOCR-VL.
     var onReread: ((Int) -> Void)?
+    /// A region someone asked to edit from elsewhere — a double-click in the
+    /// rendered Markdown. Opened here and cleared.
+    var editRequest: Binding<Int?> = .constant(nil)
 
     @State private var editing: Int?
     @State private var draft = ""
 
+    /// Opens a region's editor, when there is something to edit and somewhere
+    /// for the correction to go.
+    private func beginEditing(_ source: Int) {
+        guard onCorrect != nil, let text = textForSource(source) else { return }
+        draft = text
+        editing = source
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // A list, not a stack of cards: one quiet line of who-and-what above
+        // each region, a tint for the one selected, and a rule between them.
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(blocks) { block in
                 let source = block.sourceBlock
-                let isLit = source != nil && (source == highlighted || source == selected)
-                let tint = source.flatMap(colorForSource) ?? .accentColor
-                Group {
-                    // While a region is being corrected its own markup is set
-                    // aside: what is edited is what the model actually wrote,
-                    // not the rendering of it.
-                    if let source, editing == source, isFirstBlock(of: source, block) {
-                        correctionEditor(for: source)
-                    } else if source == editing, editing != nil {
-                        EmptyView()
+                let isSelected = source != nil && source == selected
+                let isHovered = source != nil && source == highlighted && !isSelected
+                let isFirst = source.map { isFirstBlock(of: $0, block) } ?? true
+                let isLast = source.map { isLastBlock(of: $0, block) } ?? true
+                VStack(alignment: .leading, spacing: 6) {
+                    if let source, isFirst {
+                        header(for: source, isSelected: isSelected)
+                    }
+                    if let source, editing == source {
+                        // While a region is being corrected it is edited in
+                        // the form it is read in, standing in for all of it.
+                        if isFirst { correctionEditor(for: source) }
                     } else {
-                        VStack(alignment: .leading, spacing: 6) {
-                            view(for: block)
-                            if let source, isLastBlock(of: source, block), let note = noteForSource(source) {
-                                Label(note, systemImage: "exclamationmark.triangle.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
-                                    .textSelection(.disabled)
-                            }
-                        }
+                        view(for: block)
+                    }
+                    if let source, isLast, editing != source, let note = noteForSource(source) {
+                        reviewNote(note, for: source)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                // Room above for the tag and below for the buttons, kept
-                // whether or not they are showing: chrome that appears on
-                // hover must not move the paragraph it belongs to.
-                .padding(.top, 12)
-                .padding(.bottom, 14)
-                .background {
-                    // The page and the document are two views of the same
-                    // thing, in the same colours: the tint is what the region
-                    // *is*, matching its box in the preview exactly.
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(tint.opacity(isLit ? 0.12 : 0))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(tint.opacity(isLit ? 0.7 : 0), lineWidth: 1)
-                        }
-                }
-                .overlay(alignment: .topLeading) {
-                    if isLit, let source, editing == nil, isFirstBlock(of: source, block) {
-                        regionTag(for: source, tint: tint)
-                    }
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if isLit, let source, editing == nil, isFirstBlock(of: source, block) {
-                        blockControls(for: source)
-                    }
+                .padding(.horizontal, 16)
+                .padding(.top, isFirst ? 12 : 3)
+                .padding(.bottom, isLast ? 12 : 3)
+                .background(isSelected ? Color.accentColor.opacity(0.10)
+                            : isHovered ? Color.primary.opacity(0.04) : Color.clear)
+                .overlay(alignment: .bottom) {
+                    if isLast { Divider().opacity(0.6) }
                 }
                 .contentShape(Rectangle())
                 .onHover { inside in onHover(inside ? source : nil) }
+                // Double-click to change a region where it is read; declared
+                // first so it is not taken for two single clicks.
+                .onTapGesture(count: 2) {
+                    if let source, editing != source { beginEditing(source) }
+                }
                 .onTapGesture { if let source { onTap(source) } }
                 .id(block.id)
             }
         }
+        .onAppear(perform: takeEditRequest)
+        .onChange(of: editRequest.wrappedValue) { _, _ in takeEditRequest() }
     }
 
-    /// What the region is, and how sure the model was — on the top-left corner,
-    /// where the preview puts the same label on the same box.
-    @ViewBuilder
-    private func regionTag(for source: Int, tint: Color) -> some View {
-        HStack(spacing: 4) {
-            if let name = labelForSource(source) {
-                Text(name)
+    private func takeEditRequest() {
+        guard let source = editRequest.wrappedValue else { return }
+        editRequest.wrappedValue = nil
+        beginEditing(source)
+    }
+
+    /// "3 · 表格" on the left, "PaddleOCR-VL" on the right — and, on the
+    /// selected region, the few things to do with it.
+    private func header(for source: Int, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            if let label = labelForSource(source) {
+                Text(label)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             }
-            if let confidence = confidenceForSource(source) {
-                Text("\(Int((confidence * 100).rounded()))%").monospacedDigit().opacity(0.85)
+            Spacer(minLength: 4)
+            if isSelected, editing == nil {
+                blockControls(for: source)
+            }
+            if let reader = readerForSource(source) {
+                Text(reader)
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
             }
         }
-        .font(.caption2)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(tint, in: RoundedRectangle(cornerRadius: 4))
-        .foregroundStyle(.white)
-        .offset(x: 0, y: -1)
-        .allowsHitTesting(false)
+        .font(.caption)
+        .textSelection(.disabled)
     }
 
-    /// Copy and correct, at the bottom-right corner — inside the block's own
-    /// bounds, so moving the pointer onto a button does not count as leaving
-    /// the block and take the buttons away before they can be clicked.
+    /// Copy, correct and re-read, as small icons on the selected region only.
     @ViewBuilder
     private func blockControls(for source: Int) -> some View {
         if let text = textForSource(source) {
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 } label: {
-                    Label("复制", systemImage: "doc.on.doc")
+                    Image(systemName: "doc.on.doc")
                 }
+                .help("复制这一块")
                 if onCorrect != nil {
                     Button {
-                        draft = text
-                        editing = source
+                        beginEditing(source)
                     } label: {
-                        Label("纠正", systemImage: "pencil")
+                        Image(systemName: "pencil")
                     }
+                    .help("纠正这一块（也可以双击）")
                 }
                 if let onReread {
                     Button {
                         onReread(source)
                     } label: {
-                        Label("VL 重读", systemImage: "arrow.triangle.2.circlepath")
+                        Image(systemName: "arrow.clockwise")
                     }
-                    .help("用 PaddleOCR-VL 重新识别这一区域")
+                    .help("用 PaddleOCR-VL 重新识别这一块")
                 }
             }
-            .font(.caption)
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .fixedSize()
-            .padding(.trailing, 4)
-            .offset(y: 3)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
         }
+    }
+
+    /// Why a region needs a look, in the one colour that means "look here",
+    /// with the way to deal with it beside the reason.
+    private func reviewNote(_ note: String, for source: Int) -> some View {
+        HStack(spacing: 6) {
+            if note == OCRViewModel.rereadingNote {
+                ProgressView().controlSize(.mini)
+            } else {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            Text(note)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if let onReview, note != OCRViewModel.rereadingNote {
+                Button("去复核 →") { onReview(source) }
+                    .buttonStyle(.borderless)
+                    .fontWeight(.semibold)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.orange)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+        .textSelection(.disabled)
     }
 
     /// True for the last rendered block of a region, under which its note goes.
@@ -728,17 +758,10 @@ struct MarkdownDocumentView: View {
     }
 
     private func correctionEditor(for source: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextEditor(text: $draft)
-                .font(.system(.callout, design: .monospaced))
-                .frame(minHeight: 80)
-                .padding(4)
-                .background(Color(nsColor: .textBackgroundColor),
-                            in: RoundedRectangle(cornerRadius: 5))
-                .overlay(RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1))
+        VStack(alignment: .leading, spacing: 8) {
+            InlineRegionEditor(kind: kindForSource(source), text: $draft, startsEditing: true)
             HStack {
-                Text("直接修改模型读出的原文；保存后文本、Markdown 与导出都会跟着变")
+                Text("保存后文本、Markdown 与导出都会跟着变")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -862,10 +885,12 @@ struct MarkdownDocumentView: View {
 /// once each one is 20 points wide.
 struct MDTableView: View {
     let table: MDTable
+    /// Cells to mark, as where two readings of the table part ways.
+    var flagged: Set<MDCellRef> = []
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
-            MDTableGrid(table: table)
+            MDTableGrid(table: table, flagged: flagged)
         }
         // The pane is itself a vertical ScrollView, which offers its content
         // unbounded height; without this the table would take all of it.
@@ -873,18 +898,49 @@ struct MDTableView: View {
     }
 }
 
+/// One cell of a parsed table, by row and position in the row.
+struct MDCellRef: Hashable {
+    let row: Int
+    let cell: Int
+}
+
+extension MDTable {
+    /// The cells whose text is not what the other table has in the same place.
+    func cells(differingFrom other: MDTable) -> Set<MDCellRef> {
+        var differing = Set<MDCellRef>()
+        for (r, row) in rows.enumerated() {
+            for (c, cell) in row.cells.enumerated() where !cell.isContinuation {
+                let theirs = other.rows.indices.contains(r) && other.rows[r].cells.indices.contains(c)
+                    ? other.rows[r].cells[c].text : nil
+                let mine = cell.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if theirs?.trimmingCharacters(in: .whitespacesAndNewlines) != mine {
+                    differing.insert(MDCellRef(row: r, cell: c))
+                }
+            }
+        }
+        return differing
+    }
+
+    /// True when some cell says it is a header. The model writes every cell as
+    /// `<td>`, so without one the first row is taken to be the header.
+    var hasExplicitHeader: Bool { rows.contains { $0.cells.contains(where: \.isHeader) } }
+}
+
 struct MDTableGrid: View {
     let table: MDTable
+    var flagged: Set<MDCellRef> = []
 
     private let borderColor = Color.secondary.opacity(0.35)
 
     var body: some View {
+        let implicitHeader = !table.hasExplicitHeader && table.rows.count > 1
         Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
             ForEach(table.rows) { row in
                 GridRow {
                     ForEach(row.cells) { cell in
-                        Text(cell.text)
-                            .font(cell.isHeader ? .callout.weight(.semibold) : .callout)
+                        let isHeader = cell.isHeader || (implicitHeader && row.id == 0)
+                        let isFlagged = flagged.contains(MDCellRef(row: row.id, cell: cell.id))
+                        MDCellText(text: cell.text, isHeader: isHeader)
                             .textSelection(.enabled)
                             .lineSpacing(2)
                             .padding(.horizontal, 8)
@@ -893,16 +949,17 @@ struct MDTableGrid: View {
                             // of them may be twice as wide before it wraps.
                             .frame(minWidth: 52 * CGFloat(cell.columnSpan),
                                    maxWidth: 260 * CGFloat(cell.columnSpan),
-                                   alignment: cell.isHeader ? .center : .leading)
+                                   alignment: .leading)
                             // Keeps a wrapped cell at its full height instead
                             // of letting the row's proposal truncate it.
                             .fixedSize(horizontal: false, vertical: true)
                             // Fills the row, so a one-line cell next to a
                             // wrapped one still has its rules drawn around it.
                             .frame(maxHeight: .infinity, alignment: .top)
-                            .background(cell.isHeader ? Color.secondary.opacity(0.12) : .clear)
+                            .background(isFlagged ? Color.orange.opacity(0.25)
+                                        : isHeader ? Color.secondary.opacity(0.12) : .clear)
                             .overlay(MDCellBorder(skipTop: cell.isContinuation)
-                                .stroke(borderColor, lineWidth: 0.5))
+                                .stroke(isFlagged ? Color.orange : borderColor, lineWidth: isFlagged ? 1 : 0.5))
                             .gridCellColumns(cell.columnSpan)
                     }
                 }
@@ -913,9 +970,54 @@ struct MDTableGrid: View {
     }
 }
 
+/// A cell's text, with the bare LaTeX the model writes in table cells —
+/// `d_{model}`, `\epsilon _{ls}`, `params \times 10^{6}` — set as maths.
+struct MDCellText: View {
+    let text: String
+    var isHeader = false
+
+    var body: some View {
+        let source = MDParser.cellMathSource(text)
+        Group {
+            if source != text, MathInlineText.hasInlineMath(source) {
+                MathInlineText(source: source, size: 13)
+            } else {
+                Text(text)
+            }
+        }
+        .font(isHeader ? .callout.weight(.semibold) : .callout)
+    }
+}
+
+extension MDParser {
+    /// Puts dollars round the parts of a cell that are LaTeX.
+    ///
+    /// In prose the model marks its maths; in a table cell it writes it bare,
+    /// so the cell is taken a word at a time. A word with a command, a
+    /// subscript or a superscript in it is maths; a `_{ls}` set apart by a
+    /// space belongs to the word before it.
+    static func cellMathSource(_ text: String) -> String {
+        guard !text.contains("$"), text.contains(where: { "\\_^".contains($0) }) else { return text }
+        return text.components(separatedBy: "\n").map { line in
+            var words: [String] = []
+            for word in line.split(separator: " ").map(String.init) {
+                if let last = words.last,
+                   word.first == "_" || word.first == "^" || last.hasSuffix("_") || last.hasSuffix("^") {
+                    words[words.count - 1] = last + word
+                } else {
+                    words.append(word)
+                }
+            }
+            return words.map { word in
+                word.contains(where: { "\\_^".contains($0) }) ? "$\(word)$" : word
+            }.joined(separator: " ")
+        }.joined(separator: "\n")
+    }
+}
+
 /// The rules around one cell. A cell continuing the `rowspan` of the one above
 /// drops its top edge, so the pair reads as the single merged cell it was.
-private struct MDCellBorder: Shape {
+struct MDCellBorder: Shape {
     let skipTop: Bool
 
     func path(in rect: CGRect) -> Path {
@@ -948,9 +1050,9 @@ struct MDFigureView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: min(image.size.width, 560), maxHeight: 460)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                    // The crop is the picture; a frame round it only adds a
+                    // box to a list that is otherwise rules and text.
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
                 // No label under the picture: the placeholder's alt text only
                 // ever names the kind of block, which the crop already shows.
                 // The page's own 图题 block is a caption of its own.

@@ -248,63 +248,42 @@ struct SidebarView: View {
 
             Spacer()
 
-            // Counts double as status filters.
+            if vm.isWatching, let folder = vm.watchFolder {
+                Image(systemName: "eye")
+                    .font(.caption)
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 6)
+                    .help("正在监控「\(folder.lastPathComponent)」")
+            }
+
+            // One menu instead of a row of coloured counts: the counts are in
+            // the menu, and the list itself says which state each file is in.
             if !vm.items.isEmpty {
-                HStack(spacing: 4) {
-                    filterChip(.all, count: vm.items.count, icon: nil, tint: .secondary,
-                               help: "显示全部 \(vm.items.count) 个文件")
-                    if vm.completedCount > 0 {
-                        filterChip(.completed, count: vm.completedCount,
-                                   icon: "checkmark.circle.fill", tint: .green,
-                                   help: "只看已完成的 \(vm.completedCount) 个")
+                Menu {
+                    Picker("显示", selection: $filter) {
+                        Text("全部（\(vm.items.count)）").tag(StatusFilter.all)
+                        Text("已完成（\(vm.completedCount)）").tag(StatusFilter.completed)
+                        Text("待复核（\(vm.reviewCount)）").tag(StatusFilter.review)
+                        Text("失败（\(vm.failedCount)）").tag(StatusFilter.failed)
+                        Text("已取消（\(vm.cancelledCount)）").tag(StatusFilter.cancelled)
                     }
-                    if vm.reviewCount > 0 {
-                        filterChip(.review, count: vm.reviewCount,
-                                   icon: "exclamationmark.triangle.fill", tint: .orange,
-                                   help: "只看有待复核内容的 \(vm.reviewCount) 个")
-                    }
-                    if vm.failedCount > 0 {
-                        filterChip(.failed, count: vm.failedCount,
-                                   icon: "xmark.circle.fill", tint: .red,
-                                   help: "只看失败的 \(vm.failedCount) 个")
-                    }
-                    if vm.cancelledCount > 0 {
-                        filterChip(.cancelled, count: vm.cancelledCount,
-                                   icon: "stop.circle.fill", tint: .orange,
-                                   help: "只看已取消的 \(vm.cancelledCount) 个")
-                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Image(systemName: filter == .all
+                          ? "line.3.horizontal.decrease.circle"
+                          : "line.3.horizontal.decrease.circle.fill")
                 }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .foregroundStyle(filter == .all ? Color.secondary : Color.accentColor)
                 .padding(.trailing, 8)
+                .help(filter == .all ? "按状态筛选" : "只显示「\(filter.label)」，点按更改")
             }
         }
         .padding(.leading, 6)
         .frame(height: 32)
         .background(.bar)
-    }
-}
-
-extension SidebarView {
-    /// Clicking an active chip other than 全部 returns to 全部, so the filter can
-    /// always be cleared from the chip that set it.
-    fileprivate func filterChip(_ target: StatusFilter, count: Int, icon: String?,
-                                tint: Color, help: String) -> some View {
-        let isActive = filter == target
-        return Button {
-            filter = (isActive && target != .all) ? .all : target
-        } label: {
-            HStack(spacing: 3) {
-                if let icon { Image(systemName: icon) }
-                Text("\(count)").monospacedDigit()
-            }
-            .font(.caption)
-            .foregroundStyle(isActive ? Color.white : tint)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(isActive ? tint : .clear, in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(help)
     }
 }
 
@@ -338,31 +317,41 @@ struct SidebarRowView: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if let snippet {
-                    Text(snippet)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else {
-                HStack(spacing: 6) {
-                    Text(item.fileExtension)
-                        .font(.caption2)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.accentColor.opacity(0.15))
-                        .foregroundStyle(Color.accentColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                    Text(item.fileSizeString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                }
+                Text(snippet ?? statusLine)
+                    .font(.caption)
+                    .foregroundStyle(item.status == .failed && snippet == nil ? Color.red : Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
             Spacer(minLength: 0)
             trailingControl
         }
         .padding(.vertical, 3)
         .onHover { isHovering = $0 }
+    }
+
+    /// How many things on this file are flagged for review.
+    private var flagCount: Int {
+        item.reviewNotes.filter { $0.note.severity == .warning }.count
+    }
+
+    /// The second line: where the file stands, in words — the badge on the
+    /// right says the same thing at a glance.
+    private var statusLine: String {
+        switch item.status {
+        case .pending:
+            return "\(item.fileExtension) · \(item.fileSizeString)"
+        case .processing:
+            return "识别中 \(Int((item.processingProgress * 100).rounded()))%"
+        case .completed:
+            let pages = item.pages.count > 1 ? "\(item.pages.count) 页" : "1 页"
+            if flagCount > 0 { return "\(pages) · \(flagCount) 处待复核" }
+            return item.reusedCachedResult ? "\(pages) · 复用此前结果" : pages
+        case .failed:
+            return item.errorMessage ?? "识别失败"
+        case .cancelled:
+            return "已取消"
+        }
     }
 
     /// On hover, failed/completed rows swap their status badge for the
@@ -410,37 +399,50 @@ struct SidebarRowView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary, lineWidth: 0.5))
+        // A page's proportions rather than a square: most of what is read
+        // here is a page.
+        .frame(width: 28, height: 36)
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(.quaternary, lineWidth: 0.5))
     }
 
     @ViewBuilder
     private var statusBadge: some View {
         switch item.status {
         case .pending:
-            Image(systemName: "circle")
+            Image(systemName: "circle.dashed")
                 .foregroundStyle(.tertiary)
                 .font(.caption)
         case .processing:
             ProcessingRingView(progress: item.processingProgress)
-                .frame(width: 16, height: 16)
-        case .completed where item.needsReview:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .font(.callout)
-                .help("识别完成，有内容待复核")
+                .frame(width: 14, height: 14)
+        case .completed where flagCount > 0:
+            // The count, not just a warning sign: it is what decides whether
+            // to deal with it now.
+            Button {
+                vm.startReview(itemID: item.id)
+            } label: {
+                Text("\(flagCount)")
+                    .font(.caption2.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.black.opacity(0.75))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(.orange, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("\(flagCount) 处待复核，点按开始复核")
         case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.callout)
+            Image(systemName: "checkmark")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
         case .failed:
-            Image(systemName: "exclamationmark.circle.fill")
+            Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.red)
                 .font(.callout)
         case .cancelled:
-            Image(systemName: "stop.circle.fill")
-                .foregroundStyle(.orange)
+            Image(systemName: "stop.circle")
+                .foregroundStyle(.secondary)
                 .font(.callout)
         }
     }
@@ -449,7 +451,7 @@ struct SidebarRowView: View {
 /// A hand-drawn ring instead of `ProgressView(value:).progressViewStyle(.circular)`:
 /// on macOS a determinate circular `ProgressView` renders as two crossing arcs
 /// rather than a filling ring, which reads as a rendering glitch, not progress.
-private struct ProcessingRingView: View {
+struct ProcessingRingView: View {
     var progress: Double
 
     var body: some View {

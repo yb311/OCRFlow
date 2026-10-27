@@ -155,6 +155,14 @@ final class OCRViewModel: ObservableObject {
 
     @Published var items: [ImageItem] = []
     @Published var selectedIDs: Set<UUID> = []
+    /// Whether the window is browsing documents or working through what was
+    /// flagged for review.
+    @Published var mode: WorkspaceMode = .workspace
+    /// The flagged item the review pane is on.
+    @Published var reviewFocus: ReviewEntry.Key?
+    /// A page and region the document pane should turn to, set when leaving
+    /// review for "在文档中查看". The pane clears it once it has moved.
+    @Published var documentFocus: DocumentFocus?
     @Published var isProcessing = false
     /// Set between pressing 停止 and the last in-flight image actually letting
     /// go. A run cannot be restarted in that window: the worker still holds the
@@ -648,6 +656,7 @@ final class OCRViewModel: ObservableObject {
         block.text = text
         // A person has looked at it now; whatever the check flagged is settled.
         block.review = nil
+        block.alternative = nil
         items[index].pages[page].blocks[blockIndex] = block
         rebuildDocument(at: index)
         store.save(items[index])
@@ -679,7 +688,7 @@ final class OCRViewModel: ObservableObject {
         let config = vlConfig
         let pageSize = item.pages[page].size
         // Shown under the region while the model works.
-        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = "正在用 PaddleOCR-VL 重读…" }
+        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = Self.rereadingNote }
 
         Task {
             do {
@@ -693,24 +702,40 @@ final class OCRViewModel: ObservableObject {
                 let rect = block.rect.applying(CGAffineTransform(scaleX: sx, y: sy))
                 let crop = PPLayoutPostProcess.expanded(rect, ratio: config.cropUnclipRatio,
                                                         within: CGSize(width: image.width, height: image.height))
+                // Asked for by a person, so given the larger budget the
+                // pipeline only reaches for on a second attempt.
+                let limit = config.maxOutputTokens * RegionReader.retryBudgetFactor
                 let output = try await Task.detached(priority: .userInitiated) {
-                    try engine.recognize([VLRequest(image: image, crop: crop, task: task)])[0].get()
+                    try engine.recognize([VLRequest(image: image, crop: crop, task: task,
+                                                    maxTokens: limit)])[0].get()
                 }.value
+                let previous = AlternativeReading(source: block.source ?? item.pages[page].blockSource,
+                                                  text: block.text, note: "重读前")
                 updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
                     block.review = nil
                     guard !output.text.isEmpty else {
                         block.review = "PaddleOCR-VL 没有读出内容，保留了原结果"
                         return
                     }
-                    block.text = output.text
+                    let text = task == .table
+                        ? (PPDocumentAssembler.htmlTable(fromOTSL: output.text) ?? output.text) : output.text
+                    block.text = text
                     block.source = .visionLanguageModel
                     block.recognisedText = nil
                     block.routing = "手动要求 PaddleOCR-VL 重读"
                     switch output.ending {
-                    case .lengthLimit:  block.review = "输出达到 \(config.maxOutputTokens) token 上限，内容可能不完整"
+                    case .lengthLimit:  block.review = "输出达到 \(limit) token 上限，内容可能不完整"
                     case .repetition:   block.review = "模型出现重复输出，已截断，可能漏读"
                     case .decodeFailed: block.review = "PaddleOCR-VL 推理中断，内容可能不完整"
                     case .finished, .cancelled: break
+                    }
+                    // The same answer twice settles it; a different one is a
+                    // choice for the person who asked.
+                    let changed = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        != text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    block.alternative = changed && !previous.text.isEmpty ? previous : nil
+                    if changed, !previous.text.isEmpty, block.review == nil {
+                        block.review = "重读结果与原结果不同，请选择保留哪一个"
                     }
                 }
             } catch {
@@ -731,15 +756,96 @@ final class OCRViewModel: ObservableObject {
         store.save(items[index])
     }
 
-    /// Marks one page's findings as looked at, without changing any text.
-    func dismissReview(itemID: UUID, page: Int) {
-        guard let index = items.firstIndex(where: { $0.id == itemID }),
-              items[index].pages.indices.contains(page) else { return }
-        items[index].pages[page].notes.removeAll { $0.severity == .warning }
-        for block in items[index].pages[page].blocks.indices {
-            items[index].pages[page].blocks[block].review = nil
+    /// What a region says while PaddleOCR-VL is reading it again.
+    static let rereadingNote = "正在用 PaddleOCR-VL 重读…"
+
+    // MARK: - Review
+
+    /// Everything flagged for a person to look at, file by file, page by page,
+    /// in reading order — the queue the review mode works through.
+    var reviewEntries: [ReviewEntry] {
+        items.filter { $0.status == .completed }.flatMap { item in
+            item.pages.enumerated().flatMap { pageIndex, page in
+                let pageNotes = page.notes.filter { $0.severity == .warning }.map { note in
+                    ReviewEntry(itemID: item.id, fileName: item.fileName, page: pageIndex,
+                                origin: .note(note), message: note.message)
+                }
+                let regions = page.blocks.indices
+                    .filter { page.blocks[$0].review != nil }
+                    .sorted { page.blocks[$0].readingOrder < page.blocks[$1].readingOrder }
+                    .map { index in
+                        ReviewEntry(itemID: item.id, fileName: item.fileName, page: pageIndex,
+                                    origin: .region(index), message: page.blocks[index].review ?? "")
+                    }
+                return pageNotes + regions
+            }
+        }
+    }
+
+    /// Settles one flagged item without changing any text: the region, or the
+    /// page note, has been looked at and is fine as it is.
+    func resolveReview(_ entry: ReviewEntry) {
+        guard let index = items.firstIndex(where: { $0.id == entry.itemID }),
+              items[index].pages.indices.contains(entry.page) else { return }
+        switch entry.origin {
+        case let .region(block):
+            guard items[index].pages[entry.page].blocks.indices.contains(block) else { return }
+            items[index].pages[entry.page].blocks[block].review = nil
+            items[index].pages[entry.page].blocks[block].alternative = nil
+        case let .note(note):
+            items[index].pages[entry.page].notes.removeAll { $0 == note }
         }
         store.save(items[index])
+    }
+
+    /// Settles a flagged region with the text a person chose.
+    ///
+    /// Picking one of the two readings as it stands takes that reader's word
+    /// for it — the region now says who read it, and nothing counts as
+    /// corrected. Anything else typed in is a correction, kept beside what was
+    /// recognised the way `correctBlock` keeps it.
+    func settleRegion(itemID: UUID, page: Int, blockIndex: Int, text: String, chosenSource: PPTextSource?) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].pages.indices.contains(page),
+              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+        var block = items[index].pages[page].blocks[blockIndex]
+        if let chosenSource {
+            block.text = text
+            block.source = chosenSource
+        } else if block.text != text {
+            let original = block.recognisedText ?? block.text
+            block.recognisedText = text == original ? nil : original
+            block.text = text
+        }
+        block.review = nil
+        block.alternative = nil
+        items[index].pages[page].blocks[blockIndex] = block
+        rebuildDocument(at: index)
+        store.save(items[index])
+    }
+
+    /// Opens review on a file — at a given page, and region, when there is one
+    /// flagged there.
+    func startReview(itemID: UUID? = nil, page: Int? = nil, block: Int? = nil) {
+        let entries = reviewEntries
+        // Asked for no place in particular: carry on where review was left.
+        if itemID == nil, let focus = reviewFocus, entries.contains(where: { $0.id == focus }) {
+            mode = .review
+            return
+        }
+        let match = entries.first { entry in
+            (itemID == nil || entry.itemID == itemID) && (page == nil || entry.page == page)
+                && (block == nil || entry.block == block)
+        } ?? entries.first { $0.itemID == itemID } ?? entries.first
+        reviewFocus = match?.id
+        mode = .review
+    }
+
+    /// Leaves review for the document, turned to the page and region in question.
+    func showInDocument(_ entry: ReviewEntry) {
+        selectedIDs = [entry.itemID]
+        documentFocus = DocumentFocus(itemID: entry.itemID, page: entry.page, block: entry.block)
+        mode = .workspace
     }
 
     /// Rebuilds the text and the Markdown of every finished result.

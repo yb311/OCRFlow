@@ -71,6 +71,14 @@ enum MathParser {
             text = String(text.dropFirst(open.count).dropLast(close.count))
             break
         }
+        // An answer cut off by the token limit opens its delimiter and never
+        // closes it; the opening alone is still not part of the formula.
+        for open in ["\\[", "\\("] where text.hasPrefix(open) {
+            text = String(text.dropFirst(open.count))
+        }
+        for close in ["\\]", "\\)"] where text.hasSuffix(close) {
+            text = String(text.dropLast(close.count))
+        }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -235,6 +243,8 @@ enum MathParser {
                 // the sentence, and parsing it as maths would eat them.
                 return .styled(.run(parseBracedRaw()), .prose)
             case "mathrm", "operatorname", "mathsf", "mathtt":
+                // `\operatorname*` only moves the limits; the star is not text.
+                if name == "operatorname", peek() == "*" { index += 1 }
                 return .styled(parseAtom(stopAt: stoppers) ?? .run(""), .upright)
             case "mathbf", "textbf", "bm", "boldsymbol":
                 return .styled(parseAtom(stopAt: stoppers) ?? .run(""), .bold)

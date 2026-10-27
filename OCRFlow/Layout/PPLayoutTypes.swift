@@ -214,8 +214,20 @@ struct PPLayoutBlock: Equatable, Codable {
     /// The text as recognised, before anyone corrected it. Nil until a
     /// correction is made, so re-recognising never silently replaces an edit.
     var recognisedText: String?
+    /// Another reading of this region that disagrees with `text` — the other
+    /// engine's, or the one before a re-read — kept while the region is under
+    /// review so a person can pick between the two instead of retyping.
+    var alternative: AlternativeReading?
 
     var isCorrected: Bool { recognisedText != nil }
+}
+
+/// A second reading of a region, and who made it.
+struct AlternativeReading: Equatable, Codable {
+    var source: PPTextSource
+    var text: String
+    /// What sets it apart, when "who read it" is not enough: "重读前".
+    var note: String?
 }
 
 extension PPLayoutLabel: Codable {

@@ -315,18 +315,46 @@ enum RegionReader {
 
         let lock = NSLock()
         var done = 0
-        let results = vl.recognize(requests, isCancelled: isCancelled) { _, _ in
+        var results = vl.recognize(requests, isCancelled: isCancelled) { _, _ in
             lock.lock()
             done += 1
-            let fraction = Double(done) / Double(requests.count)
+            // The first pass is most of the work; the retries below are the rest.
+            let fraction = 0.9 * Double(done) / Double(requests.count)
             lock.unlock()
             progress?(fraction)
         }
 
-        for (region, result) in zip(regions, results) {
-            apply(result, for: region, to: &blocks[region.block], limit: config.maxOutputTokens)
+        // An answer that ran out of budget is read again with more of it before
+        // anyone is asked to look: a long table or a dense paragraph simply
+        // needs more tokens, and a person cannot supply the missing half.
+        let retryLimit = config.maxOutputTokens * Self.retryBudgetFactor
+        let truncated = results.indices.filter { index in
+            if case let .success(output) = results[index] { return output.ending == .lengthLimit }
+            return false
+        }
+        if !truncated.isEmpty, !isCancelled() {
+            var retries = truncated.map { requests[$0] }
+            for index in retries.indices { retries[index].maxTokens = retryLimit }
+            let second = vl.recognize(retries, isCancelled: isCancelled) { _, _ in }
+            for (index, result) in zip(truncated, second) {
+                // Kept only when it got further; a retry that failed outright
+                // leaves the truncated answer, which is still most of the region.
+                if case let .success(output) = result, output.ending != .cancelled {
+                    results[index] = result
+                }
+            }
+        }
+        progress?(1)
+
+        for (index, region) in regions.enumerated() {
+            let limit = truncated.contains(index) ? retryLimit : config.maxOutputTokens
+            apply(results[index], for: region, to: &blocks[region.block], limit: limit)
         }
     }
+
+    /// How many times the configured budget a truncated region gets on its
+    /// second reading.
+    static let retryBudgetFactor = 4
 
     private static func apply(_ result: Result<VLOutput, Error>, for region: Region,
                               to block: inout PPLayoutBlock, limit: Int) {
@@ -373,6 +401,11 @@ enum RegionReader {
             if let finding = crossCheck(block.text, against: fallback, readBy: otherReader,
                                         task: region.task, isEscalation: region.isEscalation) {
                 block.review = finding
+                // The other reading is what makes the flag answerable: pick one
+                // of the two rather than retype the region from the picture.
+                if !fallback.isEmpty {
+                    block.alternative = AlternativeReading(source: otherReader ?? .plainOCR, text: fallback)
+                }
             }
         }
     }

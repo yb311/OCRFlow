@@ -28,6 +28,7 @@
 		B10000010000000000000008 /* PPGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000008 /* PPGeometry.swift */; };
 		B10000010000000000000009 /* PPConnectedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000009 /* PPConnectedComponents.swift */; };
 		B10000010000000000000A03 /* PaddleOCR in Resources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A03 /* PaddleOCR */; };
+		C1010000000000000000000B /* MarkdownViewer in Resources */ = {isa = PBXBuildFile; fileRef = C1020000000000000000000B /* MarkdownViewer */; };
 		B10000010000000000000A06 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = B1000010000000000000AA05 /* onnxruntime */; };
 		B10000010000000000000A07 /* PPDocOrientationClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000A07 /* PPDocOrientationClassifier.swift */; };
 		B1000001000000000000010A /* PPLayoutTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002000000000000010A /* PPLayoutTypes.swift */; };
@@ -64,6 +65,8 @@
 		C10100000000000000000007 /* TableWorkbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000007 /* TableWorkbook.swift */; };
 		C10100000000000000000008 /* FolderWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000008 /* FolderWatcher.swift */; };
 		C10100000000000000000009 /* TranslationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10200000000000000000009 /* TranslationSheet.swift */; };
+		C1010000000000000000000A /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1020000000000000000000A /* ReviewView.swift */; };
+		C1010000000000000000000C /* MarkdownWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1020000000000000000000C /* MarkdownWebView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +93,7 @@
 		B10000020000000000000008 /* PPGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPGeometry.swift; sourceTree = "<group>"; };
 		B10000020000000000000009 /* PPConnectedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPConnectedComponents.swift; sourceTree = "<group>"; };
 		B10000020000000000000A03 /* PaddleOCR */ = {isa = PBXFileReference; lastKnownFileType = folder; path = PaddleOCR; sourceTree = "<group>"; };
+		C1020000000000000000000B /* MarkdownViewer */ = {isa = PBXFileReference; lastKnownFileType = folder; path = MarkdownViewer; sourceTree = "<group>"; };
 		B10000020000000000000A07 /* PPDocOrientationClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPDocOrientationClassifier.swift; sourceTree = "<group>"; };
 		B1000002000000000000010A /* PPLayoutTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutTypes.swift; sourceTree = "<group>"; };
 		B1000002000000000000010B /* PPLayoutDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutDetector.swift; sourceTree = "<group>"; };
@@ -123,6 +127,8 @@
 		C10200000000000000000007 /* TableWorkbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableWorkbook.swift; sourceTree = "<group>"; };
 		C10200000000000000000008 /* FolderWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderWatcher.swift; sourceTree = "<group>"; };
 		C10200000000000000000009 /* TranslationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSheet.swift; sourceTree = "<group>"; };
+		C1020000000000000000000A /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		C1020000000000000000000C /* MarkdownWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownWebView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -198,6 +204,8 @@
 			isa = PBXGroup;
 			children = (
 				C10200000000000000000009 /* TranslationSheet.swift */,
+				C1020000000000000000000A /* ReviewView.swift */,
+				C1020000000000000000000C /* MarkdownWebView.swift */,
 				A1000002000000000000AA05 /* SidebarView.swift */,
 				A1000002000000000000AA06 /* DetailView.swift */,
 				A1000002000000000000AA07 /* DropZoneView.swift */,
@@ -270,6 +278,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000020000000000000A03 /* PaddleOCR */,
+				C1020000000000000000000B /* MarkdownViewer */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -381,6 +390,7 @@
 				A1000001000000000000AA08 /* Assets.xcassets in Resources */,
 				A1000001000000000000AA0B /* AppIcon.icon in Resources */,
 				B10000010000000000000A03 /* PaddleOCR in Resources */,
+				C1010000000000000000000B /* MarkdownViewer in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -392,6 +402,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C10100000000000000000009 /* TranslationSheet.swift in Sources */,
+				C1010000000000000000000A /* ReviewView.swift in Sources */,
+				C1010000000000000000000C /* MarkdownWebView.swift in Sources */,
 				C10100000000000000000008 /* FolderWatcher.swift in Sources */,
 				C10100000000000000000007 /* TableWorkbook.swift in Sources */,
 				C10100000000000000000006 /* PipelineBenchmark.swift in Sources */,

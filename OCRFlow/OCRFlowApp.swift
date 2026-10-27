@@ -1,5 +1,35 @@
 import SwiftUI
 
+/// Light, dark, or whatever the system is set to.
+///
+/// Applied through `NSApp.appearance` rather than `preferredColorScheme`: the
+/// latter, once set, does not reliably let go again on macOS, so "跟随系统"
+/// would stick on whichever scheme was picked last.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    static let storageKey = "appearance"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light:  return "浅色"
+        case .dark:   return "深色"
+        }
+    }
+
+    @MainActor
+    func apply() {
+        switch self {
+        case .system: NSApp.appearance = nil
+        case .light:  NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark:   NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 @main
 struct OCRFlowApp: App {
     @StateObject private var viewModel = OCRViewModel()
@@ -38,6 +68,14 @@ struct OCRFlowApp: App {
                     viewModel.captureScreenshot()
                 }
                 .keyboardShortcut("2", modifiers: [.command, .shift])
+            }
+
+            CommandGroup(before: .sidebar) {
+                Button("工作台") { viewModel.mode = .workspace }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("复核") { viewModel.startReview() }
+                    .keyboardShortcut("2", modifiers: .command)
+                Divider()
             }
 
             CommandGroup(after: .newItem) {

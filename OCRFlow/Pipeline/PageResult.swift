@@ -29,6 +29,66 @@ struct ReviewNote: Equatable, Hashable, Codable {
     }
 }
 
+/// What the window is for at the moment.
+enum WorkspaceMode: String, CaseIterable, Identifiable {
+    /// Browsing the files and reading their results.
+    case workspace
+    /// Working through what was flagged, one item at a time.
+    case review
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .workspace: return "工作台"
+        case .review:    return "复核"
+        }
+    }
+}
+
+/// One thing flagged for review: a region's note, or a note about a page.
+struct ReviewEntry: Identifiable, Hashable {
+    enum Origin: Hashable {
+        /// `PPLayoutBlock.review` on the region at this index.
+        case region(Int)
+        /// A warning in `PageResult.notes`.
+        case note(ReviewNote)
+    }
+
+    /// Stays the same while the message changes — a region being re-read is
+    /// still the same item in the queue.
+    struct Key: Hashable {
+        let itemID: UUID
+        let page: Int
+        let origin: Origin
+    }
+
+    let itemID: UUID
+    let fileName: String
+    let page: Int
+    let origin: Origin
+    let message: String
+
+    var id: Key { Key(itemID: itemID, page: page, origin: origin) }
+
+    /// The region the entry is about, if it is about one.
+    var block: Int? {
+        switch origin {
+        case let .region(index): return index
+        case let .note(note):    return note.block
+        }
+    }
+}
+
+/// Where the document pane should turn to.
+struct DocumentFocus: Equatable {
+    let itemID: UUID
+    let page: Int
+    let block: Int?
+    /// Asking for the same place twice still moves the pane.
+    let token = UUID()
+}
+
 /// What one page yielded.
 ///
 /// A multi-page file used to keep page one's boxes and the whole file's text,
@@ -133,6 +193,23 @@ extension PageResult {
                 PPDocumentAssembler.markdown(from: blocks, dropping: dropping,
                                              source: blockSource,
                                              inferHeadingLevels: inferHeadingLevels))
+    }
+
+    /// How sure PP-OCRv6 was about the lines inside a region, or nil when it
+    /// did not read them.
+    ///
+    /// The region's own `score` is how sure the layout model was that there is
+    /// a region there at all — not a word about the text in it.
+    /// `evenIfReplaced` asks about PP-OCRv6's lines even when another reader's
+    /// text has since taken the region over — the confidence of the reading
+    /// that is now the alternative.
+    func ocrConfidence(ofBlock index: Int, evenIfReplaced: Bool = false) -> Double? {
+        guard blocks.indices.contains(index),
+              evenIfReplaced || (blocks[index].source ?? blockSource) == .plainOCR else { return nil }
+        let rect = blocks[index].rect
+        let inside = lines.filter { rect.contains(CGPoint(x: $0.boundingBox.midX, y: $0.boundingBox.midY)) }
+        guard !inside.isEmpty else { return nil }
+        return inside.reduce(0) { $0 + $1.confidence } / Double(inside.count)
     }
 
     /// The same boxes on an image `factor` times the size.

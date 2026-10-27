@@ -15,6 +15,8 @@ struct SettingsView: View {
     /// Remembered across openings: someone who tunes thresholds keeps coming
     /// back to the same section, and re-opening it every time is friction.
     @AppStorage("settings.paddleAdvancedExpanded") private var showPaddleAdvanced = false
+    /// Applied by the main window, which watches the same key.
+    @AppStorage(AppAppearance.storageKey) private var appearance: AppAppearance = .system
     @State private var showResetConfirm = false
 
     var body: some View {
@@ -793,6 +795,17 @@ struct SettingsView: View {
 
     private var behaviorTab: some View {
         settingsScroll {
+            settingSection("外观") {
+                Picker("外观", selection: $appearance) {
+                    ForEach(AppAppearance.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+
             settingSection("自动化") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.autoStartOnAdd,
