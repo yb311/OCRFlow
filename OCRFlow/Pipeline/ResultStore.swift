@@ -21,7 +21,7 @@ final class ResultStore: @unchecked Sendable {
 
     /// Bumped whenever the pipelines change what they produce for the same
     /// input, so a cached result from an older build is not served as current.
-    static let pipelineVersion = 2
+    static let pipelineVersion = 3
 
     let directory: URL
     /// Every document read, kept after it leaves the list.

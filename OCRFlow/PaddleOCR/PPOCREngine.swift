@@ -113,14 +113,22 @@ final class PPOCREngine: @unchecked Sendable {
             // it labelled as furniture would drop it from the document.
             regions = ((try? layout.detect(page)) ?? [])
                 .reclassifyingFalsePageFurniture(pageHeight: CGFloat(page.height))
-            regions = Self.mappedBack(regions, orientation: orientation,
-                                      originalWidth: buffer.width, originalHeight: buffer.height)
+        }
+        // Everything below works on the straightened page — reading order is
+        // a matter of columns and rows, which only exist the right way up —
+        // and is turned back into the caller's coordinates at the end.
+        func mappedBack(_ result: Page) -> Page {
+            Page(lines: Self.mappedBack(result.lines, orientation: orientation,
+                                        originalWidth: buffer.width, originalHeight: buffer.height),
+                 blocks: Self.mappedBack(result.blocks, orientation: orientation,
+                                         originalWidth: buffer.width, originalHeight: buffer.height),
+                 members: result.members)
         }
         progress?(0.2)
 
         let quads = try detector.detect(page, config: cfg)
         progress?(0.35)
-        guard !quads.isEmpty else { return Page(lines: [], blocks: regions, members: regions.map { _ in [] }) }
+        guard !quads.isEmpty else { return mappedBack(Page(lines: [], blocks: regions, members: regions.map { _ in [] })) }
         if isCancelled?() == true { return Page() }
 
         var crops: [PPImageBuffer] = []
@@ -129,14 +137,9 @@ final class PPOCREngine: @unchecked Sendable {
         for quad in quads {
             guard let crop = page.perspectiveCrop(quad: quad) else { continue }
             crops.append(crop)
-            // Report boxes in the coordinates of the image the caller passed in.
-            keptQuads.append(quad.map {
-                PPDocOrientationClassifier.mapBack($0, orientation: orientation,
-                                                   originalWidth: buffer.width,
-                                                   originalHeight: buffer.height)
-            })
+            keptQuads.append(quad)
         }
-        guard !crops.isEmpty else { return Page(lines: [], blocks: regions, members: regions.map { _ in [] }) }
+        guard !crops.isEmpty else { return mappedBack(Page(lines: [], blocks: regions, members: regions.map { _ in [] })) }
         progress?(0.45)
         if isCancelled?() == true { return Page() }
 
@@ -166,9 +169,9 @@ final class PPOCREngine: @unchecked Sendable {
         // back to reading the geometry of the lines themselves.
         if !regions.isEmpty {
             let page = PPStructureAssembler.assemble(lines: lines, blocks: regions)
-            return Page(lines: page.lines, blocks: page.blocks, members: page.members)
+            return mappedBack(Page(lines: page.lines, blocks: page.blocks, members: page.members))
         }
-        return Page(lines: Self.inReadingOrder(lines, mode: cfg.readingOrder), blocks: [])
+        return mappedBack(Page(lines: Self.inReadingOrder(lines, mode: cfg.readingOrder), blocks: []))
     }
 
     /// Layout analysis alone, for a page whose text comes from somewhere else
@@ -195,9 +198,24 @@ final class PPOCREngine: @unchecked Sendable {
         return PPXYCut.order(lines.map(\.boundingBox)).map { lines[$0] }
     }
 
-    /// Layout runs on the straightened page, so its boxes come back in that
-    /// page's coordinates; the caller works in the coordinates of the image it
-    /// passed in, which is what the text-line quads are already mapped to.
+    /// Lines from the straightened page, in the coordinates of the image the
+    /// caller passed in.
+    private static func mappedBack(_ lines: [PPTextLine],
+                                   orientation: PPDocOrientationClassifier.Orientation,
+                                   originalWidth: Int, originalHeight: Int) -> [PPTextLine] {
+        guard orientation != .upright else { return lines }
+        return lines.map { line in
+            var line = line
+            line.quad = line.quad.map {
+                PPDocOrientationClassifier.mapBack($0, orientation: orientation,
+                                                   originalWidth: originalWidth, originalHeight: originalHeight)
+            }
+            return line
+        }
+    }
+
+    /// Regions from the straightened page, in the coordinates of the image the
+    /// caller passed in.
     private static func mappedBack(_ blocks: [PPLayoutBlock],
                                    orientation: PPDocOrientationClassifier.Orientation,
                                    originalWidth: Int, originalHeight: Int) -> [PPLayoutBlock] {

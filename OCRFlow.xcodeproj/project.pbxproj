@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E1323942E6A90246D52A80D5 /* OrientationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB91FCA9FAB7674A193C68FA /* OrientationTests.swift */; };
 		E979926B6DF3697B35C9EB0E /* PipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5864FCC49E7BE1B44DA93AA /* PipelineTests.swift */; };
 		EC6102CD294A1C0160709794 /* OCRViewModel+Review.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DFFBC990E132197A04FE65 /* OCRViewModel+Review.swift */; };
 		E2B37CE9B887B6E215BDBA1B /* OCRViewModel+History.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB7F06C4B80F58CF68086EA5 /* OCRViewModel+History.swift */; };
@@ -85,6 +86,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		EB91FCA9FAB7674A193C68FA /* OrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationTests.swift; sourceTree = "<group>"; };
 		E5864FCC49E7BE1B44DA93AA /* PipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTests.swift; sourceTree = "<group>"; };
 		E2DFFBC990E132197A04FE65 /* OCRViewModel+Review.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OCRViewModel+Review.swift"; sourceTree = "<group>"; };
 		EB7F06C4B80F58CF68086EA5 /* OCRViewModel+History.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OCRViewModel+History.swift"; sourceTree = "<group>"; };
@@ -186,6 +188,7 @@
 		E0000004000000000000FF01 /* OCRFlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				EB91FCA9FAB7674A193C68FA /* OrientationTests.swift */,
 				E5864FCC49E7BE1B44DA93AA /* PipelineTests.swift */,
 				EE8A099FA9F3963CEC5AFCA7 /* HistoryTests.swift */,
 				E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */,
@@ -513,6 +516,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1323942E6A90246D52A80D5 /* OrientationTests.swift in Sources */,
 				E979926B6DF3697B35C9EB0E /* PipelineTests.swift in Sources */,
 				E0C4CF9F1B72E5212F9A97ED /* HistoryTests.swift in Sources */,
 				EB43135A63A94DB46B2A6407 /* DiagnosticsTests.swift in Sources */,

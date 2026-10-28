@@ -191,9 +191,11 @@ struct PPOCRConfig: Equatable, Codable {
 
     // Document orientation
     /// Detects a whole page rotated by 90/180/270° and straightens it before
-    /// detection. Off by default: PP-OCR's detector only handles upright text,
-    /// but the classifier is unreliable on images that are not documents.
-    var useDocOrientation: Bool = false
+    /// detection. On by default: without it a page scanned sideways has its
+    /// columns read across one another. Measured on scans, photos, receipts,
+    /// slides and app screenshots, it turned none of the upright ones, for
+    /// about 50 ms a page.
+    var useDocOrientation: Bool = true
 
     // Recognition
     var recBatchSize: Int = 6

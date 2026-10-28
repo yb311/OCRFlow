@@ -42,6 +42,16 @@ enum PPModelStore {
         return url
     }
 
+    /// The page orientation classifier on its own, for a pipeline that does
+    /// not otherwise load PP-OCR. It ships in the bundle.
+    static func resolveDocOrientationModel() throws -> URL {
+        let name = "PP-LCNet_x1_0_doc_ori.onnx"
+        guard let url = locate(name, bundledFallback: true) else {
+            throw PPOCRError.modelsMissing(tier: .small, missing: [name], searchPath: userModelsDirectory.path)
+        }
+        return url
+    }
+
     static func ensureUserModelsDirectory() {
         try? FileManager.default.createDirectory(at: userModelsDirectory,
                                                  withIntermediateDirectories: true)

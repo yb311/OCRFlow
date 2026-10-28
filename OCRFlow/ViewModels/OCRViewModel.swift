@@ -237,6 +237,8 @@ final class OCRViewModel: ObservableObject {
     /// UVDoc, loaded the first time a page has to be flattened.
     private var docUnwarper: PPDocUnwarper?
     private var docUnwarperEnv: ORTEnv?
+    private var docOrienter: PPDocOrientationClassifier?
+    private var docOrienterEnv: ORTEnv?
     /// Read from the OCR worker thread to honour the Stop button mid-image.
     private let cancellation = PPCancellationToken()
 
@@ -1467,6 +1469,9 @@ final class OCRViewModel: ObservableObject {
     private func loadEnginesNow(for settings: DocumentRecognizer.Settings) async throws -> DocumentRecognizer.Engines {
         var engines = DocumentRecognizer.Engines()
         engines.unwarper = await loadDocUnwarper()
+        if settings.engine == .auto || settings.engine == .paddleVL {
+            engines.orienter = await loadDocOrienter(for: settings.paddleConfig)
+        }
         switch settings.engine {
         case .visionFast, .visionAccurate:
             break
@@ -1529,6 +1534,23 @@ final class OCRViewModel: ObservableObject {
         }
 
         return VLDocumentPipeline(layout: detector, vl: engine)
+    }
+
+    /// Loads the page orientation classifier when the setting asks for it.
+    /// It is small and bundled; failing to load it only means pages are read
+    /// as they lie.
+    private func loadDocOrienter(for config: PPOCRConfig) async -> PPDocOrientationClassifier? {
+        guard config.useDocOrientation else { return nil }
+        if let docOrienter { return docOrienter }
+        guard let url = try? PPModelStore.resolveDocOrientationModel(),
+              let env = try? ORTEnv(loggingLevel: .error) else { return nil }
+        let session = try? await Task.detached(priority: .userInitiated) {
+            try PPSession(modelPath: url, env: env, config: .default)
+        }.value
+        guard let session else { return nil }
+        docOrienterEnv = env
+        docOrienter = PPDocOrientationClassifier(session: session)
+        return docOrienter
     }
 
     /// Loads UVDoc if the setting asks for it and the file is there. A missing

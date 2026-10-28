@@ -13,7 +13,8 @@ import OnnxRuntimeBindings
 /// VLM one region at a time, as before batching), `auto`, and `auto-ocr`
 /// (智能分层 with the PDF text layer ignored, so its routing is what is
 /// measured). `OCRFLOW_MODELS_DIR` points it at models kept outside the
-/// app's folder.
+/// app's folder; `DOC_ORIENTATION=1` or `0` overrides the whole-page
+/// orientation setting.
 ///
 /// For a born-digital PDF the page's own text layer is the ground truth, and
 /// each reading is scored against it: the share of its letters and digits
@@ -140,6 +141,9 @@ enum PipelineBenchmark {
 
     private static func settings(for mode: String) throws -> DocumentRecognizer.Settings {
         var paddle = PPOCRConfig.default
+        if let flag = ProcessInfo.processInfo.environment["DOC_ORIENTATION"] {
+            paddle.useDocOrientation = flag == "1"
+        }
         if let tier = ProcessInfo.processInfo.environment["PADDLE_TIER"].flatMap(PPModelTier.init(rawValue:)) {
             paddle.tier = tier
             paddle.applyDetectionDefaults()
@@ -167,6 +171,12 @@ enum PipelineBenchmark {
 
     private static func loadEngines(for settings: DocumentRecognizer.Settings) throws -> DocumentRecognizer.Engines {
         var engines = DocumentRecognizer.Engines()
+        if settings.paddleConfig.useDocOrientation,
+           settings.engine == .auto || settings.engine == .paddleVL {
+            engines.orienter = PPDocOrientationClassifier(session: try PPSession(
+                modelPath: PPModelStore.resolveDocOrientationModel(),
+                env: ORTEnv(loggingLevel: .error), config: .default))
+        }
         switch settings.engine {
         case .visionFast, .visionAccurate:
             break

@@ -65,6 +65,9 @@ enum DocumentRecognizer {
         var vlPipeline: VLDocumentPipeline?
         var layered: LayeredPipeline?
         var unwarper: PPDocUnwarper?
+        /// Turns sideways pages upright before PaddleOCR-VL or 智能分层 cut
+        /// regions out of them. PP-OCR on its own straightens pages itself.
+        var orienter: PPDocOrientationClassifier?
         /// The error that kept PaddleOCR-VL from loading, when 智能分层 is
         /// running without it although it is installed. Noted on every page
         /// it affects.
@@ -271,6 +274,19 @@ enum DocumentRecognizer {
             image = flat
             rectified = flat
         }
+        // PaddleOCR-VL reads regions cut out of the page, so a page lying on
+        // its side is turned upright first; its boxes then belong to the
+        // turned page, kept the same way a flattened one is.
+        //
+        // Not a page a PDF drew itself: its rotation is the PDF's own, already
+        // applied when it was rendered, and the classifier only gets such a
+        // page wrong — a figure full of sideways labels reads to it as a page
+        // on its side.
+        let drawnByPDF = pdf.map { $0.source.verdict(page: $0.index) == .digital } ?? false
+        if !drawnByPDF, let orienter = engines.orienter, let upright = try? orienter.straightened(image) {
+            image = upright
+            rectified = upright
+        }
 
         var page: PageResult
         switch settings.engine {
@@ -287,7 +303,9 @@ enum DocumentRecognizer {
             guard let paddle = engines.paddle else {
                 throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
             }
-            let result = try paddle.recognize(image: image, config: settings.paddleConfig,
+            var config = settings.paddleConfig
+            if drawnByPDF { config.useDocOrientation = false }
+            let result = try paddle.recognize(image: image, config: config,
                                               progress: progress, isCancelled: isCancelled)
             page = PageResult(size: CGSize(width: image.width, height: image.height),
                               lines: result.lines, blocks: result.blocks,

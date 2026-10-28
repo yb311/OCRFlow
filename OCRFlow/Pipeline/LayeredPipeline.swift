@@ -65,6 +65,9 @@ struct LayeredPipeline {
     func read(image: CGImage, progress: Progress?, isCancelled: @escaping () -> Bool) throws -> PageResult {
         var runtime = paddleConfig
         runtime.readingOrder = paddle.hasLayoutAnalysis ? .layout : paddleConfig.readingOrder
+        // The page arrives upright: `DocumentRecognizer` has already decided
+        // whether it needed turning, and asking again could only disagree.
+        runtime.useDocOrientation = false
         // Every line comes back, however unsure; the drop threshold is applied
         // below, after the unsure lines have had their say in routing.
         runtime.dropScore = 0

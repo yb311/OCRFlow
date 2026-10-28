@@ -45,6 +45,14 @@ struct PPDocOrientationClassifier {
         return Orientation(rawValue: best) ?? .upright
     }
 
+    /// The page turned the right way up, or nil when it already is.
+    func straightened(_ image: CGImage) throws -> CGImage? {
+        guard let buffer = PPImageBuffer(cgImage: image) else { return nil }
+        let orientation = try classify(buffer)
+        guard orientation != .upright else { return nil }
+        return Self.straighten(buffer, from: orientation).cgImage
+    }
+
     /// Counter-rotates the image so the text ends up upright.
     static func straighten(_ image: PPImageBuffer, from orientation: Orientation) -> PPImageBuffer {
         switch orientation {
