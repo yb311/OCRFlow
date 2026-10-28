@@ -20,9 +20,9 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .auto:           return "智能分层（推荐）"
-        case .visionFast:     return "Apple Vision · 快速模式"
-        case .visionAccurate: return "Apple Vision · 精准模式"
+        case .auto:           return String(localized: "Smart Layering (recommended)")
+        case .visionFast:     return String(localized: "Apple Vision · Fast")
+        case .visionAccurate: return String(localized: "Apple Vision · Accurate")
         case .paddleOCR:      return "PaddleOCR · PP-OCRv6"
         case .paddleVL:       return "PaddleOCR-VL · 1.6"
         }
@@ -31,20 +31,20 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
     var hint: String {
         switch self {
         case .auto:
-            return "PDF 原生文字直接提取；正文交给 PP-OCRv6，表格、公式、图表、印章和低置信度区域交给 PaddleOCR-VL"
-        case .visionFast:     return "速度快，适合批量快速处理"
-        case .visionAccurate: return "识别效果好，速度稍慢"
-        case .paddleOCR:      return "PP-OCRv6 模型，单模型覆盖 50 种语言，输出逐行文本框与置信度"
-        case .paddleVL:       return "0.9B 视觉语言模型，版面分析 + 逐块识别，输出 Markdown（较慢，需下载模型）"
+            return String(localized: "Native PDF text is extracted directly. Body text goes to PP-OCRv6; tables, formulas, charts, seals and low-confidence regions go to PaddleOCR-VL")
+        case .visionFast:     return String(localized: "Fast, good for quick batch processing")
+        case .visionAccurate: return String(localized: "Better results, a little slower")
+        case .paddleOCR:      return String(localized: "PP-OCRv6 model. One model covers 50 languages and outputs line boxes with confidence")
+        case .paddleVL:       return String(localized: "0.9B vision-language model. Layout analysis plus block-by-block reading, outputs Markdown (slower, requires model download)")
         }
     }
 
     /// The short name the file list and the result pane use.
     var shortLabel: String {
         switch self {
-        case .auto:           return "智能分层"
-        case .visionFast:     return "Vision 快速"
-        case .visionAccurate: return "Vision 精准"
+        case .auto:           return String(localized: "Smart Layering")
+        case .visionFast:     return String(localized: "Vision Fast")
+        case .visionAccurate: return String(localized: "Vision Accurate")
         case .paddleOCR:      return "PP-OCRv6"
         case .paddleVL:       return "PaddleOCR-VL"
         }
@@ -481,11 +481,17 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Export settings
     enum ExportSeparator: String, CaseIterable, Identifiable, Codable {
-        case emptyLine  = "空行"
-        case divider    = "分割线"
-        case pageBreak  = "换页符"
-        case none       = "无"
+        case emptyLine, divider, pageBreak, none
         var id: String { rawValue }
+        /// The raw value is what settings store; this is what the picker shows.
+        var label: String {
+            switch self {
+            case .emptyLine:  return String(localized: "Blank line")
+            case .divider:    return String(localized: "Divider")
+            case .pageBreak:  return String(localized: "Page break")
+            case .none:       return String(localized: "None")
+            }
+        }
         var separator: String {
             switch self {
             case .emptyLine:  return "\n\n"
@@ -518,10 +524,10 @@ final class OCRViewModel: ObservableObject {
         var label: String {
             switch self {
             case .markdown:      return "Markdown"
-            case .plainText:     return "纯文本"
-            case .json:          return "JSON（含坐标与置信度）"
-            case .searchablePDF: return "可搜索 PDF"
-            case .excel:         return "Excel 表格（仅导出表格）"
+            case .plainText:     return String(localized: "Plain Text")
+            case .json:          return String(localized: "JSON (with coordinates and confidence)")
+            case .searchablePDF: return String(localized: "Searchable PDF")
+            case .excel:         return String(localized: "Excel (tables only)")
             }
         }
 
@@ -545,8 +551,8 @@ final class OCRViewModel: ObservableObject {
 
         var label: String {
             switch self {
-            case .combined: return "合并为一个文件"
-            case .separate: return "每个文件单独导出"
+            case .combined: return String(localized: "Combine into one file")
+            case .separate: return String(localized: "Export each file separately")
             }
         }
     }
@@ -678,17 +684,17 @@ final class OCRViewModel: ObservableObject {
         let block = item.pages[page].blocks[blockIndex]
         if block.isCorrected {
             let alert = NSAlert()
-            alert.messageText = "这一区域有手动修改"
-            alert.informativeText = "用 PaddleOCR-VL 重读会替换修改后的文字。"
-            alert.addButton(withTitle: "重读")
-            alert.addButton(withTitle: "取消")
+            alert.messageText = String(localized: "This region has manual edits")
+            alert.informativeText = String(localized: "Rereading with PaddleOCR-VL will replace the edited text.")
+            alert.addButton(withTitle: String(localized: "Reread"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         let task = block.label.vlTask ?? .ocr
         let config = vlConfig
         let pageSize = item.pages[page].size
         // Shown under the region while the model works.
-        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = Self.rereadingNote }
+        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = .rereading }
 
         Task {
             do {
@@ -710,11 +716,11 @@ final class OCRViewModel: ObservableObject {
                                                     maxTokens: limit)])[0].get()
                 }.value
                 let previous = AlternativeReading(source: block.source ?? item.pages[page].blockSource,
-                                                  text: block.text, note: "重读前")
+                                                  text: block.text, note: .beforeReread)
                 updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
                     block.review = nil
                     guard !output.text.isEmpty else {
-                        block.review = "PaddleOCR-VL 没有读出内容，保留了原结果"
+                        block.review = .rereadReadNothing
                         return
                     }
                     let text = task == .table
@@ -722,11 +728,11 @@ final class OCRViewModel: ObservableObject {
                     block.text = text
                     block.source = .visionLanguageModel
                     block.recognisedText = nil
-                    block.routing = "手动要求 PaddleOCR-VL 重读"
+                    block.routing = .rereadOnRequest
                     switch output.ending {
-                    case .lengthLimit:  block.review = "输出达到 \(limit) token 上限，内容可能不完整"
-                    case .repetition:   block.review = "模型出现重复输出，已截断，可能漏读"
-                    case .decodeFailed: block.review = "PaddleOCR-VL 推理中断，内容可能不完整"
+                    case .lengthLimit:  block.review = .outputLimit(tokens: limit)
+                    case .repetition:   block.review = .repetition
+                    case .decodeFailed: block.review = .interrupted
                     case .finished, .cancelled: break
                     }
                     // The same answer twice settles it; a different one is a
@@ -735,12 +741,12 @@ final class OCRViewModel: ObservableObject {
                         != text.trimmingCharacters(in: .whitespacesAndNewlines)
                     block.alternative = changed && !previous.text.isEmpty ? previous : nil
                     if changed, !previous.text.isEmpty, block.review == nil {
-                        block.review = "重读结果与原结果不同，请选择保留哪一个"
+                        block.review = .rereadDiffers
                     }
                 }
             } catch {
                 updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) {
-                    $0.review = "PaddleOCR-VL 重读失败：\(error.localizedDescription)"
+                    $0.review = .rereadFailed(error: error.localizedDescription)
                 }
             }
         }
@@ -756,9 +762,6 @@ final class OCRViewModel: ObservableObject {
         store.save(items[index])
     }
 
-    /// What a region says while PaddleOCR-VL is reading it again.
-    static let rereadingNote = "正在用 PaddleOCR-VL 重读…"
-
     // MARK: - Review
 
     /// Everything flagged for a person to look at, file by file, page by page,
@@ -768,14 +771,16 @@ final class OCRViewModel: ObservableObject {
             item.pages.enumerated().flatMap { pageIndex, page in
                 let pageNotes = page.notes.filter { $0.severity == .warning }.map { note in
                     ReviewEntry(itemID: item.id, fileName: item.fileName, page: pageIndex,
-                                origin: .note(note), message: note.message)
+                                origin: .note(note), reason: note.reason)
                 }
                 let regions = page.blocks.indices
                     .filter { page.blocks[$0].review != nil }
                     .sorted { page.blocks[$0].readingOrder < page.blocks[$1].readingOrder }
-                    .map { index in
-                        ReviewEntry(itemID: item.id, fileName: item.fileName, page: pageIndex,
-                                    origin: .region(index), message: page.blocks[index].review ?? "")
+                    .compactMap { index in
+                        page.blocks[index].review.map {
+                            ReviewEntry(itemID: item.id, fileName: item.fileName, page: pageIndex,
+                                        origin: .region(index), reason: $0)
+                        }
                     }
                 return pageNotes + regions
             }
@@ -906,8 +911,8 @@ final class OCRViewModel: ObservableObject {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.message = output ? "选择识别结果的输出文件夹" : "选择要监控的文件夹（包括其中的子文件夹）"
-        panel.prompt = "选择"
+        panel.message = output ? String(localized: "Choose an output folder for results") : String(localized: "Choose a folder to watch (including its subfolders)")
+        panel.prompt = String(localized: "Choose")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         if output { watchOutputFolder = url } else { watchFolder = url }
     }
@@ -1076,7 +1081,7 @@ final class OCRViewModel: ObservableObject {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let url = folder.appendingPathComponent("截图 \(formatter.string(from: Date())).png")
+        let url = folder.appendingPathComponent(String(localized: "Screenshot \(formatter.string(from: Date())).png"))
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
@@ -1105,8 +1110,8 @@ final class OCRViewModel: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = [.png, .jpeg, .tiff, .bmp, .gif, .heif, .webP, .pdf,
                                      UTType(filenameExtension: "heic") ?? .heif]
-        panel.message = "选择图片、PDF 或文件夹（包括其中的子文件夹）"
-        panel.prompt = "添加"
+        panel.message = String(localized: "Choose images, PDFs or folders (including their subfolders)")
+        panel.prompt = String(localized: "Add")
         if panel.runModal() == .OK {
             addImages(urls: panel.urls)
         }
@@ -1196,11 +1201,11 @@ final class OCRViewModel: ObservableObject {
         guard !corrected.isEmpty else { return true }
         let alert = NSAlert()
         alert.messageText = corrected.count == 1
-            ? "「\(corrected[0].fileName)」有手动修改"
-            : "\(corrected.count) 个文件有手动修改"
-        alert.informativeText = "重新识别会用新的识别结果替换这些修改。要保留修改，请先导出。"
-        alert.addButton(withTitle: "重新识别")
-        alert.addButton(withTitle: "取消")
+            ? String(localized: "“\(corrected[0].fileName)” has manual edits")
+            : String(localized: "\(corrected.count) files have manual edits")
+        alert.informativeText = String(localized: "Recognizing again will replace these edits with new results. Export first to keep them.")
+        alert.addButton(withTitle: String(localized: "Recognize Again"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         return alert.runModal() == .alertFirstButtonReturn
     }
@@ -1310,12 +1315,12 @@ final class OCRViewModel: ObservableObject {
         if targets.count == 1 {
             let stem = (targets[0].fileName as NSString).deletingPathExtension
             panel.nameFieldStringValue = "\(stem)_OCR.\(format.fileExtension)"
-            panel.message = "导出「\(targets[0].fileName)」的识别结果"
+            panel.message = String(localized: "Export the results for “\(targets[0].fileName)”")
         } else {
             panel.nameFieldStringValue = "OCRFlow_Results.\(format.fileExtension)"
-            panel.message = "导出 \(targets.count) 个文件的识别结果（合并为一个文件）"
+            panel.message = String(localized: "Export results for \(targets.count) files (combined into one file)")
         }
-        panel.prompt = "导出"
+        panel.prompt = String(localized: "Export")
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         switch format {
@@ -1350,8 +1355,8 @@ final class OCRViewModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "选择导出位置，\(targets.count) 个文件将各自保存为 .\(format.fileExtension)，并保留原文件夹结构"
-        panel.prompt = "导出到此处"
+        panel.message = String(localized: "Choose where to export. \(targets.count) files will each be saved as .\(format.fileExtension), keeping the original folder structure")
+        panel.prompt = String(localized: "Export Here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         writeSeparately(targets, format: format, into: folder, reveal: folder)
     }
@@ -1425,9 +1430,8 @@ final class OCRViewModel: ObservableObject {
         guard let reveal else { return }
         if written == 0 {
             let alert = NSAlert()
-            alert.messageText = "没有可导出的表格"
-            alert.informativeText = "只有由 PaddleOCR-VL（或智能分层中的 VL 层）识别出结构的表格才能导出到 Excel；"
-                + "PP-OCRv6 按普通文字读出的表格没有单元格信息。"
+            alert.messageText = String(localized: "No Tables to Export")
+            alert.informativeText = String(localized: "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information.")
             alert.runModal()
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([reveal])
@@ -1452,7 +1456,7 @@ final class OCRViewModel: ObservableObject {
                     try SearchablePDFWriter.write(items, to: url)
                     return nil
                 } catch {
-                    return "\(url.lastPathComponent)：\(error.localizedDescription)"
+                    return String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")
                 }
             }
             await MainActor.run {
@@ -1461,7 +1465,7 @@ final class OCRViewModel: ObservableObject {
                     NSWorkspace.shared.activateFileViewerSelecting([reveal])
                 } else {
                     let alert = NSAlert()
-                    alert.messageText = "有 \(failures.count) 个 PDF 未能写入"
+                    alert.messageText = String(localized: "\(failures.count) PDFs couldn't be written")
                     alert.informativeText = failures.prefix(8).joined(separator: "\n")
                     alert.runModal()
                 }
@@ -1555,7 +1559,7 @@ final class OCRViewModel: ObservableObject {
                                 Double(block.rect.width), Double(block.rect.height)],
                           text: block.text, isPageFurniture: block.label.isPageFurniture,
                           source: Self.exportName(for: block.source ?? page.blockSource),
-                          routing: block.routing, review: block.review,
+                          routing: block.routing?.message, review: block.review?.message,
                           recognisedText: block.recognisedText)
                 },
                 notes: page.notes.map(\.message))
@@ -1814,7 +1818,7 @@ final class OCRViewModel: ObservableObject {
                 do {
                     vl = try await loadVLEngine(for: settings.vlConfig)
                 } catch {
-                    engines.vlUnavailable = "PaddleOCR-VL 加载失败（\(error.localizedDescription)）"
+                    engines.vlUnavailable = error.localizedDescription
                 }
             }
             engines.paddle = engine
@@ -1949,8 +1953,8 @@ enum OCRError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .imageLoadFailed: return "无法加载图片文件"
-        case .pdfOpenFailed:   return "无法打开 PDF（文件损坏，或设有打开密码）"
+        case .imageLoadFailed: return String(localized: "Couldn't load the image file")
+        case .pdfOpenFailed:   return String(localized: "Couldn't open the PDF (it's damaged or password-protected)")
         }
     }
 }

@@ -66,31 +66,31 @@ enum PPLayoutLabel: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .abstract:         return "摘要"
-        case .algorithm:        return "算法"
-        case .asideText:        return "旁注"
-        case .chart:            return "图表"
-        case .content:          return "目录"
-        case .displayFormula:   return "行间公式"
-        case .docTitle:         return "文档标题"
-        case .figureTitle:      return "图题"
-        case .footer:           return "页脚"
-        case .footerImage:      return "页脚图"
-        case .footnote:         return "脚注"
-        case .formulaNumber:    return "公式编号"
-        case .header:           return "页眉"
-        case .headerImage:      return "页眉图"
-        case .image:            return "图片"
-        case .inlineFormula:    return "行内公式"
-        case .number:           return "页码"
-        case .paragraphTitle:   return "段落标题"
-        case .reference:        return "参考文献"
-        case .referenceContent: return "参考文献内容"
-        case .seal:             return "印章"
-        case .table:            return "表格"
-        case .text:             return "正文"
-        case .verticalText:     return "竖排文字"
-        case .visionFootnote:   return "图注"
+        case .abstract:         return String(localized: "Abstract")
+        case .algorithm:        return String(localized: "Algorithm")
+        case .asideText:        return String(localized: "Side note")
+        case .chart:            return String(localized: "Chart")
+        case .content:          return String(localized: "Table of contents")
+        case .displayFormula:   return String(localized: "Display formula")
+        case .docTitle:         return String(localized: "Document title")
+        case .figureTitle:      return String(localized: "Figure title")
+        case .footer:           return String(localized: "Footer")
+        case .footerImage:      return String(localized: "Footer image")
+        case .footnote:         return String(localized: "Footnote")
+        case .formulaNumber:    return String(localized: "Formula number")
+        case .header:           return String(localized: "Header")
+        case .headerImage:      return String(localized: "Header image")
+        case .image:            return String(localized: "Image")
+        case .inlineFormula:    return String(localized: "Inline formula")
+        case .number:           return String(localized: "Page number")
+        case .paragraphTitle:   return String(localized: "Paragraph title")
+        case .reference:        return String(localized: "References")
+        case .referenceContent: return String(localized: "Reference content")
+        case .seal:             return String(localized: "Seal")
+        case .table:            return String(localized: "Table")
+        case .text:             return String(localized: "Body text")
+        case .verticalText:     return String(localized: "Vertical text")
+        case .visionFootnote:   return String(localized: "Figure note")
         }
     }
 
@@ -204,10 +204,11 @@ struct PPLayoutBlock: Equatable, Codable {
     /// mix all three.
     var source: PPTextSource?
     /// Why this region went to the reader it did, when that was a decision
-    /// rather than the default: "PP-OCR 置信度 62%，改由 PaddleOCR-VL 重读".
-    var routing: String?
+    /// rather than the default: "PP-OCRv6 average confidence 62%; reread with
+    /// PaddleOCR-VL".
+    var routing: RoutingReason?
     /// What about this region is worth a person's attention, if anything.
-    var review: String?
+    var review: ReviewReason?
     /// How many inline formulas the layout model found inside this region —
     /// regions it then folded into this one rather than reading twice.
     var inlineFormulas: Int?
@@ -226,8 +227,19 @@ struct PPLayoutBlock: Equatable, Codable {
 struct AlternativeReading: Equatable, Codable {
     var source: PPTextSource
     var text: String
-    /// What sets it apart, when "who read it" is not enough: "重读前".
-    var note: String?
+    /// What sets it apart, when "who read it" is not enough.
+    var note: Note?
+
+    enum Note: String, Codable {
+        /// The reading a reread replaced.
+        case beforeReread
+
+        var label: String {
+            switch self {
+            case .beforeReread: return String(localized: "Before reread")
+            }
+        }
+    }
 }
 
 extension PPLayoutLabel: Codable {

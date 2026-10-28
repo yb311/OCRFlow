@@ -26,7 +26,7 @@ struct ModelManagerView: View {
     // MARK: - Sections
 
     private var sourceSection: some View {
-        section("下载源") {
+        section("Download Source") {
             VStack(alignment: .leading, spacing: 8) {
                 Picker("", selection: $downloader.source) {
                     ForEach(PPModelCatalog.Source.allCases) { source in
@@ -35,12 +35,12 @@ struct ModelManagerView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                caption("模型来自 Hugging Face。除 PaddleOCR-VL 的 Q4 量化档为社区上传外，其余均为 PaddlePaddle 官方仓库。若连接不畅可切换镜像源。")
+                caption("Models come from Hugging Face. Apart from the community-uploaded Q4 quantization of PaddleOCR-VL, all are from official PaddlePaddle repositories. Switch to the mirror if the connection is poor.")
                 Button {
                     PPModelStore.ensureUserModelsDirectory()
                     NSWorkspace.shared.open(PPModelStore.userModelsDirectory)
                 } label: {
-                    Label("打开模型目录", systemImage: "folder").font(.callout)
+                    Label("Open Models Folder", systemImage: "folder").font(.callout)
                 }
                 .buttonStyle(.link)
             }
@@ -48,7 +48,7 @@ struct ModelManagerView: View {
     }
 
     private var tierSection: some View {
-        section("PP-OCRv6 模型") {
+        section("PP-OCRv6 Models") {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(PPModelTier.allCases) { tier in
                     if tier.isBundled {
@@ -57,7 +57,7 @@ struct ModelManagerView: View {
                         entryRow(PPModelCatalog.mediumTier, title: tier.label)
                     }
                 }
-                caption("PP-OCRv6 单模型覆盖 50 种语言：简体中文、繁体中文、英文、日文，以及 46 种拉丁语系语言。")
+                caption("A single PP-OCRv6 model covers 50 languages: Simplified Chinese, Traditional Chinese, English, Japanese, and 46 Latin-script languages.")
             }
         }
     }
@@ -65,8 +65,7 @@ struct ModelManagerView: View {
     private var vlSection: some View {
         section("PaddleOCR-VL 1.6") {
             VStack(alignment: .leading, spacing: 12) {
-                caption("0.9B 视觉语言模型。官方管线分两阶段：版面分析模型切分页面并判定阅读顺序，"
-                        + "再由 VL 模型逐块识别，因此版面模型是必装项。两档权重任选其一即可。")
+                caption("A 0.9B vision-language model. The official pipeline has two stages: a layout model splits the page and decides the reading order, then the VL model reads each block, so the layout model is required. Either set of weights will do.")
                 ForEach(PPModelCatalog.vlEntries) { entry in
                     entryRow(entry, title: entry.name)
                 }
@@ -75,10 +74,9 @@ struct ModelManagerView: View {
     }
 
     private var languageSection: some View {
-        section("其他语种识别器") {
+        section("Other Language Recognizers") {
             VStack(alignment: .leading, spacing: 12) {
-                caption("PP-OCRv6 未发布以下文字的模型，改用 PP-OCRv5 单语种识别器。"
-                        + "文本检测与语种无关，安装后仍由 PP-OCRv6 检测器定位文字。")
+                caption("PP-OCRv6 has no models for the scripts below, so PP-OCRv5 single-language recognizers are used instead. Text detection is language-independent: once installed, the PP-OCRv6 detector still locates the text.")
                 ForEach(PPModelCatalog.languageRecognizers) { entry in
                     entryRow(entry, title: entry.name)
                 }
@@ -95,7 +93,7 @@ struct ModelManagerView: View {
                 Text(tier.hint).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Label("已内置", systemImage: "checkmark.seal.fill")
+            Label("Built in", systemImage: "checkmark.seal.fill")
                 .font(.caption)
                 .foregroundStyle(.green)
         }
@@ -109,21 +107,21 @@ struct ModelManagerView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.callout)
-                    Text("\(entry.detail) · 约 \(sizeText(entry.approximateBytes))")
+                    Text("\(entry.detail) · About \(sizeText(entry.approximateBytes))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if isDownloading {
-                    Button("取消") { downloader.cancel(entry) }
+                    Button("Cancel") { downloader.cancel(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else if isInstalled {
-                    Button("删除") { downloader.remove(entry) }
+                    Button("Delete") { downloader.remove(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else {
-                    Button("下载") { downloader.download(entry) }
+                    Button("Download") { downloader.download(entry) }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                 }
@@ -133,7 +131,7 @@ struct ModelManagerView: View {
                 ProgressView(value: downloader.progress[entry.id] ?? 0)
                     .progressViewStyle(.linear)
             } else if isInstalled {
-                Label("已安装", systemImage: "checkmark.circle.fill")
+                Label("Installed", systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundStyle(.green)
             }
@@ -149,7 +147,7 @@ struct ModelManagerView: View {
     // MARK: - Helpers
 
     @ViewBuilder
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.headline)
             content()
@@ -161,12 +159,11 @@ struct ModelManagerView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15), lineWidth: 1))
     }
 
-    private func caption(_ text: String) -> some View {
+    private func caption(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.caption).foregroundStyle(.secondary)
     }
 
     private func sizeText(_ bytes: Int64) -> String {
-        let mb = Double(bytes) / 1_048_576
-        return mb < 1024 ? String(format: "%.0f MB", mb) : String(format: "%.1f GB", mb / 1024)
+        bytes.formatted(.byteCount(style: .file))
     }
 }

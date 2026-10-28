@@ -3,14 +3,14 @@ import AppKit
 
 /// Something about a page that a person should look at.
 ///
-/// Phrased as what was observed — "表格识别输出达到长度上限" — rather than as a
-/// score: no engine here reports a calibrated accuracy, and a bare percentage
-/// would claim one.
+/// Phrased as what was observed — "Output hit the token limit" — rather than
+/// as a score: no engine here reports a calibrated accuracy, and a bare
+/// percentage would claim one.
 struct ReviewNote: Equatable, Hashable, Codable {
     enum Severity: String, Codable {
         /// Worth checking: the text may be wrong or incomplete.
         case warning
-        /// Worth knowing, nothing to fix: "本页取自 PDF 文字层".
+        /// Worth knowing, nothing to fix: "Body text comes from the PDF's text layer".
         case info
     }
 
@@ -18,14 +18,178 @@ struct ReviewNote: Equatable, Hashable, Codable {
     /// The region the note is about, as an index into the page's blocks; nil
     /// for the page as a whole.
     var block: Int?
-    var message: String
+    var reason: ReviewReason
 
-    static func warning(_ message: String, block: Int? = nil) -> ReviewNote {
-        ReviewNote(severity: .warning, block: block, message: message)
+    var message: String { reason.message }
+
+    static func warning(_ reason: ReviewReason, block: Int? = nil) -> ReviewNote {
+        ReviewNote(severity: .warning, block: block, reason: reason)
     }
 
-    static func info(_ message: String, block: Int? = nil) -> ReviewNote {
-        ReviewNote(severity: .info, block: block, message: message)
+    static func info(_ reason: ReviewReason, block: Int? = nil) -> ReviewNote {
+        ReviewNote(severity: .info, block: block, reason: reason)
+    }
+}
+
+/// What was observed about a region or a page, kept as what happened and put
+/// into words only when shown — so a result read in one language reads right
+/// in another, and code can ask what kind of problem it is without matching
+/// on text.
+enum ReviewReason: Hashable, Codable {
+    // A region PP-OCRv6 read on its own.
+    /// A table or formula read as plain text, with no VLM to restore it.
+    case structureNotRestored(PPLayoutLabel)
+    case layoutTextUnread
+    case lowConfidence(LowConfidence)
+
+    // A region PaddleOCR-VL read.
+    /// It failed; `kept` is whose reading stands instead, nil when there was
+    /// none and `error` says why.
+    case vlFailed(error: String, kept: PPTextSource?, hadFallback: Bool)
+    case vlReadNothing(kept: PPTextSource?, hadFallback: Bool)
+    case outputLimit(tokens: Int)
+    case repetition
+    case interrupted
+    case noTableStructure
+    case readLessThanHalf
+    case disagrees(with: PPTextSource?, overlap: Int)
+    case tableCellsMisordered(pairs: Int)
+    case tableTextMissing(count: Int, examples: [String])
+
+    // A region read again on request.
+    case rereading
+    case rereadReadNothing
+    case rereadDiffers
+    case rereadFailed(error: String)
+
+    // A page.
+    case layoutModelMissing
+    case pdfTextLayer(PDFTextLayer.Verdict)
+    case pdfNativeBody
+    case pageFailed(page: Int, error: String?)
+    /// Tables or formulas read as plain text because PaddleOCR-VL failed to load.
+    case structureReadAsPlainText(loadError: String)
+    case pageOutputLimit(tokens: Int)
+
+    var message: String {
+        switch self {
+        case let .structureNotRestored(label):
+            return String(localized: "PaddleOCR-VL isn't installed, so this region (\(label.label)) was read as plain text and its structure wasn't restored")
+        case .layoutTextUnread:
+            return String(localized: "Layout analysis found text here, but PP-OCRv6 read nothing")
+        case let .lowConfidence(finding):
+            return String(localized: "\(finding.description); worth checking")
+        case let .vlFailed(error, kept, hadFallback):
+            return hadFallback
+                ? String(localized: "PaddleOCR-VL couldn't read this region; kept the \(Self.name(of: kept)) result")
+                : String(localized: "PaddleOCR-VL couldn't read this region: \(error)")
+        case let .vlReadNothing(kept, hadFallback):
+            return hadFallback
+                ? String(localized: "PaddleOCR-VL read nothing; kept the \(Self.name(of: kept)) result")
+                : String(localized: "PaddleOCR-VL read nothing")
+        case let .outputLimit(tokens):
+            return String(localized: "Output hit the \(tokens) token limit; content may be incomplete")
+        case .repetition:
+            return String(localized: "The model repeated itself and was cut off; something may be missing")
+        case .interrupted:
+            return String(localized: "PaddleOCR-VL inference was interrupted; content may be incomplete")
+        case .noTableStructure:
+            return String(localized: "No table structure was recognized; only the text was read")
+        case .readLessThanHalf:
+            return String(localized: "PaddleOCR-VL read less than half as much text as PP-OCRv6; something may be missing")
+        case let .disagrees(other, overlap):
+            return String(localized: "Differs a lot from the \(Self.name(of: other)) result (\((Double(overlap) / 100).percentText) character overlap); please check")
+        case let .tableCellsMisordered(pairs):
+            return String(localized: "\(pairs) pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check")
+        case let .tableTextMissing(count, examples):
+            let quoted = examples.map { "“\($0)”" }.joined(separator: String(localized: ", "))
+            return String(localized: "\(count) pieces of text PP-OCRv6 read inside the table (\(quoted)\(count > examples.count ? String(localized: " etc.") : "")) are missing from it. Cells may have been skipped or misplaced; please check")
+        case .rereading:
+            return String(localized: "Rereading with PaddleOCR-VL…")
+        case .rereadReadNothing:
+            return String(localized: "PaddleOCR-VL read nothing; kept the original result")
+        case .rereadDiffers:
+            return String(localized: "The reread differs from the original. Choose which one to keep")
+        case let .rereadFailed(error):
+            return String(localized: "PaddleOCR-VL reread failed: \(error)")
+        case .layoutModelMissing:
+            return String(localized: "The layout model isn't installed, so this page was read with PP-OCRv6 only, without per-region routing")
+        case let .pdfTextLayer(verdict):
+            return String(localized: "This page's text comes from the PDF text layer (\(verdict.description))")
+        case .pdfNativeBody:
+            return String(localized: "Body text comes from the PDF's native text layer, without OCR")
+        case let .pageFailed(page, error):
+            return String(localized: "Page \(page + 1) failed: \(error ?? String(localized: "Unknown error"))")
+        case let .structureReadAsPlainText(loadError):
+            return String(localized: "This page has tables or formulas, but it was read as plain text: \(String(localized: "Couldn't load PaddleOCR-VL (\(loadError))"))")
+        case let .pageOutputLimit(tokens):
+            return String(localized: "Page output hit the \(tokens) token limit; content may be incomplete")
+        }
+    }
+
+    /// True when the reader stopped at its output budget, which a larger one
+    /// may get past.
+    var isOutputLimit: Bool {
+        switch self {
+        case .outputLimit, .pageOutputLimit: return true
+        default:                             return false
+        }
+    }
+
+    private static func name(of source: PPTextSource?) -> String {
+        source?.label ?? String(localized: "the other engine")
+    }
+}
+
+/// Why PP-OCRv6's reading of a region is in doubt.
+enum LowConfidence: Hashable, Codable {
+    case lines(unsure: Int, of: Int)
+    case average(percent: Int)
+
+    var description: String {
+        switch self {
+        case let .lines(unsure, total):
+            return String(localized: "\(unsure) of \(total) PP-OCRv6 lines have low confidence")
+        case let .average(percent):
+            return String(localized: "PP-OCRv6 average confidence \((Double(percent) / 100).percentText)")
+        }
+    }
+}
+
+extension BinaryFloatingPoint {
+    /// A fraction written as a whole percentage, the way the user's locale
+    /// writes one.
+    var percentText: String { Double(self).formatted(.percent.precision(.fractionLength(0))) }
+}
+
+/// Why a region went to the reader it did, when that was a decision rather
+/// than the default.
+enum RoutingReason: Hashable, Codable {
+    case verticalText
+    case inlineFormulas(Int)
+    case ppFoundNothing
+    case lowConfidence(LowConfidence)
+    case pdfInlineFormulas(Int)
+    case pdfNoText
+    case rereadOnRequest
+
+    var message: String {
+        switch self {
+        case .verticalText:
+            return String(localized: "Vertical text goes to PaddleOCR-VL")
+        case let .inlineFormulas(count):
+            return String(localized: "The paragraph has \(count) inline formulas, so PaddleOCR-VL reads it as LaTeX")
+        case .ppFoundNothing:
+            return String(localized: "PP-OCRv6 found no text here; reading it with PaddleOCR-VL instead")
+        case let .lowConfidence(finding):
+            return String(localized: "\(finding.description); reread with PaddleOCR-VL")
+        case let .pdfInlineFormulas(count):
+            return String(localized: "The paragraph has \(count) inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it")
+        case .pdfNoText:
+            return String(localized: "The PDF text layer has no text here; reading the image with PP-OCRv6 instead")
+        case .rereadOnRequest:
+            return String(localized: "Reread with PaddleOCR-VL on request")
+        }
     }
 }
 
@@ -40,8 +204,8 @@ enum WorkspaceMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .workspace: return "工作台"
-        case .review:    return "复核"
+        case .workspace: return String(localized: "Workspace")
+        case .review:    return String(localized: "Review")
         }
     }
 }
@@ -67,7 +231,9 @@ struct ReviewEntry: Identifiable, Hashable {
     let fileName: String
     let page: Int
     let origin: Origin
-    let message: String
+    let reason: ReviewReason
+
+    var message: String { reason.message }
 
     var id: Key { Key(itemID: itemID, page: page, origin: origin) }
 

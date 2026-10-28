@@ -33,11 +33,11 @@ struct DropZoneView: View {
                 }
 
                 VStack(spacing: 6) {
-                    Text("拖放图片到这里")
+                    Text("Drop Images Here")
                         .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
-                    Text("支持 PNG · JPEG · TIFF · BMP · GIF · HEIC · WebP · PDF")
+                    Text("PNG · JPEG · TIFF · BMP · GIF · HEIC · WebP · PDF")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -46,7 +46,7 @@ struct DropZoneView: View {
                 Button {
                     vm.openFilePicker()
                 } label: {
-                    Label("选择文件", systemImage: "folder.badge.plus")
+                    Label("Choose Files", systemImage: "folder.badge.plus")
                         .font(.callout)
                         .fontWeight(.medium)
                         .padding(.horizontal, 20)

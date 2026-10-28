@@ -74,7 +74,7 @@ struct PPLayoutDetector {
     private func decode(_ outputs: [String: PPTensor], scoreThreshold: Double,
                         width: CGFloat, height: CGFloat) throws -> [PPLayoutBlock] {
         guard let detections = outputs["fetch_name_0"]?.floats else {
-            throw PPOCRError.unexpectedOutputShape("版面模型未返回检测结果")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "The layout model returned no detections"))
         }
         let stride = 7
         let page = CGRect(x: 0, y: 0, width: width, height: height)

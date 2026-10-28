@@ -1,0 +1,6697 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {},
+    " etc." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " 等"
+          }
+        }
+      }
+    },
+    " · Edited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " · 已修改"
+          }
+        }
+      }
+    },
+    "%@ %lld Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld 个文件"
+          }
+        }
+      }
+    },
+    "%@ %lld blocks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %#@blocks@"
+          },
+          "substitutions" : {
+            "blocks" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg block"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg blocks"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld 块"
+          }
+        }
+      }
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@（%@）"
+          }
+        }
+      }
+    },
+    "%@ returned HTTP %lld. Try again later or switch the download source." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 返回 HTTP %lld，请稍后重试或切换下载源"
+          }
+        }
+      }
+    },
+    "%@ · %lld to review" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %#@flags@"
+          },
+          "substitutions" : {
+            "flags" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg to review"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg to review"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %lld 处待复核"
+          }
+        }
+      }
+    },
+    "%@ · About %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 约 %@"
+          }
+        }
+      }
+    },
+    "%@ · Reused earlier result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 复用此前结果"
+          }
+        }
+      }
+    },
+    "%@ — model not downloaded yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ —— 模型尚未下载"
+          }
+        }
+      }
+    },
+    "%@ — not downloaded yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ —— 尚未下载"
+          }
+        }
+      }
+    },
+    "%@%@-Table %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@%@-表%lld"
+          }
+        }
+      }
+    },
+    "%@. Retried with %@, which also failed: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@；已改用%@重试，仍然失败：%@"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：%@"
+          }
+        }
+      }
+    },
+    "%@: expected %lld floats, got %lld bytes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：期望 %lld 个浮点数，实际 %lld 字节"
+          }
+        }
+      }
+    },
+    "%@: expected %lld int32 values, got %lld bytes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：期望 %lld 个 int32，实际 %lld 字节"
+          }
+        }
+      }
+    },
+    "%@: expected %lld int64 values, got %lld bytes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：期望 %lld 个 int64，实际 %lld 字节"
+          }
+        }
+      }
+    },
+    "%@: unsupported output element type %d" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@：不支持的输出元素类型 %d"
+          }
+        }
+      }
+    },
+    "%@; reread with PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，改由 PaddleOCR-VL 重读"
+          }
+        }
+      }
+    },
+    "%@; worth checking" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，建议核对"
+          }
+        }
+      }
+    },
+    "%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "%lld / %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %lld"
+          }
+        }
+      }
+    },
+    "%lld Files Selected" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld File Selected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Files Selected"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选中 %lld 个文件"
+          }
+        }
+      }
+    },
+    "%lld PDFs couldn't be written" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld PDF couldn't be written"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld PDFs couldn't be written"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %lld 个 PDF 未能写入"
+          }
+        }
+      }
+    },
+    "%lld files done" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file done"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files done"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个文件已完成"
+          }
+        }
+      }
+    },
+    "%lld files have manual edits" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file has manual edits"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files have manual edits"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个文件有手动修改"
+          }
+        }
+      }
+    },
+    "%lld items on this page need review" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item on this page needs review"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items on this page need review"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一页有 %lld 处待复核"
+          }
+        }
+      }
+    },
+    "%lld items to review. Click to start reviewing" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item to review. Click to start reviewing"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items to review. Click to start reviewing"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 处待复核，点按开始复核"
+          }
+        }
+      }
+    },
+    "%lld lanes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lane"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lanes"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 路"
+          }
+        }
+      }
+    },
+    "%lld lines" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld line"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lines"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 行"
+          }
+        }
+      }
+    },
+    "%lld lines · Confidence %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@lines@ · Confidence %2$@"
+          },
+          "substitutions" : {
+            "lines" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg line"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg lines"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 行 · 置信度 %@"
+          }
+        }
+      }
+    },
+    "%lld ms" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ms"
+          }
+        }
+      }
+    },
+    "%lld of %lld PP-OCRv6 lines have low confidence" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 有 %lld/%lld 行置信度过低"
+          }
+        }
+      }
+    },
+    "%lld pages" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 页"
+          }
+        }
+      }
+    },
+    "%lld pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pair of cells in the table is ordered differently from the layout PP-OCRv6 saw; content may be in the wrong row or column. Please check"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格中 %lld 组单元格的行列顺序与 PP-OCRv6 看到的版面不符，可能有内容错行错列，请核对"
+          }
+        }
+      }
+    },
+    "%lld pieces of text PP-OCRv6 read inside the table (%@%@) are missing from it. Cells may have been skipped or misplaced; please check" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@items@ PP-OCRv6 read inside the table (%2$@%3$@) %#@verb@ missing from it. Cells may have been skipped or misplaced; please check"
+          },
+          "substitutions" : {
+            "items" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg piece of text"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg pieces of text"
+                    }
+                  }
+                }
+              }
+            },
+            "verb" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "is"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "are"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 在表格中读到的 %lld 处内容（%@%@）不在表格里，可能有单元格漏读或错位，请核对"
+          }
+        }
+      }
+    },
+    "%lld recognized" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中 %lld 个已完成识别"
+          }
+        }
+      }
+    },
+    "%lld regions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld region"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld regions"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个区域"
+          }
+        }
+      }
+    },
+    "%lld · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld · %@"
+          }
+        }
+      }
+    },
+    "%lld · Needs review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld · 待复核"
+          }
+        }
+      }
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld/%lld"
+          }
+        }
+      }
+    },
+    "(empty)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（空）"
+          }
+        }
+      }
+    },
+    ", " : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "、"
+          }
+        }
+      }
+    },
+    "-p%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "-第%lld页"
+          }
+        }
+      }
+    },
+    "0 always picks the most likely token, which is also the official default. Higher values add randomness, which rarely helps transcription." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0 表示每次都选最有把握的那个词，也是官方默认；调高会引入随机性，对转写任务通常没有好处"
+          }
+        }
+      }
+    },
+    "0.9 GB, community quantization. Loads faster and uses less memory (try this first)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0.9 GB，社区量化，加载快、占用小（推荐先试）"
+          }
+        }
+      }
+    },
+    "0.9B vision-language model. Layout analysis plus block-by-block reading, outputs Markdown (slower, requires model download)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0.9B 视觉语言模型，版面分析 + 逐块识别，输出 Markdown（较慢，需下载模型）"
+          }
+        }
+      }
+    },
+    "1.8 GB, official PaddlePaddle weights, the accuracy reference" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1.8 GB，PaddlePaddle 官方权重，精度基准"
+          }
+        }
+      }
+    },
+    "1280" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1280"
+          }
+        }
+      }
+    },
+    "139 MB, most accurate. Download it in Model Manager" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "139 MB，精度最高，需在模型管理中下载"
+          }
+        }
+      }
+    },
+    "1600" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1600"
+          }
+        }
+      }
+    },
+    "2048 (best for small text)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2048（小字最佳）"
+          }
+        }
+      }
+    },
+    "31 MB, balances speed and accuracy, bundled with the app (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "31 MB，速度与精度平衡，随应用内置（推荐）"
+          }
+        }
+      }
+    },
+    "6 MB, fastest. Covers 49 languages (no Japanese)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 MB，最快。覆盖 49 种语言（不含日文）"
+          }
+        }
+      }
+    },
+    "736 (fastest)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "736（最快）"
+          }
+        }
+      }
+    },
+    "960 (default)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "960（默认）"
+          }
+        }
+      }
+    },
+    "A 0.9B vision-language model. The official pipeline has two stages: a layout model splits the page and decides the reading order, then the VL model reads each block, so the layout model is required. Either set of weights will do." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0.9B 视觉语言模型。官方管线分两阶段：版面分析模型切分页面并判定阅读顺序，再由 VL 模型逐块识别，因此版面模型是必装项。两档权重任选其一即可。"
+          }
+        }
+      }
+    },
+    "A region goes to PaddleOCR-VL when the average confidence of its PP-OCRv6 lines is below this value, or more than a quarter of its lines are below “Minimum confidence”. Higher is more accurate but slower" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个区域内 PP-OCRv6 各行的平均置信度低于此值，或四分之一以上的行低于「最低置信度」，就交给 PaddleOCR-VL。调高更准但更慢"
+          }
+        }
+      }
+    },
+    "A single PP-OCRv6 model covers 50 languages: Simplified Chinese, Traditional Chinese, English, Japanese, and 46 Latin-script languages." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 单模型覆盖 50 种语言：简体中文、繁体中文、英文、日文，以及 46 种拉丁语系语言。"
+          }
+        }
+      }
+    },
+    "A single PP-OCRv6 model covers 50 languages: Simplified and Traditional Chinese, English, Japanese, and 46 Latin-script languages. Not Korean, Arabic, Cyrillic, Thai, Greek or Devanagari" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 单模型覆盖 50 种语言：简繁中文、英文、日文，以及 46 种拉丁语系语言。不含韩文、阿拉伯文、西里尔字母、泰文、希腊文、天城文"
+          }
+        }
+      }
+    },
+    "About %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 %@"
+          }
+        }
+      }
+    },
+    "Above 1, tokens already output are less likely to appear again. If whole passages repeat, try 1.05–1.15" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大于 1 时，已经输出过的词更不容易再次出现。遇到整段重复可以调到 1.05–1.15"
+          }
+        }
+      }
+    },
+    "Abstract" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摘要"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        }
+      }
+    },
+    "Add Files…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件…"
+          }
+        }
+      }
+    },
+    "Add images or folders" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加图片或文件夹"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级参数"
+          }
+        }
+      }
+    },
+    "After merging into one line there are no line breaks left, so “Remove extra blank lines” has no effect." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并为单行后结果里不再有换行，「去除多余空行」无从生效。"
+          }
+        }
+      }
+    },
+    "After reread" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重读后"
+          }
+        }
+      }
+    },
+    "Algorithm" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算法"
+          }
+        }
+      }
+    },
+    "All" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部"
+          }
+        }
+      }
+    },
+    "All (%lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部（%lld）"
+          }
+        }
+      }
+    },
+    "All Reviewed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部复核完成"
+          }
+        }
+      }
+    },
+    "All selected files are written into one document." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有选中的文件写入同一个文档。"
+          }
+        }
+      }
+    },
+    "Also reads text inside image regions. When off, images are kept as illustrations only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连图片区域里的文字也读出来；关闭时图片只作为插图保留"
+          }
+        }
+      }
+    },
+    "An installed single-language recognizer; detection is still done by PP-OCRv6" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装的单语种识别器，检测仍由 PP-OCRv6 完成"
+          }
+        }
+      }
+    },
+    "Analyze layout first, then read block by block" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先做版面分析，再逐块识别"
+          }
+        }
+      }
+    },
+    "Any text layer (including OCR layers on scans)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任何文字层（含扫描件的 OCR 层）"
+          }
+        }
+      }
+    },
+    "Appearance" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观"
+          }
+        }
+      }
+    },
+    "Apple Vision · Accurate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Vision · 精准模式"
+          }
+        }
+      }
+    },
+    "Apple Vision · Fast" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Vision · 快速模式"
+          }
+        }
+      }
+    },
+    "Arabic" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阿拉伯语"
+          }
+        }
+      }
+    },
+    "At least one language is required" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少需要一种语言"
+          }
+        }
+      }
+    },
+    "At least one language must remain" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少要保留一种语言"
+          }
+        }
+      }
+    },
+    "Auto (%lld on this Mac)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动（本机 %lld 路）"
+          }
+        }
+      }
+    },
+    "Automatically recognize new files added to a folder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动识别放进文件夹的新文件"
+          }
+        }
+      }
+    },
+    "Automation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动化"
+          }
+        }
+      }
+    },
+    "Auxiliary Content" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "辅助内容解析"
+          }
+        }
+      }
+    },
+    "Available" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可添加"
+          }
+        }
+      }
+    },
+    "Back to Workspace" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到工作台"
+          }
+        }
+      }
+    },
+    "Balanced (small)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "均衡版 small"
+          }
+        }
+      }
+    },
+    "Batch Concurrency" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "批量并发"
+          }
+        }
+      }
+    },
+    "Before reread" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重读前"
+          }
+        }
+      }
+    },
+    "Behavior" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行为"
+          }
+        }
+      }
+    },
+    "Better results, a little slower" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别效果好，速度稍慢"
+          }
+        }
+      }
+    },
+    "Binarization threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "二值化阈值"
+          }
+        }
+      }
+    },
+    "Blank line" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空行"
+          }
+        }
+      }
+    },
+    "Blocks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区块"
+          }
+        }
+      }
+    },
+    "Body text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正文"
+          }
+        }
+      }
+    },
+    "Body text comes from the PDF's native text layer, without OCR" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正文取自 PDF 原生文字层，未经 OCR"
+          }
+        }
+      }
+    },
+    "Body text, headings and other plain text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正文、标题等普通文字"
+          }
+        }
+      }
+    },
+    "Box threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本框阈值"
+          }
+        }
+      }
+    },
+    "Box unclip ratio" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本框扩张系数"
+          }
+        }
+      }
+    },
+    "Built in" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已内置"
+          }
+        }
+      }
+    },
+    "Built-in multilingual model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置多语言模型"
+          }
+        }
+      }
+    },
+    "By column (geometric estimate)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按栏排序（几何估算）"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "Cancelled" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消"
+          }
+        }
+      }
+    },
+    "Cancelled (%lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消（%lld）"
+          }
+        }
+      }
+    },
+    "Candidate boxes with an average probability below this are discarded" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "候选框平均概率低于此值将被丢弃"
+          }
+        }
+      }
+    },
+    "Candidate range (top-p)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果可信范围（top-p）"
+          }
+        }
+      }
+    },
+    "Capture Screenshot" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图识别"
+          }
+        }
+      }
+    },
+    "Chart" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图表"
+          }
+        }
+      }
+    },
+    "Chart recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图表识别"
+          }
+        }
+      }
+    },
+    "Check Now…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在检查…"
+          }
+        }
+      }
+    },
+    "Check for Updates…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新…"
+          }
+        }
+      }
+    },
+    "Check for updates automatically" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动检查更新"
+          }
+        }
+      }
+    },
+    "Checks GitHub Releases for new versions in the background and asks before downloading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在后台向 GitHub Releases 查询新版本，下载前会先征求同意"
+          }
+        }
+      }
+    },
+    "Checks each line for upside-down text and flips it, with almost no speed cost" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逐行判断是否倒置并翻转，几乎不影响速度"
+          }
+        }
+      }
+    },
+    "Choose" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择"
+          }
+        }
+      }
+    },
+    "Choose Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择文件"
+          }
+        }
+      }
+    },
+    "Choose a folder to watch (including its subfolders)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要监控的文件夹（包括其中的子文件夹）"
+          }
+        }
+      }
+    },
+    "Choose a folder to watch first" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先选择要监控的文件夹"
+          }
+        }
+      }
+    },
+    "Choose a folder; each image is written to its own “original name_OCR” document." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个文件夹，每张图片各写出一个「原文件名_OCR」文档。"
+          }
+        }
+      }
+    },
+    "Choose an output folder for results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择识别结果的输出文件夹"
+          }
+        }
+      }
+    },
+    "Choose images, PDFs or folders (including their subfolders)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择图片、PDF 或文件夹（包括其中的子文件夹）"
+          }
+        }
+      }
+    },
+    "Choose where to export. %lld files will each be saved as .%@, keeping the original folder structure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose where to export. %#@files@ will each be saved as .%2$@, keeping the original folder structure"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg file"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择导出位置，%lld 个文件将各自保存为 .%@，并保留原文件夹结构"
+          }
+        }
+      }
+    },
+    "Choose which reading to use · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择采用哪种读法 · %@"
+          }
+        }
+      }
+    },
+    "Choose…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择…"
+          }
+        }
+      }
+    },
+    "Clear %lld Files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clear %lld File"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Clear %lld Files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Clear Recognition Cache" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空识别缓存"
+          }
+        }
+      }
+    },
+    "Clear list" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空列表"
+          }
+        }
+      }
+    },
+    "Clear the entire list?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空整个列表？"
+          }
+        }
+      }
+    },
+    "Click Start Recognition in the toolbar to process this file" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击工具栏的「开始识别」按钮处理该文件"
+          }
+        }
+      }
+    },
+    "Click a cell to edit it" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按单元格即可修改"
+          }
+        }
+      }
+    },
+    "Click the formula to edit it" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按公式即可修改"
+          }
+        }
+      }
+    },
+    "Click the text to edit it" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按文字即可修改"
+          }
+        }
+      }
+    },
+    "Click to edit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按修改"
+          }
+        }
+      }
+    },
+    "Click to edit the formula" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按修改公式"
+          }
+        }
+      }
+    },
+    "Click to edit this cell" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按修改这个单元格"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "Collapse" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起"
+          }
+        }
+      }
+    },
+    "Collapses consecutive blank lines into one" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将连续多个空行压缩为单个空行"
+          }
+        }
+      }
+    },
+    "Combine into one file" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并为一个文件"
+          }
+        }
+      }
+    },
+    "Community quantization, about half the size of the official weights and faster to load. The vision encoder is quantized too, so accuracy may drop slightly" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社区量化版，体积约为官方的一半、加载更快；视觉编码器也被量化，精度可能略有损失"
+          }
+        }
+      }
+    },
+    "Completed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
+          }
+        }
+      }
+    },
+    "Completed (%lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成（%lld）"
+          }
+        }
+      }
+    },
+    "Compute Backend" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算后端"
+          }
+        }
+      }
+    },
+    "Confirm" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认"
+          }
+        }
+      }
+    },
+    "Context length: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下文长度：%lld"
+          }
+        }
+      }
+    },
+    "Copied" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制"
+          }
+        }
+      }
+    },
+    "Copy All Text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制所有文本"
+          }
+        }
+      }
+    },
+    "Copy Text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制文本"
+          }
+        }
+      }
+    },
+    "Copy Translation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制译文"
+          }
+        }
+      }
+    },
+    "Copy this block" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制这一块"
+          }
+        }
+      }
+    },
+    "Copy this file's results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制这个文件的识别结果"
+          }
+        }
+      }
+    },
+    "Core ML (Neural Engine / GPU)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core ML（神经引擎 / GPU）"
+          }
+        }
+      }
+    },
+    "Correct this block (or double-click)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纠正这一块（也可以双击）"
+          }
+        }
+      }
+    },
+    "Corresponds to PaddleOCR's use_doc_unwarping. Both engines use it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对应 PaddleOCR 的 use_doc_unwarping，两个引擎都会用到。"
+          }
+        }
+      }
+    },
+    "Couldn't Load Image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载图片"
+          }
+        }
+      }
+    },
+    "Couldn't build the download URL for %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法构造 %@ 的下载地址"
+          }
+        }
+      }
+    },
+    "Couldn't create %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建 %@"
+          }
+        }
+      }
+    },
+    "Couldn't create the PaddleOCR-VL context: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 上下文创建失败：%@"
+          }
+        }
+      }
+    },
+    "Couldn't create the input chunk" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建输入块"
+          }
+        }
+      }
+    },
+    "Couldn't decode the image pixels" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法解码图片像素数据"
+          }
+        }
+      }
+    },
+    "Couldn't load %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载 %@"
+          }
+        }
+      }
+    },
+    "Couldn't load PaddleOCR-VL (%@)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 加载失败（%@）"
+          }
+        }
+      }
+    },
+    "Couldn't load the PaddleOCR model: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 模型加载失败：%@"
+          }
+        }
+      }
+    },
+    "Couldn't load the PaddleOCR-VL model: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 模型加载失败：%@"
+          }
+        }
+      }
+    },
+    "Couldn't load the PaddleOCR-VL vision encoder: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 视觉编码器加载失败：%@"
+          }
+        }
+      }
+    },
+    "Couldn't load the image file" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载图片文件"
+          }
+        }
+      }
+    },
+    "Couldn't open the PDF (it's damaged or password-protected)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开 PDF（文件损坏，或设有打开密码）"
+          }
+        }
+      }
+    },
+    "Couldn't read the character dictionary from %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从 %@ 中解析字符字典"
+          }
+        }
+      }
+    },
+    "Couldn't tell what language the text is in" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法判断原文的语言"
+          }
+        }
+      }
+    },
+    "Couldn't write file %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法写入文件 %@"
+          }
+        }
+      }
+    },
+    "Crops images and charts from the original at their detected positions and shows them in the Markdown result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把版面里的图片、图表按识别到的位置从原图裁出来，显示在 Markdown 结果中"
+          }
+        }
+      }
+    },
+    "Current version %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前版本 %@"
+          }
+        }
+      }
+    },
+    "Cyrillic" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西里尔字母"
+          }
+        }
+      }
+    },
+    "Dark" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        }
+      }
+    },
+    "Decides which engine reads each region. Without it, whole pages use PP-OCRv6 only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按区域分配识别引擎的依据；未安装时整页只用 PP-OCRv6"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        }
+      }
+    },
+    "Detection model output shape %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检测模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Detection resolution" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检测分辨率"
+          }
+        }
+      }
+    },
+    "Detects pages rotated 90°/180°/270° and straightens them. Recommended for scans" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别整页旋转 90°/180°/270° 并自动摆正；扫描件建议开启"
+          }
+        }
+      }
+    },
+    "Devanagari" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天城文"
+          }
+        }
+      }
+    },
+    "Differs a lot from the %@ result (%@ character overlap); please check" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与%@的结果差异较大（字符重合 %@），请核对"
+          }
+        }
+      }
+    },
+    "Display formula" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行间公式"
+          }
+        }
+      }
+    },
+    "Divider" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分割线"
+          }
+        }
+      }
+    },
+    "Document orientation model output shape %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文档方向模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Document title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文档标题"
+          }
+        }
+      }
+    },
+    "Download" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载"
+          }
+        }
+      }
+    },
+    "Download PaddleOCR-VL Model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 PaddleOCR-VL 模型"
+          }
+        }
+      }
+    },
+    "Download Source" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载源"
+          }
+        }
+      }
+    },
+    "Download the PaddleOCR-VL model in Settings first" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要先在设置中下载 PaddleOCR-VL 模型"
+          }
+        }
+      }
+    },
+    "Drop Images Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖放图片到这里"
+          }
+        }
+      }
+    },
+    "East Slavic" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "东斯拉夫语"
+          }
+        }
+      }
+    },
+    "Edit this cell" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改这个单元格"
+          }
+        }
+      }
+    },
+    "Empty cell" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空单元格"
+          }
+        }
+      }
+    },
+    "English" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英文"
+          }
+        }
+      }
+    },
+    "Estimates columns from the gaps between lines, without a layout model. Usually right for multi-column print, but bylines and right-aligned numbers may land in the wrong place" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不依赖版面模型，按文字行之间的空白估算栏目位置。多栏报刊通常正确，但署名行、右对齐编号一类的元素可能落错位置"
+          }
+        }
+      }
+    },
+    "Excel (tables only)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excel 表格（仅导出表格）"
+          }
+        }
+      }
+    },
+    "Expand" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开"
+          }
+        }
+      }
+    },
+    "Expected %lld floats, got %lld bytes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期望 %lld 个浮点数，实际 %lld 字节"
+          }
+        }
+      }
+    },
+    "Export" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出"
+          }
+        }
+      }
+    },
+    "Export %lld Files…" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export %lld File…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export %lld Files…"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出这 %lld 个文件…"
+          }
+        }
+      }
+    },
+    "Export %lld Selected Files…" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export %lld Selected File…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export %lld Selected Files…"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出选中的 %lld 个文件…"
+          }
+        }
+      }
+    },
+    "Export All Results (%lld Files)…" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export All Results (%lld File)…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export All Results (%lld Files)…"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出全部结果（%lld 个文件）…"
+          }
+        }
+      }
+    },
+    "Export All Results…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出全部结果…"
+          }
+        }
+      }
+    },
+    "Export Bilingual…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出双语…"
+          }
+        }
+      }
+    },
+    "Export Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出到此处"
+          }
+        }
+      }
+    },
+    "Export Selected Results…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出选中结果…"
+          }
+        }
+      }
+    },
+    "Export This File's Results…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出此文件结果…"
+          }
+        }
+      }
+    },
+    "Export Translation…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出译文…"
+          }
+        }
+      }
+    },
+    "Export as" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出方式"
+          }
+        }
+      }
+    },
+    "Export each file separately" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个文件单独导出"
+          }
+        }
+      }
+    },
+    "Export format" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出格式"
+          }
+        }
+      }
+    },
+    "Export only the results for “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只导出「%@」的识别结果"
+          }
+        }
+      }
+    },
+    "Export results as text or Markdown files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出识别结果为文本或 Markdown 文件"
+          }
+        }
+      }
+    },
+    "Export results for %lld files (combined into one file)" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export results for %lld file (combined into one file)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Export results for %lld files (combined into one file)"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出 %lld 个文件的识别结果（合并为一个文件）"
+          }
+        }
+      }
+    },
+    "Export the results for “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出「%@」的识别结果"
+          }
+        }
+      }
+    },
+    "Export “%@”…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出「%@」…"
+          }
+        }
+      }
+    },
+    "Extracted directly, without OCR" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接提取，不经 OCR"
+          }
+        }
+      }
+    },
+    "Failed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败"
+          }
+        }
+      }
+    },
+    "Failed (%lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败（%lld）"
+          }
+        }
+      }
+    },
+    "Fast mode often garbles Chinese, Korean, decorative fonts and curved pages. If results look wrong, switch to Accurate before changing other settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速模式在中文、韩文、艺术字体和弯曲页面上容易出现乱码，结果不对时先换成「精准模式」再调其它设置。"
+          }
+        }
+      }
+    },
+    "Fast, good for quick batch processing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速度快，适合批量快速处理"
+          }
+        }
+      }
+    },
+    "Figure note" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图注"
+          }
+        }
+      }
+    },
+    "Figure title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图题"
+          }
+        }
+      }
+    },
+    "File not found on %@ (HTTP 404)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 上找不到该文件（HTTP 404）"
+          }
+        }
+      }
+    },
+    "File separator" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件分隔符"
+          }
+        }
+      }
+    },
+    "Filter by status" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按状态筛选"
+          }
+        }
+      }
+    },
+    "Fit to Window" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适合窗口"
+          }
+        }
+      }
+    },
+    "Flattens skewed, curled or folded pages before recognition. Scans don't need it. When on, the preview shows the flattened page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拍歪、卷曲、对折的书页先展平再识别。扫描件不需要，开启后预览显示的是展平后的页面"
+          }
+        }
+      }
+    },
+    "Flattens skewed, curled or folded pages before recognition; not needed for scans" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把拍歪、卷曲、对折的书页展平后再识别；扫描件用不上"
+          }
+        }
+      }
+    },
+    "Flip threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻转判定阈值"
+          }
+        }
+      }
+    },
+    "Footer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页脚"
+          }
+        }
+      }
+    },
+    "Footer image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页脚图"
+          }
+        }
+      }
+    },
+    "Footnote" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚注"
+          }
+        }
+      }
+    },
+    "Formula number" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公式编号"
+          }
+        }
+      }
+    },
+    "Formula recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公式识别"
+          }
+        }
+      }
+    },
+    "French" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "法文"
+          }
+        }
+      }
+    },
+    "GPU models batch regions from several files and pages and decode them together. Two files at a time is enough to keep the GPU busy; more only uses more memory." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU 模型会把多个文件、多个页面的区域合并成批一起解码，最多同时处理 2 个文件就足以让 GPU 满载，再多只会多占内存。"
+          }
+        }
+      }
+    },
+    "German" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "德文"
+          }
+        }
+      }
+    },
+    "Go through them one by one in Review (⌘2)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在复核模式里逐处查看（⌘2）"
+          }
+        }
+      }
+    },
+    "Go to page %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳到第 %lld 页"
+          }
+        }
+      }
+    },
+    "Good for English scans: rejoins words split across lines" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适合英文扫描件，自动拼合被断行分割的单词"
+          }
+        }
+      }
+    },
+    "Greek" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希腊语"
+          }
+        }
+      }
+    },
+    "HF mirror (mainland China)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HF 镜像（国内）"
+          }
+        }
+      }
+    },
+    "Header" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页眉"
+          }
+        }
+      }
+    },
+    "Header image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页眉图"
+          }
+        }
+      }
+    },
+    "Headers, footers, page numbers and the like are detected by the layout model and filtered out by default. Turn an item on to keep it in the results. Matches PaddleOCR's official auxiliary content options." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页眉、页脚、页码这类内容会被版面模型认出来并默认过滤掉；打开某一项表示把它保留在结果里。与 PaddleOCR 官方的「辅助内容解析」一一对应。"
+          }
+        }
+      }
+    },
+    "Heading level detection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "段落标题级别识别"
+          }
+        }
+      }
+    },
+    "High accuracy (medium)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高精度版 medium"
+          }
+        }
+      }
+    },
+    "How far to expand each layout region when cropping. Cropping tight to the text cuts off stroke edges and the model misses characters. Corresponds to the official unclip_ratio" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裁剪每个版面区域时向外扩张的比例。贴着文字裁会切掉笔画边缘，模型因此漏字；对应官方的 unclip_ratio"
+          }
+        }
+      }
+    },
+    "How files are separated when several are exported into one text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多个文件导出为同一文本时，各文件内容之间的分隔方式。"
+          }
+        }
+      }
+    },
+    "If the same file (judged by content, regardless of name or location) was recognized with the same settings, the earlier result is reused. “Recognize Again” always reads afresh. The list and results are kept after quitting and are there next time." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一个文件（按内容判断，与文件名和位置无关）用同样的设置识别过，就直接复用上次的结果。「重新识别」总是重新读取。列表和识别结果在退出后保留，下次打开继续。"
+          }
+        }
+      }
+    },
+    "Image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片"
+          }
+        }
+      }
+    },
+    "Image Preprocessing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图像预处理"
+          }
+        }
+      }
+    },
+    "Image decoding runs truly in parallel. PaddleOCR inference still runs one image at a time (so multiple model copies don't fight over the CPU), but the next image's decoding no longer waits." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片解码会真正并行；PaddleOCR 的模型推理仍逐张进行（避免多份模型抢占同一颗 CPU），但下一张的解码不再等待。"
+          }
+        }
+      }
+    },
+    "Images go into an .assets folder named after the .md file and are referenced by relative path. When off, image positions keep only an empty placeholder." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片写入与 .md 同名的 .assets 文件夹，文档中以相对路径引用；关闭后图片位置只保留空的占位符。"
+          }
+        }
+      }
+    },
+    "Include file names when exporting" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出时包含文件名"
+          }
+        }
+      }
+    },
+    "Includes subfolders. Files are read once they finish writing; originals are never moved or deleted" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包括子文件夹。文件写入完成后才会读取，原文件不会被移动或删除"
+          }
+        }
+      }
+    },
+    "Incomplete download: received %lld bytes, expected %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载不完整：收到 %lld 字节，应为 %lld 字节"
+          }
+        }
+      }
+    },
+    "Inference" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推理"
+          }
+        }
+      }
+    },
+    "Infers heading levels from font size and outputs ##, ###, ####. When off, all subheadings are one level" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按标题的字号大小推断层级，输出 ##、###、####；关闭后所有小标题同一级"
+          }
+        }
+      }
+    },
+    "Inline formula" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行内公式"
+          }
+        }
+      }
+    },
+    "Installed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装"
+          }
+        }
+      }
+    },
+    "Invalid address" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址无效"
+          }
+        }
+      }
+    },
+    "JSON (with coordinates and confidence)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON（含坐标与置信度）"
+          }
+        }
+      }
+    },
+    "Japanese" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日文"
+          }
+        }
+      }
+    },
+    "Join hyphenated line breaks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并连字符换行"
+          }
+        }
+      }
+    },
+    "Keep the current result and go to the next one (⌘↩)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "采用当前结果，转到下一处（⌘↩）"
+          }
+        }
+      }
+    },
+    "Keeps each page as it looks (PDF pages stay vector, not re-rasterized) and lays the recognized text over it as an invisible layer, so it can be searched and copied in Preview, Spotlight and elsewhere. Pages that already have a text layer are left alone." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留原页面外观（PDF 原页面以矢量形式保留，不重新栅格化），把识别文字以不可见文字层叠在原位置上，可在预览、聚焦等程序里搜索和复制。原本就有文字层的页面不重复添加。"
+          }
+        }
+      }
+    },
+    "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure (PaddleOCR-VL, or PP-OCRv6 with layout analysis on); others fall back to plain text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留标题层级、图片位置与表格。只有做过版面分析的结果才有这些结构（PaddleOCR-VL，或开启了版面分析的 PP-OCRv6）；没有的会退回纯文本。"
+          }
+        }
+      }
+    },
+    "Korean" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "韩语"
+          }
+        }
+      }
+    },
+    "LaTeX" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LaTeX"
+          }
+        }
+      }
+    },
+    "Languages not installed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未安装的语种"
+          }
+        }
+      }
+    },
+    "Layout Analysis" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版面分析"
+          }
+        }
+      }
+    },
+    "Layout analysis (official pipeline, recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版面分析（官方管线，推荐）"
+          }
+        }
+      }
+    },
+    "Layout analysis found text here, but PP-OCRv6 read nothing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版面分析认为这里有文字，但 PP-OCRv6 没有读出内容"
+          }
+        }
+      }
+    },
+    "Leave it for now and go to the next one (⌘])" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先不处理，转到下一处（⌘]）"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        }
+      }
+    },
+    "Lightweight (tiny)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻量版 tiny"
+          }
+        }
+      }
+    },
+    "Line Breaks" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "换行处理"
+          }
+        }
+      }
+    },
+    "Lines below this confidence are not flipped. Model output clusters around 0.27 / 0.73" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低于该置信度则不翻转；模型输出集中在 0.27 / 0.73 附近"
+          }
+        }
+      }
+    },
+    "Lines recognized with lower confidence than this are left out of the results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别置信度低于此值的文本行不会出现在结果中"
+          }
+        }
+      }
+    },
+    "Locate this region in the preview" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在预览中定位这一区域"
+          }
+        }
+      }
+    },
+    "Manage All Models…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部模型管理…"
+          }
+        }
+      }
+    },
+    "Max output per block: %lld tokens" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单块最大输出：%lld token"
+          }
+        }
+      }
+    },
+    "Merge into one line (no line breaks)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并为单行（不换行）"
+          }
+        }
+      }
+    },
+    "Minimum confidence" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最低置信度"
+          }
+        }
+      }
+    },
+    "Missing %@ model files: %@. Download them in Model Manager, or put the files in %@ and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少%1$@模型文件：%2$@。请在「模型管理」中下载，或将文件放入 %3$@ 后重试。"
+          }
+        }
+      }
+    },
+    "Missing model files for %@: %@. Download them in Model Manager, or put the files in %@ and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少%1$@的模型文件：%2$@。请在「模型管理」中下载，或将文件放入 %3$@ 后重试。"
+          }
+        }
+      }
+    },
+    "Mode" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模式"
+          }
+        }
+      }
+    },
+    "Model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型"
+          }
+        }
+      }
+    },
+    "Model %@ has no usable inputs/outputs" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型 %@ 没有可用的输入/输出"
+          }
+        }
+      }
+    },
+    "Model Manager" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型管理"
+          }
+        }
+      }
+    },
+    "Model Tier" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型档位"
+          }
+        }
+      }
+    },
+    "Models come from Hugging Face. Apart from the community-uploaded Q4 quantization of PaddleOCR-VL, all are from official PaddlePaddle repositories. Switch to the mirror if the connection is poor." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型来自 Hugging Face。除 PaddleOCR-VL 的 Q4 量化档为社区上传外，其余均为 PaddlePaddle 官方仓库。若连接不畅可切换镜像源。"
+          }
+        }
+      }
+    },
+    "Move down" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下移一位"
+          }
+        }
+      }
+    },
+    "Move up" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上移一位"
+          }
+        }
+      }
+    },
+    "Multithreaded, with the same results as Core ML (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多线程并行，识别结果与 Core ML 一致（推荐）"
+          }
+        }
+      }
+    },
+    "Native PDF text is extracted directly. Body text goes to PP-OCRv6; tables, formulas, charts, seals and low-confidence regions go to PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 原生文字直接提取；正文交给 PP-OCRv6，表格、公式、图表、印章和低置信度区域交给 PaddleOCR-VL"
+          }
+        }
+      }
+    },
+    "Native text only (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅原生文字（推荐）"
+          }
+        }
+      }
+    },
+    "Needs Review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待复核"
+          }
+        }
+      }
+    },
+    "Needs Review (%lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待复核（%lld）"
+          }
+        }
+      }
+    },
+    "Never; always recognize again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从不使用，总是重新识别"
+          }
+        }
+      }
+    },
+    "Next (⌘])" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一处（⌘]）"
+          }
+        }
+      }
+    },
+    "Next Page →" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一页 →"
+          }
+        }
+      }
+    },
+    "No %@ Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有%@的文件"
+          }
+        }
+      }
+    },
+    "No Failed Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有失败的文件"
+          }
+        }
+      }
+    },
+    "No Files Contain “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有包含「%@」的文件"
+          }
+        }
+      }
+    },
+    "No Images Yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未添加图片"
+          }
+        }
+      }
+    },
+    "No Tables to Export" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可导出的表格"
+          }
+        }
+      }
+    },
+    "No Text Found" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未识别到文字"
+          }
+        }
+      }
+    },
+    "No files to recognize" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有待识别的文件"
+          }
+        }
+      }
+    },
+    "No response" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无响应"
+          }
+        }
+      }
+    },
+    "No table structure was recognized; only the text was read" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有识别出表格结构，只读出了文字"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
+          }
+        }
+      }
+    },
+    "Not chosen" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未选择"
+          }
+        }
+      }
+    },
+    "Not installed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未安装"
+          }
+        }
+      }
+    },
+    "Nothing to Review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有待复核的内容"
+          }
+        }
+      }
+    },
+    "OCR text layer on a scan" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫描件上的 OCR 文字层"
+          }
+        }
+      }
+    },
+    "Official F16" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方 F16"
+          }
+        }
+      }
+    },
+    "Official PaddlePaddle weights, the accuracy reference. Two files: the text model and the vision encoder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddlePaddle 官方权重，精度基准。含文本模型与视觉编码器两个文件"
+          }
+        }
+      }
+    },
+    "Once a file is recognized, it is written to the output folder in the format chosen under Text & Export, keeping the subfolder structure. Source files whose output already exists count as done and aren't recognized again. Without an output folder, results stay in the list only." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个文件识别完成后，按「文本与导出」里选择的格式写入输出文件夹，并保留子文件夹结构；输出文件已存在的源文件视为已处理，不会重复识别。不选输出文件夹时，结果只留在列表里。"
+          }
+        }
+      }
+    },
+    "Only affects how the Markdown tab displays; the Source tab always shows the model's raw output. Other engines produce plain text and are not affected." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅影响「Markdown」标签页的显示方式；「源码」标签页始终是模型输出的原文。其它引擎只有纯文本，不受这里影响。"
+          }
+        }
+      }
+    },
+    "Only applies when temperature is above 0: samples from the candidates whose cumulative probability reaches this value" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只在 temperature 大于 0 时生效：从累计概率达到该值的候选里采样"
+          }
+        }
+      }
+    },
+    "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有由 PaddleOCR-VL（或智能分层中的 VL 层）识别出结构的表格才能导出到 Excel；PP-OCRv6 按普通文字读出的表格没有单元格信息。"
+          }
+        }
+      }
+    },
+    "Open Images…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开图片…"
+          }
+        }
+      }
+    },
+    "Open Models Folder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开模型目录"
+          }
+        }
+      }
+    },
+    "Orientation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方向校正"
+          }
+        }
+      }
+    },
+    "Orientation classifier output shape %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方向分类模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Original" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原图"
+          }
+        }
+      }
+    },
+    "Other Language Recognizers" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他语种识别器"
+          }
+        }
+      }
+    },
+    "Output" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输出到"
+          }
+        }
+      }
+    },
+    "Output hit the %lld token limit; content may be incomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输出达到 %lld token 上限，内容可能不完整"
+          }
+        }
+      }
+    },
+    "Outputs LaTeX" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输出 LaTeX 公式"
+          }
+        }
+      }
+    },
+    "Outputs an HTML table" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输出 HTML 表格结构"
+          }
+        }
+      }
+    },
+    "PDF native text layer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 原生文字层"
+          }
+        }
+      }
+    },
+    "PDF text layer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 文字层"
+          }
+        }
+      }
+    },
+    "PNG · JPEG · TIFF · BMP · GIF · HEIC · WebP · PDF" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持 PNG · JPEG · TIFF · BMP · GIF · HEIC · WebP · PDF"
+          }
+        }
+      }
+    },
+    "PP-DocLayoutV3 layout analysis" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-DocLayoutV3 版面分析"
+          }
+        }
+      }
+    },
+    "PP-OCRv5 single-language recognizer, used with the PP-OCRv6 detector" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv5 单语种识别器，搭配 PP-OCRv6 检测器使用"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 %@"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 Models" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 模型"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 Parameters" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 参数"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 average confidence %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 平均置信度 %@"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 found no text here; reading it with PaddleOCR-VL instead" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 在此区域没有检测到文字，改由 PaddleOCR-VL 读取"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 has no models for the scripts below, so PP-OCRv5 single-language recognizers are used instead. Text detection is language-independent: once installed, the PP-OCRv6 detector still locates the text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 未发布以下文字的模型，改用 PP-OCRv5 单语种识别器。文本检测与语种无关，安装后仍由 PP-OCRv6 检测器定位文字。"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 has no weights for these languages; the built-in model would only produce garbage for them. Download them here, then select one above. Text detection is still done by PP-OCRv6." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 没有这些语种的权重，用内置模型识别它们只会得到一堆错字。在这里直接下载，装好后即可在上面选中；文本检测仍由 PP-OCRv6 完成。"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 model. One model covers 50 languages and outputs line boxes with confidence" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 模型，单模型覆盖 50 种语言，输出逐行文本框与置信度"
+          }
+        }
+      }
+    },
+    "PaddleOCR inference failed: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 推理失败：%@"
+          }
+        }
+      }
+    },
+    "PaddleOCR's raw order: text on the same horizontal line reads left to right. Multi-column layouts get mixed across columns; suits receipts and forms with side-by-side pairs" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 原始顺序，同一水平线上的文字按从左到右排列；多栏版面会左右串行，适合票据、表单等左右成对的内容"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL %@"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL 1.6" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 1.6"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL Parameters" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 参数"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL can't process this image (error %d)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 无法处理这张图片（错误码 %d）"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL couldn't read this region: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 无法读取此区域：%@"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL couldn't read this region; kept the %@ result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 无法读取此区域，保留了 %@ 的结果"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL inference failed (error %d)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 推理失败（错误码 %d）"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL inference was interrupted; content may be incomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 推理中断，内容可能不完整"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL isn't installed, so this region (%@) was read as plain text and its structure wasn't restored" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装 PaddleOCR-VL，%@按普通文字识别，结构未还原"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL read less than half as much text as PP-OCRv6; something may be missing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 读出的文字比 PP-OCRv6 少一半以上，可能漏读"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL read nothing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 没有读出内容"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL read nothing; kept the %@ result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 没有读出内容，保留了 %@ 的结果"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL read nothing; kept the original result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 没有读出内容，保留了原结果"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL reread failed: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 重读失败：%@"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL-1.6 (Q4 quantized)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL-1.6（Q4 量化）"
+          }
+        }
+      }
+    },
+    "PaddleOCR-VL-1.6 (official F16)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL-1.6（官方 F16）"
+          }
+        }
+      }
+    },
+    "Page %lld failed: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 页识别失败：%@"
+          }
+        }
+      }
+    },
+    "Page %lld · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 页 · %@"
+          }
+        }
+      }
+    },
+    "Page break" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "换页符"
+          }
+        }
+      }
+    },
+    "Page number" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页码"
+          }
+        }
+      }
+    },
+    "Page orientation correction" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整页方向校正"
+          }
+        }
+      }
+    },
+    "Page output hit the %lld token limit; content may be incomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整页输出达到 %lld token 上限，内容可能不完整"
+          }
+        }
+      }
+    },
+    "Page unwarping" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片扭曲矫正"
+          }
+        }
+      }
+    },
+    "Paragraph title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "段落标题"
+          }
+        }
+      }
+    },
+    "Paragraphs PP-OCRv6 is unsure about are reread by the vision-language model. When off, they are only flagged for review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PP-OCRv6 读得没把握的段落改由视觉语言模型重新识别；关闭后只标记为待复核"
+          }
+        }
+      }
+    },
+    "Pending" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待处理"
+          }
+        }
+      }
+    },
+    "Pipeline Components" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分层组件"
+          }
+        }
+      }
+    },
+    "Plain Text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纯文本"
+          }
+        }
+      }
+    },
+    "Previous (⌘[)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一处（⌘[）"
+          }
+        }
+      }
+    },
+    "Primary" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首选"
+          }
+        }
+      }
+    },
+    "Probability threshold for text in the probability map. Lower it to catch fainter text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "概率图判定为文字的阈值，调低可召回更淡的文字"
+          }
+        }
+      }
+    },
+    "Process %lld files at a time" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Process %lld file at a time"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Process %lld files at a time"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时处理 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Q4 Quantized" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Q4 量化"
+          }
+        }
+      }
+    },
+    "Raise it to avoid clipping stroke edges; too high and neighboring text merges" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调大可避免笔画边缘被裁掉，过大则相邻文字会粘连"
+          }
+        }
+      }
+    },
+    "Randomness (temperature)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别稳定性（temperature）"
+          }
+        }
+      }
+    },
+    "Read again with PaddleOCR-VL using a higher output limit; if the result differs you can pick one (⌥⌘R)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 PaddleOCR-VL 以更大的输出上限重新读取，结果不同时可以二选一（⌥⌘R）"
+          }
+        }
+      }
+    },
+    "Reading Order & Layout" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读顺序与版面"
+          }
+        }
+      }
+    },
+    "Reads bar and line charts into data tables. Off by default upstream — a chart only draws shapes, so the numbers are the model's estimates" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把柱状图、折线图读成数据表格。官方默认关闭——图上只画了形状，读出来的数字是模型的估计"
+          }
+        }
+      }
+    },
+    "Reads the curved text on seals" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读出印章上的弧形文字"
+          }
+        }
+      }
+    },
+    "Reads the text in the image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读出图中文字"
+          }
+        }
+      }
+    },
+    "Recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别"
+          }
+        }
+      }
+    },
+    "Recognition Cache" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别缓存"
+          }
+        }
+      }
+    },
+    "Recognition Engine" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别引擎"
+          }
+        }
+      }
+    },
+    "Recognition Failed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别失败"
+          }
+        }
+      }
+    },
+    "Recognition Language" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别语言"
+          }
+        }
+      }
+    },
+    "Recognition Languages (in priority order)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别语言（按优先级）"
+          }
+        }
+      }
+    },
+    "Recognition Modules" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别模块"
+          }
+        }
+      }
+    },
+    "Recognition batch size: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别批大小：%lld"
+          }
+        }
+      }
+    },
+    "Recognition is running. Engine and model changes only affect files started afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别中，更改引擎或模型设置只会影响之后开始的文件。"
+          }
+        }
+      }
+    },
+    "Recognition model output shape %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Recognition stopped partway through. Only part of this page was read, so no result was kept." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别在中途停止，这一页只读到了一部分，因此没有保留结果。"
+          }
+        }
+      }
+    },
+    "Recognize %lld Unfinished Files Again" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Recognize %lld Unfinished File Again"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Recognize %lld Unfinished Files Again"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别 %lld 个未完成的文件"
+          }
+        }
+      }
+    },
+    "Recognize %lld files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Recognize %lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Recognize %lld files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Recognize Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别"
+          }
+        }
+      }
+    },
+    "Recognize this block again with PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 PaddleOCR-VL 重新识别这一块"
+          }
+        }
+      }
+    },
+    "Recognizing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别中"
+          }
+        }
+      }
+    },
+    "Recognizing %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别中 %@"
+          }
+        }
+      }
+    },
+    "Recognizing %@: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别中 %1$@：%2$@"
+          }
+        }
+      }
+    },
+    "Recognizing again will replace these edits with new results. Export first to keep them." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别会用新的识别结果替换这些修改。要保留修改，请先导出。"
+          }
+        }
+      }
+    },
+    "Recognizing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别中…"
+          }
+        }
+      }
+    },
+    "Reference content" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参考文献内容"
+          }
+        }
+      }
+    },
+    "References" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参考文献"
+          }
+        }
+      }
+    },
+    "Region padding ratio" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区域外扩系数"
+          }
+        }
+      }
+    },
+    "Regions decoded in parallel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "并行识别的区域数"
+          }
+        }
+      }
+    },
+    "Regions from the same page, neighboring pages and neighboring files are decoded together on the GPU. Each region's crop, prompt and decoding are unchanged, so results match one-at-a-time reading, only faster. Each extra lane uses about 45 MB more memory." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一页、相邻页面和相邻文件的多个区域在 GPU 上一起解码。每个区域的裁剪、提示词和解码方式都不变，识别结果与逐块识别一致，只是更快。每多一路约多占 45 MB 内存。"
+          }
+        }
+      }
+    },
+    "Regions of a disabled module still appear in the preview; they just aren't sent for recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭的模块对应的区域仍会出现在预览里，只是不送去识别。"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove %lld Files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove %lld File"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove %lld Files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Remove %lld selected files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove %lld selected file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove %lld selected files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %lld 个选中文件"
+          }
+        }
+      }
+    },
+    "Remove Selected Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除选中文件"
+          }
+        }
+      }
+    },
+    "Remove extra blank lines" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "去除多余空行"
+          }
+        }
+      }
+    },
+    "Removes extra whitespace at both ends of each line" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除每行两端多余的空白字符"
+          }
+        }
+      }
+    },
+    "Render tables as grids" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格渲染为网格"
+          }
+        }
+      }
+    },
+    "Repetition penalty" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复抑制强度"
+          }
+        }
+      }
+    },
+    "Replaces every line break with a space, producing continuous paragraphs" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将所有换行替换为空格，输出连续段落"
+          }
+        }
+      }
+    },
+    "Reread" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重读"
+          }
+        }
+      }
+    },
+    "Reread low-confidence regions with PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低置信度区域交给 PaddleOCR-VL 重读"
+          }
+        }
+      }
+    },
+    "Reread threshold (average confidence)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重读阈值（平均置信度）"
+          }
+        }
+      }
+    },
+    "Reread with Higher Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提高上限重读"
+          }
+        }
+      }
+    },
+    "Reread with PaddleOCR-VL on request" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手动要求 PaddleOCR-VL 重读"
+          }
+        }
+      }
+    },
+    "Rereading with PaddleOCR-VL will replace the edited text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 PaddleOCR-VL 重读会替换修改后的文字。"
+          }
+        }
+      }
+    },
+    "Rereading with PaddleOCR-VL…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在用 PaddleOCR-VL 重读…"
+          }
+        }
+      }
+    },
+    "Reset" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置"
+          }
+        }
+      }
+    },
+    "Reset All Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认设置"
+          }
+        }
+      }
+    },
+    "Resets all orientation, detection and recognition parameters. The selected model and compute backend are kept." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复方向校正、检测与识别的全部参数，保留所选模型与计算后端。"
+          }
+        }
+      }
+    },
+    "Restore All Defaults…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复全部默认设置…"
+          }
+        }
+      }
+    },
+    "Restore Defaults" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认值"
+          }
+        }
+      }
+    },
+    "Restore all default settings?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复全部默认设置？"
+          }
+        }
+      }
+    },
+    "Result Rendering" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果渲染"
+          }
+        }
+      }
+    },
+    "Result view" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果视图"
+          }
+        }
+      }
+    },
+    "Result · Edited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别结果 · 已修改"
+          }
+        }
+      }
+    },
+    "Result · Edited by hand" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别结果 · 已手动修改"
+          }
+        }
+      }
+    },
+    "Result · Using %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别结果 · 采用 %@"
+          }
+        }
+      }
+    },
+    "Results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别结果"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        }
+      }
+    },
+    "Returns text along with its position" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时给出文字与位置"
+          }
+        }
+      }
+    },
+    "Reused earlier result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复用此前结果"
+          }
+        }
+      }
+    },
+    "Review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复核"
+          }
+        }
+      }
+    },
+    "Review %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复核 %lld"
+          }
+        }
+      }
+    },
+    "Review →" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "去复核 →"
+          }
+        }
+      }
+    },
+    "Routing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路由策略"
+          }
+        }
+      }
+    },
+    "Runs all layers on the GPU, several times faster than CPU alone (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把全部层放到 GPU 上，比纯 CPU 快数倍（推荐）"
+          }
+        }
+      }
+    },
+    "Runs on the Neural Engine / GPU. PP-OCR's input sizes vary, so in practice this is usually several times slower than CPU" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交由神经引擎/GPU 执行。PP-OCR 输入尺寸可变，实测通常比 CPU 慢数倍"
+          }
+        }
+      }
+    },
+    "Sampling" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "采样参数"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
+    "Save images when exporting Markdown" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出 Markdown 时一并保存图片"
+          }
+        }
+      }
+    },
+    "Saving updates the text, the Markdown and exports" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存后文本、Markdown 与导出都会跟着变"
+          }
+        }
+      }
+    },
+    "Screenshot %@.png" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图 %@.png"
+          }
+        }
+      }
+    },
+    "Seal" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "印章"
+          }
+        }
+      }
+    },
+    "Seal recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "印章识别"
+          }
+        }
+      }
+    },
+    "Search names and text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索文件名或识别内容"
+          }
+        }
+      }
+    },
+    "Searchable PDF" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可搜索 PDF"
+          }
+        }
+      }
+    },
+    "Send a request to both download sources to see which one works" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向两个下载源各发一个请求，看看哪个通"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
+          }
+        }
+      }
+    },
+    "Settings (⌘,)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置（⌘,）"
+          }
+        }
+      }
+    },
+    "Settings are saved automatically and kept for the next launch. This restores all three tabs to their initial state." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置会自动保存并在下次启动时沿用；这里可以把全部三个标签页恢复到初始状态。"
+          }
+        }
+      }
+    },
+    "Several images are decoded and recognized by Apple Vision at once, making full use of a multi-core CPU." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多张图片会同时解码并交给 Apple Vision 识别，充分利用多核 CPU。"
+          }
+        }
+      }
+    },
+    "Show" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        }
+      }
+    },
+    "Show All" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示全部"
+          }
+        }
+      }
+    },
+    "Show all boxes (turn off to show only the block under the pointer)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示全部标注（关闭后只显示指向的那一块）"
+          }
+        }
+      }
+    },
+    "Show images and charts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示图片与图表"
+          }
+        }
+      }
+    },
+    "Show in Document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在文档中查看"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Finder 中显示"
+          }
+        }
+      }
+    },
+    "Show only the block under the pointer (turn on to see all boxes at once)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只显示指向的那一块（打开可一次看到全部标注）"
+          }
+        }
+      }
+    },
+    "Show this in the document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在文档中查看这一处"
+          }
+        }
+      }
+    },
+    "Showing only “%@”. Click to change" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只显示「%@」，点按更改"
+          }
+        }
+      }
+    },
+    "Side note" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旁注"
+          }
+        }
+      }
+    },
+    "Simplified Chinese" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "简体中文"
+          }
+        }
+      }
+    },
+    "Skip" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        }
+      }
+    },
+    "Skip completed files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过已完成的文件"
+          }
+        }
+      }
+    },
+    "Smart Layering" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能分层"
+          }
+        }
+      }
+    },
+    "Smart Layering (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能分层（推荐）"
+          }
+        }
+      }
+    },
+    "Software Update" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "软件更新"
+          }
+        }
+      }
+    },
+    "Spanish" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西班牙文"
+          }
+        }
+      }
+    },
+    "Start Recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始识别"
+          }
+        }
+      }
+    },
+    "Start processing as soon as files are dropped in or chosen" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入或选择文件后立即开始批量处理"
+          }
+        }
+      }
+    },
+    "Start recognition automatically after adding files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件后自动开始识别"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        }
+      }
+    },
+    "Stop recognition. Unfinished files are marked “Cancelled”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止识别，未完成的文件标记为「已取消」"
+          }
+        }
+      }
+    },
+    "Stopping…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止中…"
+          }
+        }
+      }
+    },
+    "Switching tiers resets the detection thresholds to that tier's official defaults." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换档位会把检测阈值恢复为该档位的官方默认值。"
+          }
+        }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随系统"
+          }
+        }
+      }
+    },
+    "Table" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格"
+          }
+        }
+      }
+    },
+    "Table of contents" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目录"
+          }
+        }
+      }
+    },
+    "Table recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格识别"
+          }
+        }
+      }
+    },
+    "Tables, formulas, charts, seals and low-confidence regions. Without it, these are only flagged for review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格、公式、图表、印章，以及置信度低的区域；未安装时只标记待复核"
+          }
+        }
+      }
+    },
+    "Tamil" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "泰米尔语"
+          }
+        }
+      }
+    },
+    "Telugu" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "泰卢固语"
+          }
+        }
+      }
+    },
+    "Test" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试"
+          }
+        }
+      }
+    },
+    "Text & Export" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本与导出"
+          }
+        }
+      }
+    },
+    "Text Boxes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字框"
+          }
+        }
+      }
+    },
+    "Text Detection & Recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本检测与识别"
+          }
+        }
+      }
+    },
+    "Text detection only gives each line's position, not its order. Layout analysis uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places lines back into their regions — as PaddleOCR's official document parsing does. Results also gain heading levels and image positions, ready to export as Markdown." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本检测只给出每一行的位置，不给出先后。版面分析用 PP-DocLayoutV3 找出页面上的栏目、标题、图表等区域并判定阅读顺序，再把文字行放回区域里——这也是 PaddleOCR 官方文档解析的做法，同时让结果带上标题层级、图片位置，可直接导出 Markdown。"
+          }
+        }
+      }
+    },
+    "Text in a native PDF is already exact, so using it directly is fastest and most accurate. Hidden OCR layers that other software added to scans are of unknown quality, so those pages are recognized again by default." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生 PDF 的文字本身就是准确的，直接取用最快也最准；扫描件上由其他软件生成的隐藏 OCR 文字层质量未知，默认会重新识别。"
+          }
+        }
+      }
+    },
+    "Text in images" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片文字识别"
+          }
+        }
+      }
+    },
+    "Text line orientation correction" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本行方向校正"
+          }
+        }
+      }
+    },
+    "Text post-processing only affects new results; existing ones are not changed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本后处理仅影响新识别的结果，不会修改已有内容。"
+          }
+        }
+      }
+    },
+    "Text recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字识别"
+          }
+        }
+      }
+    },
+    "Text spotting" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字定位"
+          }
+        }
+      }
+    },
+    "Thai" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "泰语"
+          }
+        }
+      }
+    },
+    "The PDF text layer has no text here; reading the image with PP-OCRv6 instead" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 文字层在此区域没有文字，改用 PP-OCRv6 识别图像"
+          }
+        }
+      }
+    },
+    "The PP-DocLayoutV3 layout model isn't downloaded yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下载 PP-DocLayoutV3 版面模型"
+          }
+        }
+      }
+    },
+    "The PaddleOCR dictionary file is missing, so results can't be decoded." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少 PaddleOCR 字典文件，无法解码识别结果。"
+          }
+        }
+      }
+    },
+    "The PaddleOCR model isn't loaded" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 模型未加载"
+          }
+        }
+      }
+    },
+    "The PaddleOCR-VL model isn't loaded" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 模型未加载"
+          }
+        }
+      }
+    },
+    "The context must fit one block's visual tokens plus its output. The per-block output limit keeps one block from stalling the whole page." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下文要装得下一块图像的视觉 token 加上它的输出；单块输出上限防止某一块卡住整页。"
+          }
+        }
+      }
+    },
+    "The detection probability map is incomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检测概率图数据不足"
+          }
+        }
+      }
+    },
+    "The first stage of PaddleOCR-VL: splits the layout and decides the reading order. Required for the VL engine" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR-VL 的第一阶段：切分版面并判定阅读顺序。使用 VL 引擎必装"
+          }
+        }
+      }
+    },
+    "The image's long side is scaled to this size before detection. Raise it for dense small text, at the cost of speed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片长边会缩放到该尺寸再送入检测模型。密集小字可调高，速度随之下降。"
+          }
+        }
+      }
+    },
+    "The layout model PP-DocLayoutV3.onnx is missing. Download it in Model Manager, or put the file in %@ and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少版面分析模型 PP-DocLayoutV3.onnx。请在「模型管理」中下载，或将文件放入 %@ 后重试。"
+          }
+        }
+      }
+    },
+    "The layout model isn't installed, so this page was read with PP-OCRv6 only, without per-region routing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装版面分析模型，本页只用 PP-OCRv6 识别，未做分区路由"
+          }
+        }
+      }
+    },
+    "The layout model returned no detections" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版面模型未返回检测结果"
+          }
+        }
+      }
+    },
+    "The model has no vocabulary" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型没有词表"
+          }
+        }
+      }
+    },
+    "The model repeated itself and was cut off; something may be missing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型出现重复输出，已截断，可能漏读"
+          }
+        }
+      }
+    },
+    "The model returned no output %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型未返回输出 %@"
+          }
+        }
+      }
+    },
+    "The most accurate tier, with better detection and recognition than small. Shares the built-in dictionary" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精度最高的一档，检测与识别均优于 small；共享内置字典"
+          }
+        }
+      }
+    },
+    "The official PaddleOCR pipeline: split the layout, decide the reading order, prompt each block appropriately, then assemble Markdown. When off, the whole page goes to the model at once — much faster, but content gets missed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 官方管线：切分版面、判定阅读顺序，逐块选用合适的提示词，最后拼成 Markdown。关闭后整页一次性交给模型，快得多但会漏内容。"
+          }
+        }
+      }
+    },
+    "The paragraph has %lld inline formulas, so PaddleOCR-VL reads it as LaTeX" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The paragraph has %lld inline formula, so PaddleOCR-VL reads it as LaTeX"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The paragraph has %lld inline formulas, so PaddleOCR-VL reads it as LaTeX"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "段落含 %lld 处行内公式，交由 PaddleOCR-VL 识别为 LaTeX"
+          }
+        }
+      }
+    },
+    "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The paragraph has %lld inline formula, which the PDF text layer can't represent, so PaddleOCR-VL reads it"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "段落含 %lld 处行内公式，PDF 文字层表达不了公式结构，交由 PaddleOCR-VL 识别"
+          }
+        }
+      }
+    },
+    "The recognition engine, model choices, all parameters, and text and export options return to their initial values. Downloaded models and files in the list are not affected." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别引擎、模型选择、全部参数、文本与导出选项都会回到初始值。已下载的模型和列表中的文件不受影响。"
+          }
+        }
+      }
+    },
+    "The recognition model and dictionary don't match: the model outputs %lld classes, the dictionary has %lld. Make sure the dictionary next to the model is from the same release." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别模型与字典不匹配：模型输出 %lld 类，字典对应 %lld 类。请确认模型旁的字典文件来自同一个版本。"
+          }
+        }
+      }
+    },
+    "The reread differs from the original. Choose which one to keep" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重读结果与原结果不同，请选择保留哪一个"
+          }
+        }
+      }
+    },
+    "The text is already in the selected language" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原文已经是所选的目标语言"
+          }
+        }
+      }
+    },
+    "The unwarping model returned too little data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扭曲矫正模型输出数据不足"
+          }
+        }
+      }
+    },
+    "There are no pages to write" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可写入的页面"
+          }
+        }
+      }
+    },
+    "These match PaddleOCR's three official sampling parameters, with the same defaults (1.00 / 0.00 / 1.0)." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 PaddleOCR 官方的三个采样参数一一对应，默认值也相同（1.00 / 0.00 / 1.0）。"
+          }
+        }
+      }
+    },
+    "These regions are always recognized and always drawn in the preview (filtered ones with dashed boxes); this only decides whether they go into the text and Markdown. Changes apply immediately without recognizing again — except for multi-page PDFs, whose text is assembled page by page during recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些区域始终会被识别，也始终画在预览里（被过滤的画成虚线框），这里只决定它们要不要进入文本和 Markdown。改动立刻生效，不需要重新识别；多页 PDF 例外，它的正文在识别时就已经逐页拼好了。"
+          }
+        }
+      }
+    },
+    "This image may not contain any recognizable text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该图片可能不含可识别的文字内容"
+          }
+        }
+      }
+    },
+    "This note is about the whole page, with no single region to edit. Confirming changes no text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这条提示针对整页，没有可以修改的单个区域。确认后不会改动任何文字。"
+          }
+        }
+      }
+    },
+    "This only removes them from the list. The original files on disk are not deleted." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅从列表中移除，不会删除磁盘上的原始文件。"
+          }
+        }
+      }
+    },
+    "This page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一页"
+          }
+        }
+      }
+    },
+    "This page has tables or formulas, but it was read as plain text: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本页含表格或公式，但 %@，按普通文字识别"
+          }
+        }
+      }
+    },
+    "This page may not contain any recognizable text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一页可能不含可识别的文字内容"
+          }
+        }
+      }
+    },
+    "This page's text comes from the PDF text layer (%@)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本页文字取自 PDF 文字层（%@）"
+          }
+        }
+      }
+    },
+    "This region has manual edits" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一区域有手动修改"
+          }
+        }
+      }
+    },
+    "Threads: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "线程数：%lld"
+          }
+        }
+      }
+    },
+    "Threads: Auto" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "线程数：自动"
+          }
+        }
+      }
+    },
+    "Top to bottom (PaddleOCR's raw order)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自上而下（PaddleOCR 原始顺序）"
+          }
+        }
+      }
+    },
+    "Traditional Chinese" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繁体中文"
+          }
+        }
+      }
+    },
+    "Translate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译"
+          }
+        }
+      }
+    },
+    "Translate %lld Files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Translate %lld File"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Translate %lld Files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Translate %lld Files…" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Translate %lld File…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Translate %lld Files…"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译这 %lld 个文件…"
+          }
+        }
+      }
+    },
+    "Translate the results on this Mac with macOS's built-in translation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 macOS 内置翻译在本机翻译识别结果"
+          }
+        }
+      }
+    },
+    "Translate to" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "译为"
+          }
+        }
+      }
+    },
+    "Translate “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译「%@」"
+          }
+        }
+      }
+    },
+    "Translating…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译中…"
+          }
+        }
+      }
+    },
+    "Translation didn't finish: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译未完成：%@"
+          }
+        }
+      }
+    },
+    "Trim spaces at line ends" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "去除行首尾空格"
+          }
+        }
+      }
+    },
+    "Turn page (⌥← / ⌥→)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻页（⌥← / ⌥→）"
+          }
+        }
+      }
+    },
+    "Turns a chart back into a table" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把图表内容还原成表格"
+          }
+        }
+      }
+    },
+    "Use" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "采用"
+          }
+        }
+      }
+    },
+    "UVDoc page unwarping" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UVDoc 图片扭曲矫正"
+          }
+        }
+      }
+    },
+    "Unexpected PaddleOCR model output shape: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PaddleOCR 模型输出形状异常：%@"
+          }
+        }
+      }
+    },
+    "Unknown error" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知错误"
+          }
+        }
+      }
+    },
+    "Unwarping model output shape %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扭曲矫正模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Use GPU (Metal)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 GPU（Metal）"
+          }
+        }
+      }
+    },
+    "Uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places the recognized lines into their regions. Matches PaddleOCR's official document-parsing pipeline and also yields layout structure and Markdown. Requires the layout model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先用 PP-DocLayoutV3 切分出栏目、标题、图表等区域并判定阅读顺序，再把识别出的文字行放回各自的区域。与 PaddleOCR 官方文档解析管线一致，同时给出版面结构与 Markdown。需下载版面分析模型"
+          }
+        }
+      }
+    },
+    "Uses macOS's built-in translation on this Mac; nothing is uploaded. The first time you use a language, macOS asks to download it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 macOS 内置翻译，在本机完成，不上传内容。首次使用某种语言时系统会提示下载语言包。"
+          }
+        }
+      }
+    },
+    "Vertical text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "竖排文字"
+          }
+        }
+      }
+    },
+    "Vertical text goes to PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "竖排文字交由 PaddleOCR-VL 识别"
+          }
+        }
+      }
+    },
+    "Vision Accurate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vision 精准"
+          }
+        }
+      }
+    },
+    "Vision Fast" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vision 快速"
+          }
+        }
+      }
+    },
+    "Vision interprets an ambiguous glyph by the languages earlier in the list. On mixed-language pages, put the main language first — it makes a big difference. Korean placed after Chinese and English gets noticeably worse." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vision 会优先按靠前的语言来判读同一个字形。混排页面把主要语言排在第一位，识别质量差别很大——韩文排在中文、英文之后就会明显变差。"
+          }
+        }
+      }
+    },
+    "Waiting for Recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待识别"
+          }
+        }
+      }
+    },
+    "Waiting for the current files to stop" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待当前文件停止"
+          }
+        }
+      }
+    },
+    "Watch" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "监控"
+          }
+        }
+      }
+    },
+    "Watched Folder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "监控文件夹"
+          }
+        }
+      }
+    },
+    "Watching “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在监控「%@」"
+          }
+        }
+      }
+    },
+    "When a PDF already has a text layer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 已有文字层时"
+          }
+        }
+      }
+    },
+    "When off, tables are shown as the model output them" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后按模型输出的原始形式显示表格"
+          }
+        }
+      }
+    },
+    "When on, each file's content starts with a level-1 heading." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启后每个文件的内容前会加上一级标题。"
+          }
+        }
+      }
+    },
+    "When on, each file's content starts with a “=== file name ===” line." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启后每段内容前会加上「=== 文件名 ===」标题行。"
+          }
+        }
+      }
+    },
+    "When you click Start Recognition again, files already recognized are not processed again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新点击「开始识别」时，不重复处理已识别的文件"
+          }
+        }
+      }
+    },
+    "Whether headers, footers, page numbers and other auxiliary content on this page go into the result (dashed boxes are excluded)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一页上的页眉/页脚/页码等辅助内容要不要写进结果（虚线框表示已排除）"
+          }
+        }
+      }
+    },
+    "Whitespace" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空白字符"
+          }
+        }
+      }
+    },
+    "Whole page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整页"
+          }
+        }
+      }
+    },
+    "Whole-page prompt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整页提示词"
+          }
+        }
+      }
+    },
+    "Workspace" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工作台"
+          }
+        }
+      }
+    },
+    "Workspace (⌘1) · Review (⌘2)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工作台（⌘1）· 复核（⌘2）"
+          }
+        }
+      }
+    },
+    "Writes only the recognized text, with no structure." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只写出识别到的文字，不带任何结构。"
+          }
+        }
+      }
+    },
+    "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from PaddleOCR-VL; tables PP-OCRv6 read as text are not exported." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把识别出结构的表格写成 Excel 工作簿，每个表格一个工作表，合并单元格保持合并，纯数字写成数值。表格结构来自 PaddleOCR-VL，PP-OCRv6 读成文字的表格不会导出。"
+          }
+        }
+      }
+    },
+    "Writes, page by page, each line's text, four-point coordinates and confidence, plus each layout region's type, reading order, position, which engine read it and why it needs review — for further processing by other programs." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按页写出每一行的文字、四点坐标与置信度，以及版面区域的类别、阅读顺序、位置、由哪个引擎识别和待复核原因，供其他程序继续处理。"
+          }
+        }
+      }
+    },
+    "Yellow marks where the two readings differ · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标黄的是两种读法不同的地方 · %@"
+          }
+        }
+      }
+    },
+    "Your corrections are saved in the results and will be included in exports." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修正已经写回结果，导出时会带上。"
+          }
+        }
+      }
+    },
+    "Zoom In" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大"
+          }
+        }
+      }
+    },
+    "Zoom Out" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小"
+          }
+        }
+      }
+    },
+    "_bilingual" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "_双语"
+          }
+        }
+      }
+    },
+    "_translation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "_译文"
+          }
+        }
+      }
+    },
+    "context length %u" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上下文长度 %u"
+          }
+        }
+      }
+    },
+    "native text layer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生文字层"
+          }
+        }
+      }
+    },
+    "no text layer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无文字层"
+          }
+        }
+      }
+    },
+    "text layer can't be decoded correctly" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字层无法正确解码"
+          }
+        }
+      }
+    },
+    "the other engine" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一引擎"
+          }
+        }
+      }
+    },
+    "“%@” has manual edits" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」有手动修改"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

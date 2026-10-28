@@ -99,7 +99,7 @@ final class VLEngine: @unchecked Sendable {
         // Metal, which is several times faster than the CPU path.
         modelParams.n_gpu_layers = config.useGPU ? -1 : 0
         guard let model = llama_model_load_from_file(paths.model.path, modelParams) else {
-            throw VLError.backendFailed("无法加载 \(paths.model.lastPathComponent)")
+            throw VLError.backendFailed(String(localized: "Couldn't load \(paths.model.lastPathComponent)"))
         }
 
         let parallelism = config.resolvedParallelism
@@ -124,7 +124,7 @@ final class VLEngine: @unchecked Sendable {
         }
         guard let context = llama_init_from_model(model, contextParams) else {
             llama_model_free(model)
-            throw VLError.contextFailed("上下文长度 \(contextParams.n_ctx)")
+            throw VLError.contextFailed(String(localized: "context length \(contextParams.n_ctx)"))
         }
 
         var mtmdParams = mtmd_context_params_default()
@@ -134,14 +134,14 @@ final class VLEngine: @unchecked Sendable {
         guard let multimodal = mtmd_init_from_file(paths.mmproj.path, model, mtmdParams) else {
             llama_free(context)
             llama_model_free(model)
-            throw VLError.multimodalFailed("无法加载 \(paths.mmproj.lastPathComponent)")
+            throw VLError.multimodalFailed(String(localized: "Couldn't load \(paths.mmproj.lastPathComponent)"))
         }
 
         guard let vocab = llama_model_get_vocab(model) else {
             mtmd_free(multimodal)
             llama_free(context)
             llama_model_free(model)
-            throw VLError.backendFailed("模型没有词表")
+            throw VLError.backendFailed(String(localized: "The model has no vocabulary"))
         }
 
         core = Core(model: model, context: context, multimodal: multimodal, vocab: vocab,
@@ -403,7 +403,7 @@ extension VLEngine {
             defer { mtmd_bitmap_free(bitmap) }
 
             guard let chunks = mtmd_input_chunks_init() else {
-                throw VLError.multimodalFailed("无法创建输入块")
+                throw VLError.multimodalFailed(String(localized: "Couldn't create the input chunk"))
             }
             var status: Int32 = 0
             prompt(for: request.task).withCString { text in

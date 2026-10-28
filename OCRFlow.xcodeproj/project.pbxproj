@@ -14,6 +14,7 @@
 		A1000001000000000000AA05 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA05 /* SidebarView.swift */; };
 		A1000001000000000000AA06 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA06 /* DetailView.swift */; };
 		A1000001000000000000AA07 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA07 /* DropZoneView.swift */; };
+		D101000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D102000000000000000000A1 /* Localizable.xcstrings */; };
 		A1000001000000000000AA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA08 /* Assets.xcassets */; };
 		A1000001000000000000AA0A /* DropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0A /* DropHelper.swift */; };
 		A1000001000000000000AA0B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0B /* AppIcon.icon */; };
@@ -79,6 +80,7 @@
 		A1000002000000000000AA06 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
 		A1000002000000000000AA07 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
 		A1000002000000000000AA08 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D102000000000000000000A1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A1000002000000000000AA09 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000002000000000000AA0A /* DropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropHelper.swift; sourceTree = "<group>"; };
 		A1000002000000000000AA0B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 				B10000040000000000000A02 /* Resources */,
 				A1000002000000000000AA08 /* Assets.xcassets */,
 				A1000002000000000000AA0B /* AppIcon.icon */,
+				D102000000000000000000A1 /* Localizable.xcstrings */,
 				A1000002000000000000AA09 /* Info.plist */,
 			);
 			path = OCRFlow;
@@ -353,6 +356,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = A1000004000000000000AA00;
 			productRefGroup = A1000004000000000000AA02 /* Products */;
@@ -391,6 +395,7 @@
 				A1000001000000000000AA0B /* AppIcon.icon in Resources */,
 				B10000010000000000000A03 /* PaddleOCR in Resources */,
 				C1010000000000000000000B /* MarkdownViewer in Resources */,
+				D101000000000000000000A1 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

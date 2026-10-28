@@ -63,11 +63,12 @@
   const md = window.markdownit({ html: true, linkify: true, breaks: false, typographer: false });
   let figures = [];
   let figureOrdinal = 0;
+  let figureLabel = "Image";
 
   // Figures are placeholders `![标签]()` in document order; each takes the
   // crop for its ordinal, or says what it stood for when there is none.
   md.renderer.rules.image = function (tokens, index) {
-    const alt = tokens[index].content || "图片";
+    const alt = tokens[index].content || figureLabel;
     const source = figures[figureOrdinal++];
     if (source) return '<img class="figure" alt="' + md.utils.escapeHtml(alt) + '" src="' + source + '">';
     return '<span class="figure-missing">' + md.utils.escapeHtml(alt) + "</span>";
@@ -156,6 +157,7 @@
 
   function render(payload) {
     figures = payload.figures || [];
+    figureLabel = payload.figureLabel || figureLabel;
     figureOrdinal = 0;
     if (payload.accent) {
       const root = document.documentElement.style;

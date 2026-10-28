@@ -64,8 +64,9 @@ enum DocumentRecognizer {
         var vlPipeline: VLDocumentPipeline?
         var layered: LayeredPipeline?
         var unwarper: PPDocUnwarper?
-        /// Why 智能分层 is running without PaddleOCR-VL although it is
-        /// installed, when that is the case. Noted on every page it affects.
+        /// The error that kept PaddleOCR-VL from loading, when 智能分层 is
+        /// running without it although it is installed. Noted on every page
+        /// it affects.
         var vlUnavailable: String?
     }
 
@@ -168,7 +169,7 @@ enum DocumentRecognizer {
         if pages.allSatisfy({ $0 == nil }), let first = errors.compactMap({ $0 }).first { throw first }
         return (0..<count).map { index in
             pages[index] ?? PageResult(size: .zero, notes: [
-                .warning("第 \(index + 1) 页识别失败：\(errors[index]?.localizedDescription ?? "未知错误")"),
+                .warning(.pageFailed(page: index, error: errors[index]?.localizedDescription)),
             ])
         }
     }
@@ -210,13 +211,13 @@ enum DocumentRecognizer {
             progress?(1)
         case .paddleVL:
             guard let vlPipeline = engines.vlPipeline else {
-                throw VLError.backendFailed("PaddleOCR-VL 模型未加载")
+                throw VLError.backendFailed(String(localized: "The PaddleOCR-VL model isn't loaded"))
             }
             page = try vlPipeline.parse(image: image, config: settings.vlConfig,
                                         progress: progress, isCancelled: isCancelled)
         case .paddleOCR:
             guard let paddle = engines.paddle else {
-                throw PPOCRError.sessionFailed("PaddleOCR 模型未加载")
+                throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
             }
             let result = try paddle.recognize(image: image, config: settings.paddleConfig,
                                               progress: progress, isCancelled: isCancelled)
@@ -225,7 +226,7 @@ enum DocumentRecognizer {
                               blockSource: .plainOCR, rawText: result.lines.plainText)
         case .auto:
             guard let layered = engines.layered else {
-                throw PPOCRError.sessionFailed("PaddleOCR 模型未加载")
+                throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
             }
             page = try layered.read(image: image, progress: progress, isCancelled: isCancelled)
             page.notes += unavailableNotes(engines, page: page)
@@ -238,7 +239,7 @@ enum DocumentRecognizer {
     private static func unavailableNotes(_ engines: Engines, page: PageResult) -> [ReviewNote] {
         guard let reason = engines.vlUnavailable else { return [] }
         let structured = page.blocks.contains { $0.label == .table || $0.label.vlTask == .formula }
-        return structured ? [.warning("本页含表格或公式，但 \(reason)，按普通文字识别")] : []
+        return structured ? [.warning(.structureReadAsPlainText(loadError: reason))] : []
     }
 
     // MARK: - Apple Vision

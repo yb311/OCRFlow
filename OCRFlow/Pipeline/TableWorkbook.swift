@@ -37,8 +37,8 @@ enum TableWorkbook {
                     guard (block.source ?? page.blockSource) == .visionLanguageModel,
                           let cells = cells(from: block.text), !cells.isEmpty else { continue }
                     count += 1
-                    let page = item.pages.count > 1 ? "-第\(pageIndex + 1)页" : ""
-                    sheets.append(Sheet(name: "\(stem)\(page)-表\(count)", cells: cells))
+                    let page = item.pages.count > 1 ? String(localized: "-p\(pageIndex + 1)") : ""
+                    sheets.append(Sheet(name: String(localized: "\(stem)\(page)-Table \(count)"), cells: cells))
                 }
             }
         }

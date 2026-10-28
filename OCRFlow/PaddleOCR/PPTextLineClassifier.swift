@@ -38,7 +38,7 @@ struct PPTextLineClassifier {
             let (values, shape) = try session.run(
                 input: tensor, shape: [count, 3, Self.inputHeight, Self.inputWidth])
             guard shape.count == 2, shape[0] == count, shape[1] == 2 else {
-                throw PPOCRError.unexpectedOutputShape("方向分类模型输出维度 \(shape)")
+                throw PPOCRError.unexpectedOutputShape(String(localized: "Orientation classifier output shape \(shape)"))
             }
 
             for i in 0..<count {

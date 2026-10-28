@@ -45,15 +45,15 @@ struct TranslationSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Text(items.count == 1 ? "翻译「\(items[0].fileName)」" : "翻译 \(items.count) 个文件")
+                Text(items.count == 1 ? "Translate “\(items[0].fileName)”" : "Translate \(items.count) Files")
                     .font(.headline)
                 Spacer()
-                Picker("译为", selection: $targetCode) {
+                Picker("Translate to", selection: $targetCode) {
                     ForEach(Self.targets, id: \.code) { Text($0.name).tag($0.code) }
                 }
                 .fixedSize()
                 .disabled(isTranslating)
-                Button(isTranslating ? "翻译中…" : "翻译") { start() }
+                Button(isTranslating ? "Translating…" : "Translate") { start() }
                     .buttonStyle(.borderedProminent)
                     .disabled(isTranslating || totalParagraphs == 0)
             }
@@ -98,17 +98,17 @@ struct TranslationSheet: View {
 
             Divider()
             HStack {
-                Text("使用 macOS 内置翻译，在本机完成，不上传内容。首次使用某种语言时系统会提示下载语言包。")
+                Text("Uses macOS's built-in translation on this Mac; nothing is uploaded. The first time you use a language, macOS asks to download it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("复制译文") { copyTranslation() }
+                Button("Copy Translation") { copyTranslation() }
                     .disabled(translations.isEmpty)
-                Button("导出双语…") { export(bilingual: true) }
+                Button("Export Bilingual…") { export(bilingual: true) }
                     .disabled(translations.isEmpty)
-                Button("导出译文…") { export(bilingual: false) }
+                Button("Export Translation…") { export(bilingual: false) }
                     .disabled(translations.isEmpty)
-                Button("关闭") { dismiss() }
+                Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
             .controlSize(.small)
@@ -130,13 +130,13 @@ struct TranslationSheet: View {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(items.map(\.ocrText).joined(separator: "\n"))
         guard let dominant = recognizer.dominantLanguage else {
-            failure = "无法判断原文的语言"
+            failure = String(localized: "Couldn't tell what language the text is in")
             return
         }
         let source = Locale.Language(identifier: dominant.rawValue)
         let target = Locale.Language(identifier: targetCode)
         guard source.minimalIdentifier != target.minimalIdentifier else {
-            failure = "原文已经是所选的目标语言"
+            failure = String(localized: "The text is already in the selected language")
             return
         }
         if configuration?.source == source, configuration?.target == target {
@@ -168,7 +168,7 @@ struct TranslationSheet: View {
                 }
             }
         } catch {
-            failure = "翻译未完成：\(error.localizedDescription)"
+            failure = String(localized: "Translation didn't finish: \(error.localizedDescription)")
         }
     }
 
@@ -189,7 +189,7 @@ struct TranslationSheet: View {
     }
 
     private func export(bilingual: Bool) {
-        let suffix = bilingual ? "_双语" : "_译文"
+        let suffix = bilingual ? String(localized: "_bilingual") : String(localized: "_translation")
         if items.count == 1 {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
@@ -202,7 +202,7 @@ struct TranslationSheet: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
-        panel.prompt = "导出到此处"
+        panel.prompt = String(localized: "Export Here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         for item in items where translations[item.id] != nil {
             let name = "\((item.fileName as NSString).deletingPathExtension)\(suffix).md"

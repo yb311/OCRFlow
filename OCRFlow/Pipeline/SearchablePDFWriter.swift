@@ -25,8 +25,8 @@ enum SearchablePDFWriter {
 
         var errorDescription: String? {
             switch self {
-            case let .cannotCreate(url): return "无法创建 \(url.lastPathComponent)"
-            case .nothingWritten:        return "没有可写入的页面"
+            case let .cannotCreate(url): return String(localized: "Couldn't create \(url.lastPathComponent)")
+            case .nothingWritten:        return String(localized: "There are no pages to write")
             }
         }
     }

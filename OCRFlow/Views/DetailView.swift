@@ -26,32 +26,32 @@ struct DetailView: View {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text("已选中 \(vm.selectedIDs.count) 个文件")
+            Text("\(vm.selectedIDs.count) Files Selected")
                 .font(.title3)
                 .fontWeight(.semibold)
             if exportable > 0 {
-                Text("其中 \(exportable) 个已完成识别")
+                Text("\(exportable) recognized")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
-                    Button("导出这 \(exportable) 个文件…") { vm.exportSelectedItems() }
+                    Button("Export \(exportable) Files…") { vm.exportSelectedItems() }
                         .buttonStyle(.borderedProminent)
-                    Button("复制所有文本") { vm.copySelectedText() }
+                    Button("Copy All Text") { vm.copySelectedText() }
                         .buttonStyle(.bordered)
                     if #available(macOS 15.0, *) {
-                        Button("翻译这 \(exportable) 个文件…") { translating = true }
+                        Button("Translate \(exportable) Files…") { translating = true }
                             .buttonStyle(.bordered)
                     }
                 }
             }
             if !rerunnable.isEmpty {
-                Button("重新识别 \(rerunnable.count) 个未完成的文件") {
+                Button("Recognize \(rerunnable.count) Unfinished Files Again") {
                     vm.retryItems(ids: Set(rerunnable.map(\.id)))
                 }
                 .buttonStyle(.bordered)
                 .disabled(vm.isProcessing)
             }
-            Button("移除选中文件", role: .destructive) { vm.removeSelectedItems() }
+            Button("Remove Selected Files", role: .destructive) { vm.removeSelectedItems() }
                 .buttonStyle(.bordered)
                 .foregroundStyle(.red)
         }
@@ -161,11 +161,18 @@ struct ItemDetailView: View {
 
     private enum ResultPane: String, CaseIterable, Identifiable {
         /// The document region by region, each with who read it.
-        case markdown = "区块"
+        case markdown
         /// The document as a document: the Markdown rendered, nothing else.
-        case source   = "Markdown"
-        case plain    = "纯文本"
+        case source
+        case plain
         var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .markdown: return String(localized: "Blocks")
+            case .source:   return "Markdown"
+            case .plain:    return String(localized: "Plain Text")
+            }
+        }
     }
 
     /// A box in the preview, and the row in the result list that goes with it.
@@ -213,11 +220,12 @@ struct ItemDetailView: View {
                         Image(systemName: vm.showTextBoxes
                               ? "square.grid.3x3.fill" : "square.grid.3x3")
                     }
+                    .accessibilityLabel("Text Boxes")
                     .buttonStyle(.borderless)
                     .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
                     .help(vm.showTextBoxes
-                          ? "显示全部标注（关闭后只显示指向的那一块）"
-                          : "只显示指向的那一块（打开可一次看到全部标注）")
+                          ? "Show all boxes (turn off to show only the block under the pointer)"
+                          : "Show only the block under the pointer (turn on to see all boxes at once)")
 
                     // The auxiliary regions this page actually has, each one
                     // switchable from here: the decision is about what is on
@@ -236,7 +244,7 @@ struct ItemDetailView: View {
                         }
                         .menuStyle(.borderlessButton)
                         .fixedSize()
-                        .help("这一页上的页眉/页脚/页码等辅助内容要不要写进结果（虚线框表示已排除）")
+                        .help("Whether headers, footers, page numbers and other auxiliary content on this page go into the result (dashed boxes are excluded)")
                     }
                     Divider().frame(height: 14)
                 }
@@ -249,9 +257,9 @@ struct ItemDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(imageZoom <= Self.minZoom)
-                    .help("缩小")
+                    .help("Zoom Out")
 
-                    Text("\(Int((imageZoom * 100).rounded()))%")
+                    Text(imageZoom.percentText)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -264,7 +272,7 @@ struct ItemDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(imageZoom >= Self.maxZoom)
-                    .help("放大")
+                    .help("Zoom In")
 
                     Button {
                         zoom(to: 1.0)
@@ -273,7 +281,7 @@ struct ItemDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(imageZoom == 1.0)
-                    .help("适合窗口")
+                    .help("Fit to Window")
                 }
             }
             .padding(.horizontal, 12)
@@ -368,7 +376,7 @@ struct ItemDetailView: View {
                     Image(systemName: "photo.slash")
                         .font(.system(size: 40))
                         .foregroundStyle(.tertiary)
-                    Text("无法加载图片")
+                    Text("Couldn't Load Image")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -428,7 +436,7 @@ struct ItemDetailView: View {
             .disabled(pageIndex >= pageCount - 1)
         }
         .buttonStyle(.borderless)
-        .help("翻页（⌥← / ⌥→）")
+        .help("Turn page (⌥← / ⌥→)")
     }
 
     /// The auxiliary regions this page actually contains, in the order the
@@ -539,20 +547,20 @@ struct ItemDetailView: View {
                 let panes = availablePanes
                 if item.status == .completed, panes.count > 1,
                    !(pageText.text.isEmpty && pageText.markdown.isEmpty) {
-                    Picker("结果视图", selection: $resultPane) {
-                        ForEach(panes) { pane in Text(pane.rawValue).tag(pane) }
+                    Picker("Result view", selection: $resultPane) {
+                        ForEach(panes) { pane in Text(pane.label).tag(pane) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .controlSize(.small)
                     .fixedSize()
                 } else {
-                    Text("识别结果")
+                    Text("Results")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 if item.status == .processing {
-                    Text("识别中 \(Int((item.processingProgress * 100).rounded()))%")
+                    Text("Recognizing \(item.processingProgress.percentText)")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
@@ -578,7 +586,7 @@ struct ItemDetailView: View {
                                 .foregroundStyle(showCopied ? Color.accentColor : Color.secondary)
                                 .frame(width: 18)
                         }
-                        .help(showCopied ? "已复制" : "复制这个文件的识别结果")
+                        .help(showCopied ? "Copied" : "Copy this file's results")
                     }
 
                     if item.isExportable, #available(macOS 15.0, *) {
@@ -587,7 +595,8 @@ struct ItemDetailView: View {
                         } label: {
                             Image(systemName: "character.bubble")
                         }
-                        .help("用 macOS 内置翻译在本机翻译识别结果")
+                        .accessibilityLabel("Translate")
+                        .help("Translate the results on this Mac with macOS's built-in translation")
                         .sheet(isPresented: $translating) {
                             TranslationSheet(items: [item])
                         }
@@ -599,7 +608,7 @@ struct ItemDetailView: View {
                         } label: {
                             Image(systemName: "square.and.arrow.up")
                         }
-                        .help("只导出「\(item.fileName)」的识别结果")
+                        .help("Export only the results for “\(item.fileName)”")
                     }
                 }
                 .buttonStyle(.borderless)
@@ -654,8 +663,8 @@ struct ItemDetailView: View {
         case .pending:
             statusPlaceholder(
                 icon: "circle.dashed",
-                title: "等待识别",
-                subtitle: "点击工具栏的「开始识别」按钮处理该文件",
+                title: String(localized: "Waiting for Recognition"),
+                subtitle: String(localized: "Click Start Recognition in the toolbar to process this file"),
                 color: .secondary
             )
 
@@ -663,13 +672,13 @@ struct ItemDetailView: View {
             VStack(spacing: 20) {
                 ProgressView()
                     .controlSize(.large)
-                Text("正在识别中…")
+                Text("Recognizing…")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 VStack(spacing: 6) {
                     ProgressView(value: item.processingProgress)
                         .tint(.accentColor)
-                    Text("\(Int((item.processingProgress * 100).rounded()))%")
+                    Text(item.processingProgress.percentText)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
@@ -682,9 +691,9 @@ struct ItemDetailView: View {
             if pageText.text.isEmpty && pageText.markdown.isEmpty {
                 statusPlaceholder(
                     icon: "text.slash",
-                    title: "未识别到文字",
-                    subtitle: pageCount > 1 ? "这一页可能不含可识别的文字内容"
-                                            : "该图片可能不含可识别的文字内容",
+                    title: String(localized: "No Text Found"),
+                    subtitle: pageCount > 1 ? String(localized: "This page may not contain any recognizable text")
+                                            : String(localized: "This image may not contain any recognizable text"),
                     color: .orange
                 )
             } else {
@@ -816,15 +825,15 @@ struct ItemDetailView: View {
                 Image(systemName: "stop.circle.fill")
                     .font(.system(size: 36))
                     .foregroundStyle(.orange)
-                Text("已取消")
+                Text("Cancelled")
                     .font(.title3)
                     .fontWeight(.semibold)
-                Text("识别在中途停止，这一页只读到了一部分，因此没有保留结果。")
+                Text("Recognition stopped partway through. Only part of this page was read, so no result was kept.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
-                Button("重新识别") { vm.retryItems(ids: [item.id]) }
+                Button("Recognize Again") { vm.retryItems(ids: [item.id]) }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     .disabled(vm.isProcessing)
@@ -836,7 +845,7 @@ struct ItemDetailView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 36))
                     .foregroundStyle(.red)
-                Text("识别失败")
+                Text("Recognition Failed")
                     .font(.title3)
                     .fontWeight(.semibold)
                 if let msg = item.errorMessage {
@@ -846,7 +855,7 @@ struct ItemDetailView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                 }
-                Button("重试") { vm.retryItems(ids: [item.id]) }
+                Button("Retry") { vm.retryItems(ids: [item.id]) }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     // A retry cannot start while a run is in flight, so the
@@ -864,24 +873,25 @@ struct ItemDetailView: View {
         if let page {
             let readers = page.readers
             if readers.count > 1 || item.engine == .auto {
-                parts += readers.map { "\($0.source.label) \($0.count) 块" }
+                parts += readers.map { String(localized: "\($0.source.label) \($0.count) blocks") }
             } else if !page.blocks.isEmpty {
-                parts.append("\(page.blocks.count) 个区域")
+                parts.append(String(localized: "\(page.blocks.count) regions"))
             }
             // Vision's confidences are coarse steps, not a measure worth
             // averaging; PP-OCRv6's are per-character probabilities.
             if !page.lines.isEmpty, item.engine == .paddleOCR || item.engine == .auto {
                 let mean = page.lines.reduce(0) { $0 + $1.confidence } / Double(page.lines.count)
-                parts.append("\(page.lines.count) 行 · 置信度 \(Int((mean * 100).rounded()))%")
+                parts.append(String(localized: "\(page.lines.count) lines · Confidence \(mean.percentText)"))
             } else if !page.lines.isEmpty, page.blocks.isEmpty {
-                parts.append("\(page.lines.count) 行")
+                parts.append(String(localized: "\(page.lines.count) lines"))
             }
         }
         if item.reusedCachedResult {
-            parts.append("复用此前结果")
+            parts.append(String(localized: "Reused earlier result"))
         } else if let elapsed = item.elapsed {
-            parts.append(elapsed < 60 ? String(format: "%.1f 秒", elapsed)
-                                      : "\(Int(elapsed) / 60) 分 \(Int(elapsed) % 60) 秒")
+            parts.append(Duration.seconds(elapsed).formatted(
+                .units(allowed: [.minutes, .seconds], width: .abbreviated,
+                       fractionalPart: elapsed < 60 ? .show(length: 1) : .hide)))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -893,22 +903,22 @@ struct ItemDetailView: View {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text("这一页有 \(warnings.count) 处待复核")
+                Text("\(warnings.count) items on this page need review")
                     .fontWeight(.semibold)
                 Spacer()
                 if let next = nextPageNeedingReview {
-                    Button("下一页 →") { pageIndex = next }
-                        .help("跳到第 \(next + 1) 页")
+                    Button("Next Page →") { pageIndex = next }
+                        .help("Go to page \(next + 1)")
                 }
-                Button("复核") { vm.startReview(itemID: item.id, page: pageIndex) }
+                Button("Review") { vm.startReview(itemID: item.id, page: pageIndex) }
                     .fontWeight(.semibold)
-                    .help("在复核模式里逐处查看（⌘2）")
+                    .help("Go through them one by one in Review (⌘2)")
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) { showingNotes.toggle() }
                 } label: {
                     Image(systemName: showingNotes ? "chevron.up" : "chevron.down")
                 }
-                .help(showingNotes ? "收起" : "展开")
+                .help(showingNotes ? "Collapse" : "Expand")
             }
             .buttonStyle(.borderless)
             if showingNotes {
@@ -931,7 +941,7 @@ struct ItemDetailView: View {
             if let index = note.block { selection = .block(index) }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(region.map { "\($0.readingOrder + 1) · \($0.label.label)" } ?? "整页")
+                Text(region.map { "\($0.readingOrder + 1) · \($0.label.label)" } ?? "Whole page")
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 56, alignment: .leading)
                 Text(note.message)
@@ -942,7 +952,7 @@ struct ItemDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(note.block == nil)
-        .help(note.block == nil ? "" : "在预览中定位这一区域")
+        .help(note.block == nil ? "" : "Locate this region in the preview")
     }
 
     /// The next page after this one with something flagged, wrapping round.
@@ -965,7 +975,7 @@ struct ItemDetailView: View {
         guard blocks.indices.contains(index) else { return nil }
         let block = blocks[index]
         var tag = "\(block.readingOrder + 1) · \(block.label.label)"
-        if block.isCorrected { tag += " · 已修改" }
+        if block.isCorrected { tag += String(localized: " · Edited") }
         return tag
     }
 
@@ -975,7 +985,7 @@ struct ItemDetailView: View {
         guard blocks.indices.contains(index), let page else { return nil }
         let source = blocks[index].source ?? page.blockSource
         if let confidence = page.ocrConfidence(ofBlock: index) {
-            return "\(source.label) · \(Int((confidence * 100).rounded()))%"
+            return "\(source.label) · \(confidence.percentText)"
         }
         return source.label
     }
@@ -1138,7 +1148,7 @@ struct LayoutBlockOverlay: View {
                                                           dash: isDropped ? [3, 2.5] : []))
 
                         let caption = isFlagged
-                            ? "\(block.readingOrder + 1) · 待复核"
+                            ? String(localized: "\(block.readingOrder + 1) · Needs review")
                             : lit || !showsAll
                                 ? "\(block.readingOrder + 1) \(block.label.label)"
                                 : "\(block.readingOrder + 1)"

@@ -18,23 +18,23 @@ enum VLTask: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .ocr:      return "文字识别"
-        case .table:    return "表格识别"
-        case .formula:  return "公式识别"
-        case .chart:    return "图表识别"
-        case .seal:     return "印章识别"
-        case .spotting: return "文字定位"
+        case .ocr:      return String(localized: "Text recognition")
+        case .table:    return String(localized: "Table recognition")
+        case .formula:  return String(localized: "Formula recognition")
+        case .chart:    return String(localized: "Chart recognition")
+        case .seal:     return String(localized: "Seal recognition")
+        case .spotting: return String(localized: "Text spotting")
         }
     }
 
     var hint: String {
         switch self {
-        case .ocr:      return "读出图中文字"
-        case .table:    return "输出 HTML 表格结构"
-        case .formula:  return "输出 LaTeX 公式"
-        case .chart:    return "把图表内容还原成表格"
-        case .seal:     return "读出印章上的弧形文字"
-        case .spotting: return "同时给出文字与位置"
+        case .ocr:      return String(localized: "Reads the text in the image")
+        case .table:    return String(localized: "Outputs an HTML table")
+        case .formula:  return String(localized: "Outputs LaTeX")
+        case .chart:    return String(localized: "Turns a chart back into a table")
+        case .seal:     return String(localized: "Reads the curved text on seals")
+        case .spotting: return String(localized: "Returns text along with its position")
         }
     }
 }
@@ -50,15 +50,15 @@ enum VLModelVariant: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .official:  return "官方 F16"
-        case .quantized: return "Q4 量化"
+        case .official:  return String(localized: "Official F16")
+        case .quantized: return String(localized: "Q4 Quantized")
         }
     }
 
     var hint: String {
         switch self {
-        case .official:  return "1.8 GB，PaddlePaddle 官方权重，精度基准"
-        case .quantized: return "0.9 GB，社区量化，加载快、占用小（推荐先试）"
+        case .official:  return String(localized: "1.8 GB, official PaddlePaddle weights, the accuracy reference")
+        case .quantized: return String(localized: "0.9 GB, community quantization. Loads faster and uses less memory (try this first)")
         }
     }
 
@@ -206,23 +206,21 @@ enum VLError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .modelsMissing(variant, missing, path):
-            return "缺少\(variant.label)模型文件：\(missing.joined(separator: "、"))。"
-                 + "请在「模型管理」中下载，或将文件放入 \(path) 后重试。"
+            return String(localized: "Missing \(variant.label) model files: \(missing.formatted(.list(type: .and))). Download them in Model Manager, or put the files in \(path) and try again.")
         case let .backendFailed(msg):
-            return "PaddleOCR-VL 模型加载失败：\(msg)"
+            return String(localized: "Couldn't load the PaddleOCR-VL model: \(msg)")
         case let .contextFailed(msg):
-            return "PaddleOCR-VL 上下文创建失败：\(msg)"
+            return String(localized: "Couldn't create the PaddleOCR-VL context: \(msg)")
         case let .multimodalFailed(msg):
-            return "PaddleOCR-VL 视觉编码器加载失败：\(msg)"
+            return String(localized: "Couldn't load the PaddleOCR-VL vision encoder: \(msg)")
         case let .tokenizeFailed(code):
-            return "PaddleOCR-VL 无法处理这张图片（错误码 \(code)）"
+            return String(localized: "PaddleOCR-VL can't process this image (error \(code))")
         case let .evalFailed(code):
-            return "PaddleOCR-VL 推理失败（错误码 \(code)）"
+            return String(localized: "PaddleOCR-VL inference failed (error \(code))")
         case .imageDecodeFailed:
-            return "无法解码图片像素数据"
+            return String(localized: "Couldn't decode the image pixels")
         case let .layoutModelMissing(path):
-            return "缺少版面分析模型 PP-DocLayoutV3.onnx。"
-                 + "请在「模型管理」中下载，或将文件放入 \(path) 后重试。"
+            return String(localized: "The layout model PP-DocLayoutV3.onnx is missing. Download it in Model Manager, or put the file in \(path) and try again.")
         }
     }
 }

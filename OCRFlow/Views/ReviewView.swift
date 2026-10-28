@@ -42,7 +42,7 @@ struct ReviewQueueView: View {
         if entries.isEmpty {
             // The pane beside it already says so in full; the list only has
             // to not look broken.
-            Text("没有待复核的内容")
+            Text("Nothing to Review")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -81,7 +81,7 @@ private struct ReviewQueueRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if entry.message == OCRViewModel.rereadingNote {
+            if entry.reason == .rereading {
                 ProgressView().controlSize(.mini)
             } else {
                 Circle().fill(.orange).frame(width: 7, height: 7)
@@ -89,7 +89,7 @@ private struct ReviewQueueRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.message)
                     .lineLimit(2)
-                Text("第 \(entry.page + 1) 页 · \(region?.label.label ?? "整页")")
+                Text("Page \(entry.page + 1) · \(region?.label.label ?? String(localized: "Whole page"))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -120,11 +120,11 @@ struct ReviewDetailView: View {
         Group {
             if entries.isEmpty {
                 ContentUnavailableView {
-                    Label("全部复核完成", systemImage: "checkmark.circle")
+                    Label("All Reviewed", systemImage: "checkmark.circle")
                 } description: {
-                    Text("修正已经写回结果，导出时会带上。")
+                    Text("Your corrections are saved in the results and will be included in exports.")
                 } actions: {
-                    Button("回到工作台") { vm.mode = .workspace }
+                    Button("Back to Workspace") { vm.mode = .workspace }
                         .buttonStyle(.borderedProminent)
                 }
             } else {
@@ -185,7 +185,7 @@ struct ReviewDetailView: View {
     private func pane(for entry: ReviewEntry, at index: Int, of entries: [ReviewEntry]) -> some View {
         let item = vm.items.first { $0.id == entry.itemID }
         let region = context(for: entry)
-        let rereading = entry.message == OCRViewModel.rereadingNote
+        let rereading = entry.reason == .rereading
 
         VStack(spacing: 0) {
             header(entry: entry, region: region?.block, index: index, count: entries.count, entries: entries)
@@ -195,7 +195,7 @@ struct ReviewDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     reason(entry.message, rereading: rereading)
 
-                    section(region == nil ? "这一页" : "原图") {
+                    section(region == nil ? String(localized: "This page") : String(localized: "Original")) {
                         HStack(alignment: .center, spacing: 16) {
                             Group {
                                 if let crop {
@@ -220,7 +220,7 @@ struct ReviewDetailView: View {
                     if let region {
                         result(for: region, rereading: rereading)
                     } else {
-                        Text("这条提示针对整页，没有可以修改的单个区域。确认后不会改动任何文字。")
+                        Text("This note is about the whole page, with no single region to edit. Confirming changes no text.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -301,9 +301,9 @@ struct ReviewDetailView: View {
         let alternativeTitle = alternative.map { title(source: $0.source, detail: detail(for: $0, in: region)) }
         // The title says what will be saved — a choice, not a view.
         let heading: String = {
-            if edited { return "识别结果 · 已手动修改" }
-            guard let alternativeTitle else { return region.block.isCorrected ? "识别结果 · 已修改" : "识别结果" }
-            return "识别结果 · 采用 " + (choice == .alternative ? alternativeTitle : currentTitle)
+            if edited { return String(localized: "Result · Edited by hand") }
+            guard let alternativeTitle else { return region.block.isCorrected ? String(localized: "Result · Edited") : String(localized: "Results") }
+            return String(localized: "Result · Using \(choice == .alternative ? alternativeTitle : currentTitle)")
         }()
 
         return VStack(alignment: .leading, spacing: 6) {
@@ -313,8 +313,8 @@ struct ReviewDetailView: View {
                         // Radio buttons, because this is a decision: which
                         // reading goes into the document.
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text("采用").foregroundStyle(.secondary)
-                            Picker("采用", selection: Binding(
+                            Text("Use").foregroundStyle(.secondary)
+                            Picker("Use", selection: Binding(
                                 get: { choice },
                                 set: { newChoice in
                                     choice = newChoice
@@ -343,12 +343,12 @@ struct ReviewDetailView: View {
     private func hint(for kind: RegionContentKind, alternatives: Bool, marked: Bool) -> String {
         let edit: String
         switch kind {
-        case .table:   edit = "点按单元格即可修改"
-        case .formula: edit = "点按公式即可修改"
-        case .text:    edit = "点按文字即可修改"
+        case .table:   edit = String(localized: "Click a cell to edit it")
+        case .formula: edit = String(localized: "Click the formula to edit it")
+        case .text:    edit = String(localized: "Click the text to edit it")
         }
-        if marked { return "标黄的是两种读法不同的地方 · \(edit)" }
-        return alternatives ? "选择采用哪种读法 · \(edit)" : edit
+        if marked { return String(localized: "Yellow marks where the two readings differ · \(edit)") }
+        return alternatives ? String(localized: "Choose which reading to use · \(edit)") : edit
     }
 
     private func title(source: PPTextSource, detail: String?) -> String {
@@ -358,18 +358,18 @@ struct ReviewDetailView: View {
     /// How the reading on screen came about, in a few words.
     private func detail(forCurrentOf region: Context) -> String? {
         if let confidence = region.page.ocrConfidence(ofBlock: region.index) {
-            return "\(Int((confidence * 100).rounded()))%"
+            return confidence.percentText
         }
-        return region.block.alternative?.note == "重读前" ? "重读后" : nil
+        return region.block.alternative?.note == .beforeReread ? String(localized: "After reread") : nil
     }
 
     private func detail(for alternative: AlternativeReading, in region: Context) -> String? {
         if alternative.source == .plainOCR,
            let confidence = region.page.ocrConfidence(ofBlock: region.index, evenIfReplaced: true) {
-            return [alternative.note, "\(Int((confidence * 100).rounded()))%"]
+            return [alternative.note?.label, confidence.percentText]
                 .compactMap { $0 }.joined(separator: " · ")
         }
-        return alternative.note
+        return alternative.note?.label
     }
 
     private func header(entry: ReviewEntry, region: PPLayoutBlock?, index: Int, count: Int,
@@ -377,7 +377,7 @@ struct ReviewDetailView: View {
         HStack(spacing: 6) {
             Text(entry.fileName).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
-            Text("第 \(entry.page + 1) 页 · \(region.map { "\($0.readingOrder + 1) \($0.label.label)" } ?? "整页")")
+            Text("Page \(entry.page + 1) · \(region.map { "\($0.readingOrder + 1) \($0.label.label)" } ?? String(localized: "Whole page"))")
                 .fontWeight(.medium)
             Spacer()
             Text("\(index + 1) / \(count)")
@@ -385,10 +385,10 @@ struct ReviewDetailView: View {
                 .foregroundStyle(.secondary)
             Button { move(by: -1, in: entries) } label: { Image(systemName: "chevron.left") }
                 .keyboardShortcut("[", modifiers: .command)
-                .help("上一处（⌘[）")
+                .help("Previous (⌘[)")
             Button { move(by: 1, in: entries) } label: { Image(systemName: "chevron.right") }
                 .keyboardShortcut("]", modifiers: .command)
-                .help("下一处（⌘]）")
+                .help("Next (⌘])")
         }
         .buttonStyle(.borderless)
         .font(.callout)
@@ -400,38 +400,38 @@ struct ReviewDetailView: View {
     private func actions(entry: ReviewEntry, item: ImageItem?, region: Context?, rereading: Bool,
                          entries: [ReviewEntry]) -> some View {
         let canReread = item.map(vm.canReread) ?? false
-        let truncated = entry.message.contains("token 上限")
+        let truncated = entry.reason.isOutputLimit
         return HStack(spacing: 8) {
             Button {
                 confirm(entry, region: region)
             } label: {
-                Text("确认").frame(minWidth: 56)
+                Text("Confirm").frame(minWidth: 56)
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(rereading)
-            .help("采用当前结果，转到下一处（⌘↩）")
+            .help("Keep the current result and go to the next one (⌘↩)")
 
-            Button("跳过") { move(by: 1, in: entries) }
-                .help("先不处理，转到下一处（⌘]）")
+            Button("Skip") { move(by: 1, in: entries) }
+                .help("Leave it for now and go to the next one (⌘])")
 
             if let block = entry.block, region != nil {
                 Button {
                     vm.rereadBlock(itemID: entry.itemID, page: entry.page, blockIndex: block)
                 } label: {
-                    Label(truncated ? "提高上限重读" : "重读", systemImage: "arrow.clockwise")
+                    Label(truncated ? "Reread with Higher Limit" : "Reread", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
                 .keyboardShortcut("r", modifiers: [.command, .option])
                 .disabled(rereading || !canReread)
                 .help(canReread
-                      ? "用 PaddleOCR-VL 以更大的输出上限重新读取，结果不同时可以二选一（⌥⌘R）"
-                      : "需要先在设置中下载 PaddleOCR-VL 模型")
+                      ? "Read again with PaddleOCR-VL using a higher output limit; if the result differs you can pick one (⌥⌘R)"
+                      : "Download the PaddleOCR-VL model in Settings first")
             }
 
             Spacer()
 
-            Button("在文档中查看") { vm.showInDocument(entry) }
+            Button("Show in Document") { vm.showInDocument(entry) }
                 .buttonStyle(.borderless)
                 .foregroundStyle(Color.accentColor)
         }
@@ -455,7 +455,7 @@ struct ReviewDetailView: View {
         }
         .buttonStyle(.plain)
         .frame(width: 84)
-        .help("在文档中查看这一处")
+        .help("Show this in the document")
     }
 
     // MARK: Actions
@@ -602,7 +602,7 @@ struct InlineRegionEditor: View {
             Button(action: begin) {
                 Group {
                     if text.isEmpty {
-                        Text("（空）").foregroundStyle(.tertiary)
+                        Text("(empty)").foregroundStyle(.tertiary)
                     } else {
                         RegionContentView(text: text, kind: .text, comparedTo: comparedTo)
                     }
@@ -612,7 +612,7 @@ struct InlineRegionEditor: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("点按修改")
+            .help("Click to edit")
         }
     }
 
@@ -637,7 +637,7 @@ struct InlineRegionEditor: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("点按修改公式")
+            .help("Click to edit the formula")
         }
     }
 }
@@ -860,8 +860,8 @@ struct EditableTableView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(cell.text.isEmpty ? "空单元格" : cell.text)
-                .accessibilityHint("修改这个单元格")
+                .accessibilityLabel(cell.text.isEmpty ? String(localized: "Empty cell") : cell.text)
+                .accessibilityHint("Edit this cell")
             }
         }
         .font(isHeader ? .callout.weight(.semibold) : .callout)
@@ -876,7 +876,7 @@ struct EditableTableView: View {
                     : isHeader ? Color.secondary.opacity(0.12) : Color.clear)
         .overlay(MDCellBorder(skipTop: false).stroke(isEditing ? Color.accentColor : borderColor,
                                                      lineWidth: isEditing ? 1.5 : 0.5))
-        .help("点按修改这个单元格")
+        .help("Click to edit this cell")
     }
 }
 

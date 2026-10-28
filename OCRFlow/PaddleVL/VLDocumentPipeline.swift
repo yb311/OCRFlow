@@ -87,11 +87,11 @@ struct VLDocumentPipeline {
                               rawText: output.text, rawMarkdown: output.text)
         switch output.ending {
         case .lengthLimit:
-            page.notes.append(.warning("整页输出达到 \(config.maxOutputTokens) token 上限，内容可能不完整"))
+            page.notes.append(.warning(.pageOutputLimit(tokens: config.maxOutputTokens)))
         case .repetition:
-            page.notes.append(.warning("模型出现重复输出，已截断，可能漏读"))
+            page.notes.append(.warning(.repetition))
         case .decodeFailed:
-            page.notes.append(.warning("PaddleOCR-VL 推理中断，内容可能不完整"))
+            page.notes.append(.warning(.interrupted))
         case .finished, .cancelled:
             break
         }

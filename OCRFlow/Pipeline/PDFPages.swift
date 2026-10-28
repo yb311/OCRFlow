@@ -115,9 +115,9 @@ enum PDFTextPolicy: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .digitalOnly:  return "仅原生文字（推荐）"
-        case .anyTextLayer: return "任何文字层（含扫描件的 OCR 层）"
-        case .never:        return "从不使用，总是重新识别"
+        case .digitalOnly:  return String(localized: "Native text only (recommended)")
+        case .anyTextLayer: return String(localized: "Any text layer (including OCR layers on scans)")
+        case .never:        return String(localized: "Never; always recognize again")
         }
     }
 
@@ -138,7 +138,7 @@ enum PDFTextPolicy: String, CaseIterable, Identifiable, Codable {
 /// whatever images it has, counts as born-digital; everything else is read
 /// again.
 enum PDFTextLayer {
-    enum Verdict: Equatable {
+    enum Verdict: String, Codable {
         /// Nothing worth extracting.
         case none
         /// Text the page draws itself: exact, and taken as it is.
@@ -151,10 +151,10 @@ enum PDFTextLayer {
 
         var description: String {
             switch self {
-            case .none:    return "无文字层"
-            case .digital: return "原生文字层"
-            case .scanned: return "扫描件上的 OCR 文字层"
-            case .garbled: return "文字层无法正确解码"
+            case .none:    return String(localized: "no text layer")
+            case .digital: return String(localized: "native text layer")
+            case .scanned: return String(localized: "OCR text layer on a scan")
+            case .garbled: return String(localized: "text layer can't be decoded correctly")
             }
         }
     }

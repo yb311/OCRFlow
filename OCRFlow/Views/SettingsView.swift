@@ -22,11 +22,11 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             recognitionTab
-                .tabItem { Label("识别", systemImage: "text.viewfinder") }
+                .tabItem { Label("Recognition", systemImage: "text.viewfinder") }
             textTab
-                .tabItem { Label("文本与导出", systemImage: "text.alignleft") }
+                .tabItem { Label("Text & Export", systemImage: "text.alignleft") }
             behaviorTab
-                .tabItem { Label("行为", systemImage: "gearshape.2") }
+                .tabItem { Label("Behavior", systemImage: "gearshape.2") }
         }
         // A settings window sizes itself to its content, and a flexible frame
         // makes it pick something shorter than the panes actually need. Fixed,
@@ -39,16 +39,16 @@ struct SettingsView: View {
     private var recognitionTab: some View {
         settingsScroll {
             if vm.isProcessing {
-                noticeBox("正在识别中，更改引擎或模型设置只会影响之后开始的文件。",
+                noticeBox("Recognition is running. Engine and model changes only affect files started afterwards.",
                           tint: .orange)
             }
 
-            settingSection("识别引擎") {
+            settingSection("Recognition Engine") {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(OCREngine.allCases) { engine in
                         let ready = engine != .paddleVL || VLModelStore.isReady(for: vm.vlConfig)
                         radioRow(title: engine.label,
-                                 subtitle: ready ? engine.hint : "\(engine.hint) —— 模型尚未下载",
+                                 subtitle: ready ? engine.hint : String(localized: "\(engine.hint) — model not downloaded yet"),
                                  selected: vm.ocrEngine == engine,
                                  enabled: ready) {
                             vm.ocrEngine = engine
@@ -56,7 +56,7 @@ struct SettingsView: View {
                     }
                     if !VLModelStore.isReady(for: vm.vlConfig) {
                         Divider().padding(.vertical, 2)
-                        modelManagerLink("下载 PaddleOCR-VL 模型")
+                        modelManagerLink("Download PaddleOCR-VL Model")
                     }
                 }
             }
@@ -78,11 +78,10 @@ struct SettingsView: View {
     @ViewBuilder
     private var visionSettings: some View {
         if vm.ocrEngine == .visionFast {
-            noticeBox("快速模式在中文、韩文、艺术字体和弯曲页面上容易出现乱码，"
-                      + "结果不对时先换成「精准模式」再调其它设置。", tint: .orange)
+            noticeBox("Fast mode often garbles Chinese, Korean, decorative fonts and curved pages. If results look wrong, switch to Accurate before changing other settings.", tint: .orange)
         }
 
-        settingSection("识别语言（按优先级）") {
+        settingSection("Recognition Languages (in priority order)") {
             VStack(alignment: .leading, spacing: 8) {
                 // Vision weights the list by position, so the order is a
                 // setting in its own right — it used to be whatever order the
@@ -91,16 +90,15 @@ struct SettingsView: View {
                     enabledLanguageRow(code: code, at: index)
                 }
                 if vm.recognitionLanguages.isEmpty {
-                    Text("至少需要一种语言").font(.caption).foregroundStyle(.secondary)
+                    Text("At least one language is required").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            hint("Vision 会优先按靠前的语言来判读同一个字形。混排页面把主要语言排在第一位，"
-                 + "识别质量差别很大——韩文排在中文、英文之后就会明显变差。")
+            hint("Vision interprets an ambiguous glyph by the languages earlier in the list. On mixed-language pages, put the main language first — it makes a big difference. Korean placed after Chinese and English gets noticeably worse.")
 
             let available = Self.visionLanguages.filter { !vm.recognitionLanguages.contains($0.code) }
             if !available.isEmpty {
                 Divider().padding(.vertical, 4)
-                Text("可添加")
+                Text("Available")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 FlowingChips(items: available.map { ($0.code, $0.name) }) { code in
@@ -121,7 +119,7 @@ struct SettingsView: View {
             Text(Self.languageName(code))
                 .font(.callout)
             if index == 0 {
-                Text("首选")
+                Text("Primary")
                     .font(.caption2)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -132,15 +130,15 @@ struct SettingsView: View {
             Button { moveLanguage(at: index, by: -1) } label: { Image(systemName: "chevron.up") }
                 .buttonStyle(.borderless)
                 .disabled(index == 0)
-                .help("上移一位")
+                .help("Move up")
             Button { moveLanguage(at: index, by: 1) } label: { Image(systemName: "chevron.down") }
                 .buttonStyle(.borderless)
                 .disabled(index == vm.recognitionLanguages.count - 1)
-                .help("下移一位")
+                .help("Move down")
             Button { removeLanguage(code) } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.borderless)
                 .disabled(vm.recognitionLanguages.count <= 1)
-                .help(vm.recognitionLanguages.count <= 1 ? "至少要保留一种语言" : "移除")
+                .help(vm.recognitionLanguages.count <= 1 ? "At least one language must remain" : "Remove")
         }
     }
 
@@ -178,18 +176,18 @@ struct SettingsView: View {
                 Image(systemName: entry.isInstalled ? "checkmark.circle.fill" : "arrow.down.circle")
                     .foregroundStyle(entry.isInstalled ? Color.green : Color.secondary)
                 Text(entry.name).font(.callout)
-                Text("约 \(Self.sizeText(entry.approximateBytes))")
+                Text("About \(Self.sizeText(entry.approximateBytes))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 0)
                 if isDownloading {
-                    Button("取消") { downloader.cancel(entry) }
+                    Button("Cancel") { downloader.cancel(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else if entry.isInstalled {
-                    Text("已安装").font(.caption).foregroundStyle(.green)
+                    Text("Installed").font(.caption).foregroundStyle(.green)
                 } else {
-                    Button("下载") { downloader.download(entry) }
+                    Button("Download") { downloader.download(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
@@ -220,10 +218,10 @@ struct SettingsView: View {
             .labelsHidden()
             .fixedSize()
 
-            Button("测试") { downloader.testSources() }
+            Button("Test") { downloader.testSources() }
                 .buttonStyle(.link)
                 .controlSize(.small)
-                .help("向两个下载源各发一个请求，看看哪个通")
+                .help("Send a request to both download sources to see which one works")
 
             switch downloader.reachability[downloader.source] {
             case .checking:
@@ -244,8 +242,7 @@ struct SettingsView: View {
     }
 
     static func sizeText(_ bytes: Int64) -> String {
-        let mb = Double(bytes) / 1_048_576
-        return mb < 1024 ? String(format: "%.0f MB", mb) : String(format: "%.1f GB", mb / 1024)
+        bytes.formatted(.byteCount(style: .file))
     }
 
     /// A friendly name for an installed single-language recogniser, falling
@@ -254,7 +251,7 @@ struct SettingsView: View {
         let entry = PPModelCatalog.languageRecognizers.first {
             $0.recognizerFileName == recognizer.fileName
         }
-        return entry.map { "\($0.name)（\(recognizer.displayName)）" } ?? recognizer.displayName
+        return entry.map { String(localized: "\($0.name) (\(recognizer.displayName))") } ?? recognizer.displayName
     }
 
     /// Catalogue languages whose recogniser is not on disk yet.
@@ -267,14 +264,14 @@ struct SettingsView: View {
     }
 
     private static let visionLanguages: [(code: String, name: String)] = [
-        ("zh-Hans", "简体中文"),
-        ("zh-Hant", "繁体中文"),
-        ("en-US",   "英文"),
-        ("ja-JP",   "日文"),
-        ("ko-KR",   "韩文"),
-        ("fr-FR",   "法文"),
-        ("de-DE",   "德文"),
-        ("es-ES",   "西班牙文"),
+        ("zh-Hans", String(localized: "Simplified Chinese")),
+        ("zh-Hant", String(localized: "Traditional Chinese")),
+        ("en-US",   String(localized: "English")),
+        ("ja-JP",   String(localized: "Japanese")),
+        ("ko-KR",   String(localized: "Korean")),
+        ("fr-FR",   String(localized: "French")),
+        ("de-DE",   String(localized: "German")),
+        ("es-ES",   String(localized: "Spanish")),
     ]
 
     // MARK: - Engine settings: 智能分层
@@ -284,23 +281,23 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var layeredSettings: some View {
-        settingSection("分层组件") {
+        settingSection("Pipeline Components") {
             VStack(alignment: .leading, spacing: 8) {
-                componentRow("PDF 原生文字层", detail: "直接提取，不经 OCR", ready: true)
-                componentRow("PP-DocLayoutV3 版面分析",
-                             detail: "按区域分配识别引擎的依据；未安装时整页只用 PP-OCRv6",
+                componentRow("PDF native text layer", detail: "Extracted directly, without OCR", ready: true)
+                componentRow("PP-DocLayoutV3 layout analysis",
+                             detail: "Decides which engine reads each region. Without it, whole pages use PP-OCRv6 only",
                              ready: VLModelStore.isLayoutModelInstalled)
-                componentRow("PP-OCRv6 \(vm.paddleConfig.tier.label)", detail: "正文、标题等普通文字",
+                componentRow("PP-OCRv6 \(vm.paddleConfig.tier.label)", detail: "Body text, headings and other plain text",
                              ready: PPModelStore.isInstalled(vm.paddleConfig.tier))
                 componentRow("PaddleOCR-VL \(vm.vlConfig.variant.label)",
-                             detail: "表格、公式、图表、印章，以及置信度低的区域；未安装时只标记待复核",
+                             detail: "Tables, formulas, charts, seals and low-confidence regions. Without it, these are only flagged for review",
                              ready: VLModelStore.isInstalled(vm.vlConfig.variant))
                 let missing = [PPModelCatalog.layoutModel, PPModelCatalog.vlQuantized]
                     .filter { !$0.isInstalled }
                 if !missing.isEmpty, !VLModelStore.isInstalled(vm.vlConfig.variant) || !VLModelStore.isLayoutModelInstalled {
                     Divider().padding(.vertical, 2)
                     HStack {
-                        Text("尚未安装").font(.caption).foregroundStyle(.secondary)
+                        Text("Not installed").font(.caption).foregroundStyle(.secondary)
                         Spacer()
                         downloadSourceControl
                     }
@@ -309,21 +306,19 @@ struct SettingsView: View {
             }
         }
 
-        settingSection("路由策略") {
+        settingSection("Routing") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.layeredConfig.escalateLowConfidence,
-                          title: "低置信度区域交给 PaddleOCR-VL 重读",
-                          subtitle: "PP-OCRv6 读得没把握的段落改由视觉语言模型重新识别；关闭后只标记为待复核")
-                valueSlider("重读阈值（平均置信度）", value: $vm.layeredConfig.escalationConfidence,
+                          title: "Reread low-confidence regions with PaddleOCR-VL",
+                          subtitle: "Paragraphs PP-OCRv6 is unsure about are reread by the vision-language model. When off, they are only flagged for review")
+                valueSlider("Reread threshold (average confidence)", value: $vm.layeredConfig.escalationConfidence,
                             range: 0.5...0.98, step: 0.01,
-                            hint: "一个区域内 PP-OCRv6 各行的平均置信度低于此值，或四分之一以上的行"
-                                + "低于「最低置信度」，就交给 PaddleOCR-VL。调高更准但更慢")
+                            hint: "A region goes to PaddleOCR-VL when the average confidence of its PP-OCRv6 lines is below this value, or more than a quarter of its lines are below “Minimum confidence”. Higher is more accurate but slower")
                     .disabled(!vm.layeredConfig.escalateLowConfidence)
-                Picker("PDF 已有文字层时", selection: $vm.layeredConfig.pdfText) {
+                Picker("When a PDF already has a text layer", selection: $vm.layeredConfig.pdfText) {
                     ForEach(PDFTextPolicy.allCases) { Text($0.label).tag($0) }
                 }
-                hint("原生 PDF 的文字本身就是准确的，直接取用最快也最准；扫描件上由其他软件生成的"
-                     + "隐藏 OCR 文字层质量未知，默认会重新识别。")
+                hint("Text in a native PDF is already exact, so using it directly is fastest and most accurate. Hidden OCR layers that other software added to scans are of unknown quality, so those pages are recognized again by default.")
             }
         }
 
@@ -331,18 +326,18 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) { paddleSettings }
                 .padding(.top, 8)
         } label: {
-            Text("PP-OCRv6 参数").font(.headline)
+            Text("PP-OCRv6 Parameters").font(.headline)
         }
 
         DisclosureGroup(isExpanded: $showLayeredVL) {
             VStack(alignment: .leading, spacing: 16) { vlSettings }
                 .padding(.top, 8)
         } label: {
-            Text("PaddleOCR-VL 参数").font(.headline)
+            Text("PaddleOCR-VL Parameters").font(.headline)
         }
     }
 
-    private func componentRow(_ title: String, detail: String, ready: Bool) -> some View {
+    private func componentRow(_ title: LocalizedStringKey, detail: LocalizedStringKey, ready: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: ready ? "checkmark.circle.fill" : "circle.dashed")
                 .foregroundStyle(ready ? Color.green : Color.secondary)
@@ -357,12 +352,12 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var paddleSettings: some View {
-        settingSection("模型档位") {
+        settingSection("Model Tier") {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(PPModelTier.allCases) { tier in
                     let installed = PPModelStore.isInstalled(tier)
                     radioRow(title: tier.label,
-                             subtitle: installed ? tier.hint : "\(tier.hint) —— 尚未下载",
+                             subtitle: installed ? tier.hint : String(localized: "\(tier.hint) — not downloaded yet"),
                              selected: vm.paddleConfig.tier == tier,
                              enabled: installed) {
                         vm.selectTier(tier)
@@ -371,23 +366,22 @@ struct SettingsView: View {
                 if !PPModelCatalog.mediumTier.isInstalled {
                     Divider().padding(.vertical, 2)
                     HStack {
-                        Text("尚未安装").font(.caption).foregroundStyle(.secondary)
+                        Text("Not installed").font(.caption).foregroundStyle(.secondary)
                         Spacer()
                         downloadSourceControl
                     }
                     inlineDownloadRow(PPModelCatalog.mediumTier)
                 }
                 Divider().padding(.vertical, 2)
-                modelManagerLink("全部模型管理…")
-                hint("切换档位会把检测阈值恢复为该档位的官方默认值。")
+                modelManagerLink("Manage All Models…")
+                hint("Switching tiers resets the detection thresholds to that tier's official defaults.")
             }
         }
 
-        settingSection("识别语言") {
+        settingSection("Recognition Language") {
             VStack(alignment: .leading, spacing: 10) {
-                radioRow(title: "内置多语言模型",
-                         subtitle: "PP-OCRv6 单模型覆盖 50 种语言：简繁中文、英文、日文，以及 46 种拉丁语系语言。"
-                                 + "不含韩文、阿拉伯文、西里尔字母、泰文、希腊文、天城文",
+                radioRow(title: String(localized: "Built-in multilingual model"),
+                         subtitle: String(localized: "A single PP-OCRv6 model covers 50 languages: Simplified and Traditional Chinese, English, Japanese, and 46 Latin-script languages. Not Korean, Arabic, Cyrillic, Thai, Greek or Devanagari"),
                          selected: vm.paddleConfig.recognizer == .builtin,
                          enabled: true) {
                     vm.selectRecognizer(.builtin)
@@ -395,7 +389,7 @@ struct SettingsView: View {
                 ForEach(PPModelStore.installedCustomRecognizers()) { recognizer in
                     let choice = PPRecognizerChoice.custom(fileName: recognizer.fileName)
                     radioRow(title: Self.recognizerName(recognizer),
-                             subtitle: "已安装的单语种识别器，检测仍由 PP-OCRv6 完成",
+                             subtitle: String(localized: "An installed single-language recognizer; detection is still done by PP-OCRv6"),
                              selected: vm.paddleConfig.recognizer == choice,
                              enabled: true) {
                         vm.selectRecognizer(choice)
@@ -411,7 +405,7 @@ struct SettingsView: View {
                 if !missing.isEmpty {
                     Divider().padding(.vertical, 2)
                     HStack {
-                        Text("尚未安装的语种")
+                        Text("Languages not installed")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -421,18 +415,17 @@ struct SettingsView: View {
                         inlineDownloadRow(entry)
                     }
                 }
-                hint("PP-OCRv6 没有这些语种的权重，用内置模型识别它们只会得到一堆错字。"
-                     + "在这里直接下载，装好后即可在上面选中；文本检测仍由 PP-OCRv6 完成。")
+                hint("PP-OCRv6 has no weights for these languages; the built-in model would only produce garbage for them. Download them here, then select one above. Text detection is still done by PP-OCRv6.")
             }
         }
 
-        settingSection("阅读顺序与版面") {
+        settingSection("Reading Order & Layout") {
             VStack(alignment: .leading, spacing: 10) {
                 let layoutReady = VLModelStore.isLayoutModelInstalled
                 ForEach(PPTextOrder.allCases) { order in
                     let ready = !order.needsLayoutModel || layoutReady
                     radioRow(title: order.label,
-                             subtitle: ready ? order.hint : "\(order.hint) —— 尚未下载",
+                             subtitle: ready ? order.hint : String(localized: "\(order.hint) — not downloaded yet"),
                              selected: vm.paddleConfig.readingOrder == order,
                              enabled: ready) {
                         vm.paddleConfig.readingOrder = order
@@ -442,13 +435,11 @@ struct SettingsView: View {
                     Divider().padding(.vertical, 2)
                     inlineDownloadRow(PPModelCatalog.layoutModel)
                 }
-                hint("文本检测只给出每一行的位置，不给出先后。版面分析用 PP-DocLayoutV3 找出页面上的"
-                     + "栏目、标题、图表等区域并判定阅读顺序，再把文字行放回区域里——这也是 PaddleOCR "
-                     + "官方文档解析的做法，同时让结果带上标题层级、图片位置，可直接导出 Markdown。")
+                hint("Text detection only gives each line's position, not its order. Layout analysis uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places lines back into their regions — as PaddleOCR's official document parsing does. Results also gain heading levels and image positions, ready to export as Markdown.")
             }
         }
 
-        settingSection("计算后端") {
+        settingSection("Compute Backend") {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(PPComputeUnit.allCases) { unit in
                     radioRow(title: unit.label, subtitle: unit.hint,
@@ -458,75 +449,74 @@ struct SettingsView: View {
                 }
                 Stepper(value: $vm.paddleConfig.threadCount, in: 0...16) {
                     Text(vm.paddleConfig.threadCount == 0
-                         ? "线程数：自动"
-                         : "线程数：\(vm.paddleConfig.threadCount)")
+                         ? "Threads: Auto"
+                         : "Threads: \(vm.paddleConfig.threadCount)")
                         .font(.callout)
                 }
             }
         }
 
-        settingSection("图像预处理") {
+        settingSection("Image Preprocessing") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.useDocUnwarping,
-                          title: "图片扭曲矫正",
-                          subtitle: "拍歪、卷曲、对折的书页先展平再识别。扫描件不需要，"
-                                  + "开启后预览显示的是展平后的页面")
+                          title: "Page unwarping",
+                          subtitle: "Flattens skewed, curled or folded pages before recognition. Scans don't need it. When on, the preview shows the flattened page")
                 if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
                     inlineDownloadRow(PPModelCatalog.unwarpingModel)
                 }
-                hint("对应 PaddleOCR 的 use_doc_unwarping，两个引擎都会用到。")
+                hint("Corresponds to PaddleOCR's use_doc_unwarping. Both engines use it.")
             }
         }
 
-        settingSection("方向校正") {
+        settingSection("Orientation") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.paddleConfig.useDocOrientation,
-                          title: "整页方向校正",
-                          subtitle: "识别整页旋转 90°/180°/270° 并自动摆正；扫描件建议开启")
+                          title: "Page orientation correction",
+                          subtitle: "Detects pages rotated 90°/180°/270° and straightens them. Recommended for scans")
                 toggleRow(isOn: $vm.paddleConfig.useTextLineOrientation,
-                          title: "文本行方向校正",
-                          subtitle: "逐行判断是否倒置并翻转，几乎不影响速度")
+                          title: "Text line orientation correction",
+                          subtitle: "Checks each line for upside-down text and flips it, with almost no speed cost")
                 if vm.paddleConfig.useTextLineOrientation {
-                    valueSlider("翻转判定阈值", value: $vm.paddleConfig.clsThresh,
+                    valueSlider("Flip threshold", value: $vm.paddleConfig.clsThresh,
                                 range: 0.5...0.9, step: 0.05,
-                                hint: "低于该置信度则不翻转；模型输出集中在 0.27 / 0.73 附近")
+                                hint: "Lines below this confidence are not flipped. Model output clusters around 0.27 / 0.73")
                 }
             }
         }
 
-        settingSection("文本检测与识别") {
+        settingSection("Text Detection & Recognition") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("检测分辨率", selection: $vm.paddleConfig.detLimitSideLen) {
-                    Text("736（最快）").tag(736)
-                    Text("960（默认）").tag(960)
+                Picker("Detection resolution", selection: $vm.paddleConfig.detLimitSideLen) {
+                    Text("736 (fastest)").tag(736)
+                    Text("960 (default)").tag(960)
                     Text("1280").tag(1280)
                     Text("1600").tag(1600)
-                    Text("2048（小字最佳）").tag(2048)
+                    Text("2048 (best for small text)").tag(2048)
                 }
                 .pickerStyle(.menu)
-                hint("图片长边会缩放到该尺寸再送入检测模型。密集小字可调高，速度随之下降。")
+                hint("The image's long side is scaled to this size before detection. Raise it for dense small text, at the cost of speed.")
 
                 DisclosureGroup(isExpanded: $showPaddleAdvanced) {
                     VStack(alignment: .leading, spacing: 12) {
-                        valueSlider("二值化阈值", value: $vm.paddleConfig.detThresh,
+                        valueSlider("Binarization threshold", value: $vm.paddleConfig.detThresh,
                                     range: 0.1...0.9, step: 0.05,
-                                    hint: "概率图判定为文字的阈值，调低可召回更淡的文字")
-                        valueSlider("文本框阈值", value: $vm.paddleConfig.detBoxThresh,
+                                    hint: "Probability threshold for text in the probability map. Lower it to catch fainter text")
+                        valueSlider("Box threshold", value: $vm.paddleConfig.detBoxThresh,
                                     range: 0.1...0.95, step: 0.05,
-                                    hint: "候选框平均概率低于此值将被丢弃")
-                        valueSlider("文本框扩张系数", value: $vm.paddleConfig.detUnclipRatio,
+                                    hint: "Candidate boxes with an average probability below this are discarded")
+                        valueSlider("Box unclip ratio", value: $vm.paddleConfig.detUnclipRatio,
                                     range: 1.0...3.0, step: 0.1,
-                                    hint: "调大可避免笔画边缘被裁掉，过大则相邻文字会粘连")
+                                    hint: "Raise it to avoid clipping stroke edges; too high and neighboring text merges")
                         Stepper(value: $vm.paddleConfig.recBatchSize, in: 1...32) {
-                            Text("识别批大小：\(vm.paddleConfig.recBatchSize)").font(.callout)
+                            Text("Recognition batch size: \(vm.paddleConfig.recBatchSize)").font(.callout)
                         }
-                        valueSlider("最低置信度", value: $vm.paddleConfig.dropScore,
+                        valueSlider("Minimum confidence", value: $vm.paddleConfig.dropScore,
                                     range: 0...0.95, step: 0.05,
-                                    hint: "识别置信度低于此值的文本行不会出现在结果中")
+                                    hint: "Lines recognized with lower confidence than this are left out of the results")
                     }
                     .padding(.top, 8)
                 } label: {
-                    Text("高级参数").font(.callout)
+                    Text("Advanced").font(.callout)
                 }
             }
         }
@@ -534,10 +524,10 @@ struct SettingsView: View {
         HStack {
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Button("恢复默认值") { vm.resetPaddleTuning() }
+                Button("Restore Defaults") { vm.resetPaddleTuning() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                Text("恢复方向校正、检测与识别的全部参数，保留所选模型与计算后端。")
+                Text("Resets all orientation, detection and recognition parameters. The selected model and compute backend are kept.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -548,12 +538,12 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var vlSettings: some View {
-        settingSection("模型") {
+        settingSection("Model") {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(VLModelVariant.allCases) { variant in
                     let installed = VLModelStore.isInstalled(variant)
                     radioRow(title: variant.label,
-                             subtitle: installed ? variant.hint : "\(variant.hint) —— 尚未下载",
+                             subtitle: installed ? variant.hint : String(localized: "\(variant.hint) — not downloaded yet"),
                              selected: vm.vlConfig.variant == variant,
                              enabled: installed) {
                         vm.vlConfig.variant = variant
@@ -561,7 +551,7 @@ struct SettingsView: View {
                 }
                 Divider().padding(.vertical, 2)
                 HStack {
-                    modelManagerLink("模型管理")
+                    modelManagerLink("Model Manager")
                     Spacer()
                     downloadSourceControl
                 }
@@ -571,101 +561,95 @@ struct SettingsView: View {
             }
         }
 
-        settingSection("图像预处理") {
+        settingSection("Image Preprocessing") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.useDocUnwarping,
-                          title: "图片扭曲矫正",
-                          subtitle: "拍歪、卷曲、对折的书页先展平再识别。扫描件不需要，"
-                                  + "开启后预览显示的是展平后的页面")
+                          title: "Page unwarping",
+                          subtitle: "Flattens skewed, curled or folded pages before recognition. Scans don't need it. When on, the preview shows the flattened page")
                 if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
                     inlineDownloadRow(PPModelCatalog.unwarpingModel)
                 }
             }
         }
 
-        settingSection("版面分析") {
+        settingSection("Layout Analysis") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.vlConfig.useLayoutDetection,
-                          title: "先做版面分析，再逐块识别",
-                          subtitle: "PaddleOCR 官方管线：切分版面、判定阅读顺序，逐块选用合适的提示词，"
-                                  + "最后拼成 Markdown。关闭后整页一次性交给模型，快得多但会漏内容。")
+                          title: "Analyze layout first, then read block by block",
+                          subtitle: "The official PaddleOCR pipeline: split the layout, decide the reading order, prompt each block appropriately, then assemble Markdown. When off, the whole page goes to the model at once — much faster, but content gets missed.")
                 if !VLModelStore.isLayoutModelInstalled {
-                    Label("尚未下载 PP-DocLayoutV3 版面模型", systemImage: "exclamationmark.triangle.fill")
+                    Label("The PP-DocLayoutV3 layout model isn't downloaded yet", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
 
-                valueSlider("区域外扩系数", value: $vm.vlConfig.cropUnclipRatio,
+                valueSlider("Region padding ratio", value: $vm.vlConfig.cropUnclipRatio,
                             range: 1.0...1.3, step: 0.01,
-                            hint: "裁剪每个版面区域时向外扩张的比例。贴着文字裁会切掉笔画边缘，"
-                                + "模型因此漏字；对应官方的 unclip_ratio")
+                            hint: "How far to expand each layout region when cropping. Cropping tight to the text cuts off stroke edges and the model misses characters. Corresponds to the official unclip_ratio")
 
                 if !vm.vlConfig.useLayoutDetection {
                     Divider().padding(.vertical, 2)
-                    Picker("整页提示词", selection: $vm.vlConfig.wholeImageTask) {
+                    Picker("Whole-page prompt", selection: $vm.vlConfig.wholeImageTask) {
                         ForEach(VLTask.allCases) { task in
-                            Text("\(task.label)（\(task.prompt)）").tag(task)
+                            Text("\(task.label) (\(task.prompt))").tag(task)
                         }
                     }
-                    hint(vm.vlConfig.wholeImageTask.hint)
+                    hint(verbatim: vm.vlConfig.wholeImageTask.hint)
                 }
             }
         }
 
-        settingSection("识别模块") {
+        settingSection("Recognition Modules") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.vlConfig.useChartRecognition,
-                          title: "图表识别",
-                          subtitle: "把柱状图、折线图读成数据表格。官方默认关闭——图上只画了形状，"
-                                  + "读出来的数字是模型的估计")
+                          title: "Chart recognition",
+                          subtitle: "Reads bar and line charts into data tables. Off by default upstream — a chart only draws shapes, so the numbers are the model's estimates")
                 toggleRow(isOn: $vm.vlConfig.useSealRecognition,
-                          title: "印章识别",
-                          subtitle: "读出印章上的弧形文字")
+                          title: "Seal recognition",
+                          subtitle: "Reads the curved text on seals")
                 toggleRow(isOn: $vm.vlConfig.useImageTextRecognition,
-                          title: "图片文字识别",
-                          subtitle: "连图片区域里的文字也读出来；关闭时图片只作为插图保留")
+                          title: "Text in images",
+                          subtitle: "Also reads text inside image regions. When off, images are kept as illustrations only")
                 toggleRow(isOn: $vm.vlConfig.inferHeadingLevels,
-                          title: "段落标题级别识别",
-                          subtitle: "按标题的字号大小推断层级，输出 ##、###、####；关闭后所有小标题同一级")
-                hint("关闭的模块对应的区域仍会出现在预览里，只是不送去识别。")
+                          title: "Heading level detection",
+                          subtitle: "Infers heading levels from font size and outputs ##, ###, ####. When off, all subheadings are one level")
+                hint("Regions of a disabled module still appear in the preview; they just aren't sent for recognition.")
             }
         }
 
-        settingSection("采样参数") {
+        settingSection("Sampling") {
             VStack(alignment: .leading, spacing: 12) {
-                valueSlider("重复抑制强度", value: $vm.vlConfig.repetitionPenalty,
+                valueSlider("Repetition penalty", value: $vm.vlConfig.repetitionPenalty,
                             range: 1.0...1.5, step: 0.05,
-                            hint: "大于 1 时，已经输出过的词更不容易再次出现。遇到整段重复可以调到 1.05–1.15")
-                valueSlider("识别稳定性（temperature）", value: $vm.vlConfig.temperature,
+                            hint: "Above 1, tokens already output are less likely to appear again. If whole passages repeat, try 1.05–1.15")
+                valueSlider("Randomness (temperature)", value: $vm.vlConfig.temperature,
                             range: 0...1.0, step: 0.05,
-                            hint: "0 表示每次都选最有把握的那个词，也是官方默认；调高会引入随机性，"
-                                + "对转写任务通常没有好处")
-                valueSlider("结果可信范围（top-p）", value: $vm.vlConfig.topP,
+                            hint: "0 always picks the most likely token, which is also the official default. Higher values add randomness, which rarely helps transcription.")
+                valueSlider("Candidate range (top-p)", value: $vm.vlConfig.topP,
                             range: 0.1...1.0, step: 0.05,
-                            hint: "只在 temperature 大于 0 时生效：从累计概率达到该值的候选里采样")
-                hint("与 PaddleOCR 官方的三个采样参数一一对应，默认值也相同（1.00 / 0.00 / 1.0）。")
+                            hint: "Only applies when temperature is above 0: samples from the candidates whose cumulative probability reaches this value")
+                hint("These match PaddleOCR's three official sampling parameters, with the same defaults (1.00 / 0.00 / 1.0).")
             }
         }
 
-        settingSection("推理") {
+        settingSection("Inference") {
             VStack(alignment: .leading, spacing: 10) {
                 toggleRow(isOn: $vm.vlConfig.useGPU,
-                          title: "使用 GPU（Metal）",
-                          subtitle: "把全部层放到 GPU 上，比纯 CPU 快数倍（推荐）")
+                          title: "Use GPU (Metal)",
+                          subtitle: "Runs all layers on the GPU, several times faster than CPU alone (recommended)")
                 Stepper(value: $vm.vlConfig.contextTokens, in: 2048...32768, step: 2048) {
-                    Text("上下文长度：\(vm.vlConfig.contextTokens)").font(.callout)
+                    Text("Context length: \(vm.vlConfig.contextTokens)").font(.callout)
                 }
                 Stepper(value: $vm.vlConfig.maxOutputTokens, in: 128...4096, step: 128) {
-                    Text("单块最大输出：\(vm.vlConfig.maxOutputTokens) token").font(.callout)
+                    Text("Max output per block: \(vm.vlConfig.maxOutputTokens) tokens").font(.callout)
                 }
-                hint("上下文要装得下一块图像的视觉 token 加上它的输出；单块输出上限防止某一块卡住整页。")
+                hint("The context must fit one block's visual tokens plus its output. The per-block output limit keeps one block from stalling the whole page.")
                 Divider().padding(.vertical, 2)
-                Picker("并行识别的区域数", selection: $vm.vlConfig.parallelSequences) {
-                    Text("自动（本机 \(VLConfig().resolvedParallelism) 路）").tag(0)
-                    ForEach(VLConfig.parallelismChoices, id: \.self) { Text("\($0) 路").tag($0) }
+                Picker("Regions decoded in parallel", selection: $vm.vlConfig.parallelSequences) {
+                    Text("Auto (\(VLConfig().resolvedParallelism) on this Mac)").tag(0)
+                    ForEach(VLConfig.parallelismChoices, id: \.self) { Text("\($0) lanes").tag($0) }
                 }
-                hint("同一页、相邻页面和相邻文件的多个区域在 GPU 上一起解码。每个区域的裁剪、提示词和"
-                     + "解码方式都不变，识别结果与逐块识别一致，只是更快。每多一路约多占 45 MB 内存。")
+                hint("Regions from the same page, neighboring pages and neighboring files are decoded together on the GPU. Each region's crop, prompt and decoding are unchanged, so results match one-at-a-time reading, only faster. Each extra lane uses about 45 MB more memory.")
             }
         }
     }
@@ -674,42 +658,41 @@ struct SettingsView: View {
 
     private var textTab: some View {
         settingsScroll {
-            settingSection("换行处理") {
+            settingSection("Line Breaks") {
                 VStack(alignment: .leading, spacing: 10) {
                     // Never disabled: it used to switch itself off once both were
                     // on, which left the pair locked with no way back.
                     toggleRow(isOn: $vm.mergeLineBreaks,
-                              title: "合并为单行（不换行）",
-                              subtitle: "将所有换行替换为空格，输出连续段落")
+                              title: "Merge into one line (no line breaks)",
+                              subtitle: "Replaces every line break with a space, producing continuous paragraphs")
                     toggleRow(isOn: $vm.removeEmptyLines,
-                              title: "去除多余空行",
-                              subtitle: "将连续多个空行压缩为单个空行")
+                              title: "Remove extra blank lines",
+                              subtitle: "Collapses consecutive blank lines into one")
                         .disabled(vm.mergeLineBreaks)
                     if vm.mergeLineBreaks {
-                        hint("合并为单行后结果里不再有换行，「去除多余空行」无从生效。")
+                        hint("After merging into one line there are no line breaks left, so “Remove extra blank lines” has no effect.")
                     }
                 }
             }
 
-            settingSection("空白字符") {
+            settingSection("Whitespace") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.trimWhitespace,
-                              title: "去除行首尾空格",
-                              subtitle: "清除每行两端多余的空白字符")
+                              title: "Trim spaces at line ends",
+                              subtitle: "Removes extra whitespace at both ends of each line")
                     toggleRow(isOn: $vm.removeHyphenBreaks,
-                              title: "合并连字符换行",
-                              subtitle: "适合英文扫描件，自动拼合被断行分割的单词")
+                              title: "Join hyphenated line breaks",
+                              subtitle: "Good for English scans: rejoins words split across lines")
                 }
             }
 
             if vm.mergeLineBreaks || vm.removeEmptyLines || vm.trimWhitespace || vm.removeHyphenBreaks {
-                noticeBox("文本后处理仅影响新识别的结果，不会修改已有内容。", tint: .accentColor)
+                noticeBox("Text post-processing only affects new results; existing ones are not changed.", tint: .accentColor)
             }
 
-            settingSection("辅助内容解析") {
+            settingSection("Auxiliary Content") {
                 VStack(alignment: .leading, spacing: 8) {
-                    hint("页眉、页脚、页码这类内容会被版面模型认出来并默认过滤掉；"
-                         + "打开某一项表示把它保留在结果里。与 PaddleOCR 官方的「辅助内容解析」一一对应。")
+                    hint("Headers, footers, page numbers and the like are detected by the layout model and filtered out by default. Turn an item on to keep it in the results. Matches PaddleOCR's official auxiliary content options.")
                     ForEach(PPLayoutLabel.auxiliary, id: \.rawValue) { label in
                         Toggle(isOn: Binding(
                             get: { vm.keptAuxiliary.contains(label) },
@@ -723,68 +706,64 @@ struct SettingsView: View {
                         }
                     }
                     Divider().padding(.vertical, 2)
-                    hint("这些区域始终会被识别，也始终画在预览里（被过滤的画成虚线框），"
-                         + "这里只决定它们要不要进入文本和 Markdown。改动立刻生效，不需要重新识别；"
-                         + "多页 PDF 例外，它的正文在识别时就已经逐页拼好了。")
+                    hint("These regions are always recognized and always drawn in the preview (filtered ones with dashed boxes); this only decides whether they go into the text and Markdown. Changes apply immediately without recognizing again — except for multi-page PDFs, whose text is assembled page by page during recognition.")
                 }
             }
 
-            settingSection("结果渲染") {
+            settingSection("Result Rendering") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.renderFigures,
-                              title: "显示图片与图表",
-                              subtitle: "把版面里的图片、图表按识别到的位置从原图裁出来，显示在 Markdown 结果中")
+                              title: "Show images and charts",
+                              subtitle: "Crops images and charts from the original at their detected positions and shows them in the Markdown result")
                     toggleRow(isOn: $vm.renderTables,
-                              title: "表格渲染为网格",
-                              subtitle: "关闭后按模型输出的原始形式显示表格")
-                    hint("仅影响「Markdown」标签页的显示方式；「源码」标签页始终是模型输出的原文。"
-                         + "其它引擎只有纯文本，不受这里影响。")
+                              title: "Render tables as grids",
+                              subtitle: "When off, tables are shown as the model output them")
+                    hint("Only affects how the Markdown tab displays; the Source tab always shows the model's raw output. Other engines produce plain text and are not affected.")
                 }
             }
 
-            settingSection("导出") {
+            settingSection("Export") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker("导出格式", selection: $vm.exportFormat) {
+                    Picker("Export format", selection: $vm.exportFormat) {
                         ForEach(OCRViewModel.ExportFormat.allCases) { format in
                             Text(format.label).tag(format)
                         }
                     }
                     .pickerStyle(.menu)
-                    hint(exportFormatHint)
+                    hint(verbatim: exportFormatHint)
 
-                    Picker("导出方式", selection: $vm.exportLayout) {
+                    Picker("Export as", selection: $vm.exportLayout) {
                         ForEach(OCRViewModel.ExportLayout.allCases) { layout in
                             Text(layout.label).tag(layout)
                         }
                     }
                     .pickerStyle(.menu)
                     hint(vm.exportLayout == .combined
-                         ? "所有选中的文件写入同一个文档。"
-                         : "选择一个文件夹，每张图片各写出一个「原文件名_OCR」文档。")
+                         ? "All selected files are written into one document."
+                         : "Choose a folder; each image is written to its own “original name_OCR” document.")
 
                     if vm.exportFormat == .markdown {
                         Divider()
-                        Toggle("导出 Markdown 时一并保存图片", isOn: $vm.exportFigures)
-                        hint("图片写入与 .md 同名的 .assets 文件夹，文档中以相对路径引用；"
-                             + "关闭后图片位置只保留空的占位符。")
+                        Toggle("Save images when exporting Markdown", isOn: $vm.exportFigures)
+                        hint("Images go into an .assets folder named after the .md file and are referenced by relative path. When off, image positions keep only an empty placeholder.")
                     }
 
                     if vm.exportLayout == .combined, vm.exportFormat != .json {
                         Divider()
-                        Picker("文件分隔符", selection: $vm.exportSeparator) {
+                        Picker("File separator", selection: $vm.exportSeparator) {
                             ForEach(OCRViewModel.ExportSeparator.allCases) { separator in
-                                Text(separator.rawValue).tag(separator)
+                                Text(separator.label).tag(separator)
                             }
                         }
                         .pickerStyle(.menu)
-                        hint("多个文件导出为同一文本时，各文件内容之间的分隔方式。")
+                        hint("How files are separated when several are exported into one text.")
                     }
 
                     if vm.exportFormat != .json {
-                        Toggle("导出时包含文件名", isOn: $vm.exportIncludeFilename)
+                        Toggle("Include file names when exporting", isOn: $vm.exportIncludeFilename)
                         hint(vm.exportFormat == .markdown
-                             ? "开启后每个文件的内容前会加上一级标题。"
-                             : "开启后每段内容前会加上「=== 文件名 ===」标题行。")
+                             ? "When on, each file's content starts with a level-1 heading."
+                             : "When on, each file's content starts with a “=== file name ===” line.")
                     }
                 }
             }
@@ -795,8 +774,8 @@ struct SettingsView: View {
 
     private var behaviorTab: some View {
         settingsScroll {
-            settingSection("外观") {
-                Picker("外观", selection: $appearance) {
+            settingSection("Appearance") {
+                Picker("Appearance", selection: $appearance) {
                     ForEach(AppAppearance.allCases) { option in
                         Text(option.label).tag(option)
                     }
@@ -806,88 +785,85 @@ struct SettingsView: View {
                 .fixedSize()
             }
 
-            settingSection("自动化") {
+            settingSection("Automation") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.autoStartOnAdd,
-                              title: "添加文件后自动开始识别",
-                              subtitle: "拖入或选择文件后立即开始批量处理")
+                              title: "Start recognition automatically after adding files",
+                              subtitle: "Start processing as soon as files are dropped in or chosen")
                     toggleRow(isOn: $vm.skipCompleted,
-                              title: "跳过已完成的文件",
-                              subtitle: "重新点击「开始识别」时，不重复处理已识别的文件")
+                              title: "Skip completed files",
+                              subtitle: "When you click Start Recognition again, files already recognized are not processed again")
                 }
             }
 
-            settingSection("监控文件夹") {
+            settingSection("Watched Folder") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.watchEnabled,
-                              title: "自动识别放进文件夹的新文件",
-                              subtitle: "包括子文件夹。文件写入完成后才会读取，原文件不会被移动或删除")
-                    folderRow("监控", url: vm.watchFolder) { vm.chooseWatchFolder(output: false) }
-                    folderRow("输出到", url: vm.watchOutputFolder) { vm.chooseWatchFolder(output: true) }
+                              title: "Automatically recognize new files added to a folder",
+                              subtitle: "Includes subfolders. Files are read once they finish writing; originals are never moved or deleted")
+                    folderRow("Watch", url: vm.watchFolder) { vm.chooseWatchFolder(output: false) }
+                    folderRow("Output", url: vm.watchOutputFolder) { vm.chooseWatchFolder(output: true) }
                     if vm.watchEnabled, vm.watchFolder == nil {
-                        Label("请先选择要监控的文件夹", systemImage: "exclamationmark.triangle.fill")
+                        Label("Choose a folder to watch first", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.orange)
                     }
-                    hint("每个文件识别完成后，按「文本与导出」里选择的格式写入输出文件夹，并保留子文件夹结构；"
-                         + "输出文件已存在的源文件视为已处理，不会重复识别。不选输出文件夹时，结果只留在列表里。")
+                    hint("Once a file is recognized, it is written to the output folder in the format chosen under Text & Export, keeping the subfolder structure. Source files whose output already exists count as done and aren't recognized again. Without an output folder, results stay in the list only.")
                 }
             }
 
-            settingSection("识别缓存") {
+            settingSection("Recognition Cache") {
                 VStack(alignment: .leading, spacing: 10) {
-                    hint("同一个文件（按内容判断，与文件名和位置无关）用同样的设置识别过，就直接复用上次的结果。"
-                         + "「重新识别」总是重新读取。列表和识别结果在退出后保留，下次打开继续。")
-                    Button("清空识别缓存") { vm.store.clearCache() }
+                    hint("If the same file (judged by content, regardless of name or location) was recognized with the same settings, the earlier result is reused. “Recognize Again” always reads afresh. The list and results are kept after quitting and are there next time.")
+                    Button("Clear Recognition Cache") { vm.store.clearCache() }
                         .controlSize(.small)
                 }
             }
 
-            settingSection("批量并发") {
+            settingSection("Batch Concurrency") {
                 VStack(alignment: .leading, spacing: 10) {
                     // The GPU engines batch regions across files themselves, so
                     // `processConcurrently` caps them at two files in flight.
                     let capped = vm.ocrEngine.prefersFewFilesInFlight
                     Stepper(value: $vm.maxConcurrentTasks, in: 1...8) {
                         Text(capped
-                             ? "同时处理 \(min(2, vm.maxConcurrentTasks)) 个文件"
-                             : "同时处理 \(vm.maxConcurrentTasks) 个文件")
+                             ? "Process \(min(2, vm.maxConcurrentTasks)) files at a time"
+                             : "Process \(vm.maxConcurrentTasks) files at a time")
                             .font(.callout)
                     }
-                    hint(concurrencyHint)
+                    hint(verbatim: concurrencyHint)
                 }
             }
 
-            settingSection("软件更新") {
+            settingSection("Software Update") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $updater.automaticallyChecksForUpdates,
-                              title: "自动检查更新",
-                              subtitle: "在后台向 GitHub Releases 查询新版本，下载前会先征求同意")
+                              title: "Check for updates automatically",
+                              subtitle: "Checks GitHub Releases for new versions in the background and asks before downloading")
                     HStack(spacing: 10) {
-                        Button("现在检查…") { updater.checkForUpdates() }
+                        Button("Check Now…") { updater.checkForUpdates() }
                             .buttonStyle(.bordered)
                             .disabled(!updater.canCheckForUpdates)
-                        Text("当前版本 \(appVersion)")
+                        Text("Current version \(appVersion)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
 
-            settingSection("重置") {
+            settingSection("Reset") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Button("恢复全部默认设置…") { showResetConfirm = true }
+                    Button("Restore All Defaults…") { showResetConfirm = true }
                         .buttonStyle(.bordered)
-                    hint("设置会自动保存并在下次启动时沿用；这里可以把全部三个标签页恢复到初始状态。")
+                    hint("Settings are saved automatically and kept for the next launch. This restores all three tabs to their initial state.")
                 }
             }
-            .confirmationDialog("恢复全部默认设置？",
+            .confirmationDialog("Restore all default settings?",
                                 isPresented: $showResetConfirm,
                                 titleVisibility: .visible) {
-                Button("恢复默认设置", role: .destructive) { vm.resetAllSettings() }
-                Button("取消", role: .cancel) {}
+                Button("Reset All Settings", role: .destructive) { vm.resetAllSettings() }
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("识别引擎、模型选择、全部参数、文本与导出选项都会回到初始值。"
-                     + "已下载的模型和列表中的文件不受影响。")
+                Text(String(localized: "The recognition engine, model choices, all parameters, and text and export options return to their initial values. Downloaded models and files in the list are not affected."))
             }
         }
     }
@@ -902,48 +878,42 @@ struct SettingsView: View {
     private var exportFormatHint: String {
         switch vm.exportFormat {
         case .markdown:
-            return "保留标题层级、图片位置与表格。只有做过版面分析的结果才有这些结构"
-                 + "（PaddleOCR-VL，或开启了版面分析的 PP-OCRv6）；没有的会退回纯文本。"
+            return String(localized: "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure (PaddleOCR-VL, or PP-OCRv6 with layout analysis on); others fall back to plain text.")
         case .plainText:
-            return "只写出识别到的文字，不带任何结构。"
+            return String(localized: "Writes only the recognized text, with no structure.")
         case .json:
-            return "按页写出每一行的文字、四点坐标与置信度，以及版面区域的类别、阅读顺序、位置、"
-                 + "由哪个引擎识别和待复核原因，供其他程序继续处理。"
+            return String(localized: "Writes, page by page, each line's text, four-point coordinates and confidence, plus each layout region's type, reading order, position, which engine read it and why it needs review — for further processing by other programs.")
         case .excel:
-            return "把识别出结构的表格写成 Excel 工作簿，每个表格一个工作表，合并单元格保持合并，"
-                 + "纯数字写成数值。表格结构来自 PaddleOCR-VL，PP-OCRv6 读成文字的表格不会导出。"
+            return String(localized: "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from PaddleOCR-VL; tables PP-OCRv6 read as text are not exported.")
         case .searchablePDF:
-            return "保留原页面外观（PDF 原页面以矢量形式保留，不重新栅格化），把识别文字以不可见文字层"
-                 + "叠在原位置上，可在预览、聚焦等程序里搜索和复制。原本就有文字层的页面不重复添加。"
+            return String(localized: "Keeps each page as it looks (PDF pages stay vector, not re-rasterized) and lays the recognized text over it as an invisible layer, so it can be searched and copied in Preview, Spotlight and elsewhere. Pages that already have a text layer are left alone.")
         }
     }
 
     private var concurrencyHint: String {
         switch vm.ocrEngine {
         case .paddleVL, .auto:
-            return "GPU 模型会把多个文件、多个页面的区域合并成批一起解码，"
-                 + "最多同时处理 2 个文件就足以让 GPU 满载，再多只会多占内存。"
+            return String(localized: "GPU models batch regions from several files and pages and decode them together. Two files at a time is enough to keep the GPU busy; more only uses more memory.")
         case .paddleOCR:
-            return "图片解码会真正并行；PaddleOCR 的模型推理仍逐张进行"
-                 + "（避免多份模型抢占同一颗 CPU），但下一张的解码不再等待。"
+            return String(localized: "Image decoding runs truly in parallel. PaddleOCR inference still runs one image at a time (so multiple model copies don't fight over the CPU), but the next image's decoding no longer waits.")
         case .visionFast, .visionAccurate:
-            return "多张图片会同时解码并交给 Apple Vision 识别，充分利用多核 CPU。"
+            return String(localized: "Several images are decoded and recognized by Apple Vision at once, making full use of a multi-core CPU.")
         }
     }
 
     // MARK: - Building blocks
 
-    private func folderRow(_ title: String, url: URL?, choose: @escaping () -> Void) -> some View {
+    private func folderRow(_ title: LocalizedStringKey, url: URL?, choose: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             Text(title).font(.callout).frame(width: 44, alignment: .leading)
-            Text(url?.path(percentEncoded: false) ?? "未选择")
+            Text(url?.path(percentEncoded: false) ?? String(localized: "Not chosen"))
                 .font(.caption)
                 .foregroundStyle(url == nil ? .tertiary : .secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(url?.path(percentEncoded: false) ?? "")
-            Button("选择…", action: choose).controlSize(.small)
+            Button("Choose…", action: choose).controlSize(.small)
         }
     }
 
@@ -958,7 +928,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func settingSection<Content: View>(_ title: String,
+    private func settingSection<Content: View>(_ title: LocalizedStringKey,
                                                @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
@@ -973,14 +943,23 @@ struct SettingsView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15), lineWidth: 1))
     }
 
-    private func hint(_ text: String) -> some View {
-        Text(text)
+    private func hint(_ text: LocalizedStringKey) -> some View {
+        hint(Text(text))
+    }
+
+    /// For text that is already localised, such as an enum's description.
+    private func hint(verbatim text: String) -> some View {
+        hint(Text(verbatim: text))
+    }
+
+    private func hint(_ text: Text) -> some View {
+        text
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.top, 2)
     }
 
-    private func noticeBox(_ text: String, tint: Color) -> some View {
+    private func noticeBox(_ text: LocalizedStringKey, tint: Color) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: "info.circle")
                 .font(.caption)
@@ -995,7 +974,7 @@ struct SettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func modelManagerLink(_ title: String) -> some View {
+    private func modelManagerLink(_ title: LocalizedStringKey) -> some View {
         Button {
             openWindow(id: ModelManagerView.windowID)
         } label: {
@@ -1030,7 +1009,7 @@ struct SettingsView: View {
         .opacity(enabled ? 1 : 0.5)
     }
 
-    private func toggleRow(isOn: Binding<Bool>, title: String, subtitle: String) -> some View {
+    private func toggleRow(isOn: Binding<Bool>, title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.callout)
@@ -1040,14 +1019,14 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func valueSlider(_ title: String, value: Binding<Double>,
+    private func valueSlider(_ title: LocalizedStringKey, value: Binding<Double>,
                              range: ClosedRange<Double>, step: Double,
-                             hint text: String) -> some View {
+                             hint text: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title).font(.callout)
                 Spacer()
-                Text(String(format: "%.2f", value.wrappedValue))
+                Text(value.wrappedValue.formatted(.number.precision(.fractionLength(2))))
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

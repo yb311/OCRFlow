@@ -13,11 +13,11 @@ enum ProcessingStatus: String, Equatable, Codable {
 
     var label: String {
         switch self {
-        case .pending:    return "待处理"
-        case .processing: return "识别中"
-        case .completed:  return "已完成"
-        case .failed:     return "失败"
-        case .cancelled:  return "已取消"
+        case .pending:    return String(localized: "Pending")
+        case .processing: return String(localized: "Recognizing")
+        case .completed:  return String(localized: "Completed")
+        case .failed:     return String(localized: "Failed")
+        case .cancelled:  return String(localized: "Cancelled")
         }
     }
 }
@@ -64,9 +64,7 @@ struct ImageItem: Identifiable, Equatable {
     var fileSizeString: String {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attrs[.size] as? Int64 else { return "—" }
-        let kb = Double(size) / 1024
-        if kb < 1024 { return String(format: "%.1f KB", kb) }
-        return String(format: "%.1f MB", kb / 1024)
+        return size.formatted(.byteCount(style: .file))
     }
 
     /// Wraps a decoded page so its pixel dimensions survive.

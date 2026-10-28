@@ -60,7 +60,8 @@ struct MarkdownWebView: NSViewRepresentable {
             coordinator.pending = Payload(fragments: fragments,
                                           figures: figures.map { $0.flatMap(Self.dataURL) },
                                           selected: selected,
-                                          accent: Self.accentHex())
+                                          accent: Self.accentHex(),
+                                          figureLabel: String(localized: "Image"))
             coordinator.selected = selected
             coordinator.flush()
         } else if coordinator.selected != selected {
@@ -84,6 +85,8 @@ struct MarkdownWebView: NSViewRepresentable {
         let figures: [String?]
         let selected: Int?
         let accent: String
+        /// What an uncaptioned figure is called, in the app's language.
+        let figureLabel: String
     }
 
     /// A crop as an inline image the page can show without file access.

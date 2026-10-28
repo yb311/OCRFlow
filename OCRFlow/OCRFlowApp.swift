@@ -14,9 +14,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .system: return "跟随系统"
-        case .light:  return "浅色"
-        case .dark:   return "深色"
+        case .system: return String(localized: "System")
+        case .light:  return String(localized: "Light")
+        case .dark:   return String(localized: "Dark")
         }
     }
 
@@ -51,7 +51,7 @@ struct OCRFlowApp: App {
         .defaultSize(width: 1100, height: 700)
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("检查更新…") {
+                Button("Check for Updates…") {
                     updater.checkForUpdates()
                 }
                 .disabled(!updater.canCheckForUpdates)
@@ -59,21 +59,21 @@ struct OCRFlowApp: App {
 
             // Replaces the standard New group, which this app has no use for.
             CommandGroup(replacing: .newItem) {
-                Button("打开图片…") {
+                Button("Open Images…") {
                     viewModel.openFilePicker()
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
-                Button("截图识别") {
+                Button("Capture Screenshot") {
                     viewModel.captureScreenshot()
                 }
                 .keyboardShortcut("2", modifiers: [.command, .shift])
             }
 
             CommandGroup(before: .sidebar) {
-                Button("工作台") { viewModel.mode = .workspace }
+                Button("Workspace") { viewModel.mode = .workspace }
                     .keyboardShortcut("1", modifiers: .command)
-                Button("复核") { viewModel.startReview() }
+                Button("Review") { viewModel.startReview() }
                     .keyboardShortcut("2", modifiers: .command)
                 Divider()
             }
@@ -81,19 +81,19 @@ struct OCRFlowApp: App {
             CommandGroup(after: .newItem) {
                 Divider()
 
-                Button("开始识别") {
+                Button("Start Recognition") {
                     viewModel.startProcessing()
                 }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(viewModel.actionableCount == 0)
 
-                Button("导出全部结果…") {
+                Button("Export All Results…") {
                     viewModel.exportResults()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(viewModel.exportableCount == 0)
 
-                Button("导出选中结果…") {
+                Button("Export Selected Results…") {
                     viewModel.exportSelectedItems()
                 }
                 .keyboardShortcut("e", modifiers: .command)
@@ -112,7 +112,7 @@ struct OCRFlowApp: App {
 
         // Its own window rather than a sheet on top of the settings sheet:
         // downloading gigabytes of models is a task in its own right.
-        Window("模型管理", id: ModelManagerView.windowID) {
+        Window("Model Manager", id: ModelManagerView.windowID) {
             ModelManagerView(downloader: viewModel.modelDownloader)
         }
         .defaultSize(width: 620, height: 580)

@@ -77,7 +77,7 @@ struct LayeredPipeline {
         guard !ocr.blocks.isEmpty else {
             var page = PageResult(size: size, lines: kept, rawText: kept.plainText)
             if !paddle.hasLayoutAnalysis {
-                page.notes.append(.info("未安装版面分析模型，本页只用 PP-OCRv6 识别，未做分区路由"))
+                page.notes.append(.info(.layoutModelMissing))
             }
             return page
         }
@@ -127,7 +127,7 @@ struct LayeredPipeline {
             guard let text = native.texts.first, !text.isEmpty else { return nil }
             return PageResult(size: size, blockSource: .pdfTextLayer, rawText: text,
                               rawMarkdown: text,
-                              notes: [.info("本页文字取自 PDF 文字层（\(native.verdict.description)）")])
+                              notes: [.info(.pdfTextLayer(native.verdict))])
         }
         progress?(0.1)
         if layout.isEmpty { return nil }
@@ -156,7 +156,7 @@ struct LayeredPipeline {
                 // `d_k` comes out as "dk", and a font's radical can come out as
                 // an arrow. The VLM writes it as LaTeX; the PDF's text stays as
                 // the fallback and the yardstick.
-                blocks[index].routing = "段落含 \(formulas) 处行内公式，PDF 文字层表达不了公式结构，交由 PaddleOCR-VL 识别"
+                blocks[index].routing = .pdfInlineFormulas(formulas)
                 regions.append(.init(block: index, task: .ocr, fallback: native.texts[index],
                                      isEscalation: true))
             } else if blocks[index].label.vlTask != nil, native.texts[index].isEmpty,
@@ -180,7 +180,7 @@ struct LayeredPipeline {
             blocks[index].text = lines.filter { $0.confidence >= paddleConfig.dropScore }
                 .map(\.text).joined(separator: "\n")
             blocks[index].source = .plainOCR
-            blocks[index].routing = "PDF 文字层在此区域没有文字，改用 PP-OCRv6 识别图像"
+            blocks[index].routing = .pdfNoText
             switch route(blocks[index], lines: lines) {
             case let .vl(task, reason):
                 if let reason { blocks[index].routing = reason }
@@ -193,7 +193,7 @@ struct LayeredPipeline {
         progress?(0.3)
 
         var page = PageResult(size: size, blocks: blocks, blockSource: .pdfTextLayer,
-                              notes: [.info("正文取自 PDF 原生文字层，未经 OCR")])
+                              notes: [.info(.pdfNativeBody)])
         try readRegions(regions, of: image, into: &page, progress: progress, isCancelled: isCancelled)
         return page
     }
@@ -203,9 +203,9 @@ struct LayeredPipeline {
     private enum Route {
         /// Read with PaddleOCR-VL; the reason is set when it is an escalation
         /// rather than the region's kind.
-        case vl(VLTask, reason: String?)
+        case vl(VLTask, reason: RoutingReason?)
         /// Keep what PP-OCR read, optionally flagged.
-        case keep(review: String?)
+        case keep(review: ReviewReason?)
     }
 
     /// The prompt for a region whose content PP-OCR cannot represent, or nil
@@ -230,7 +230,7 @@ struct LayeredPipeline {
         if let task = structuralTask(for: block.label) {
             guard vl != nil else {
                 return .keep(review: block.label == .table || block.label.vlTask == .formula
-                             ? "未安装 PaddleOCR-VL，\(block.label.label)按普通文字识别，结构未还原" : nil)
+                             ? .structureNotRestored(block.label) : nil)
             }
             return .vl(task, reason: nil)
         }
@@ -240,17 +240,17 @@ struct LayeredPipeline {
 
         let canEscalate = vl != nil && config.escalateLowConfidence
         if block.label == .verticalText, vl != nil {
-            return .vl(.ocr, reason: "竖排文字交由 PaddleOCR-VL 识别")
+            return .vl(.ocr, reason: .verticalText)
         }
         // Prose with maths in it: PP-OCR reads `d_k` as "dk" and has no way to
         // write a square root at all. The VLM writes the formulas as LaTeX.
         if let formulas = block.inlineFormulas, formulas > 0, vl != nil {
-            return .vl(.ocr, reason: "段落含 \(formulas) 处行内公式，交由 PaddleOCR-VL 识别为 LaTeX")
+            return .vl(.ocr, reason: .inlineFormulas(formulas))
         }
         guard !lines.isEmpty else {
             return canEscalate
-                ? .vl(.ocr, reason: "PP-OCRv6 在此区域没有检测到文字，改由 PaddleOCR-VL 读取")
-                : .keep(review: "版面分析认为这里有文字，但 PP-OCRv6 没有读出内容")
+                ? .vl(.ocr, reason: .ppFoundNothing)
+                : .keep(review: .layoutTextUnread)
         }
 
         let mean = lines.reduce(0) { $0 + $1.confidence } / Double(lines.count)
@@ -261,12 +261,12 @@ struct LayeredPipeline {
         guard mean < config.escalationConfidence || unsure * 4 >= lines.count else {
             return .keep(review: nil)
         }
-        let finding = unsure * 4 >= lines.count
-            ? "PP-OCRv6 有 \(unsure)/\(lines.count) 行置信度过低"
-            : "PP-OCRv6 平均置信度 \(Int((mean * 100).rounded()))%"
+        let finding: LowConfidence = unsure * 4 >= lines.count
+            ? .lines(unsure: unsure, of: lines.count)
+            : .average(percent: Int((mean * 100).rounded()))
         return canEscalate
-            ? .vl(.ocr, reason: "\(finding)，改由 PaddleOCR-VL 重读")
-            : .keep(review: "\(finding)，建议核对")
+            ? .vl(.ocr, reason: .lowConfidence(finding))
+            : .keep(review: .lowConfidence(finding))
     }
 
     private func readRegions(_ regions: [RegionReader.Region], of image: CGImage,
@@ -366,9 +366,8 @@ enum RegionReader {
         let output: VLOutput
         switch result {
         case let .failure(error):
-            block.review = fallback.isEmpty
-                ? "PaddleOCR-VL 无法读取此区域：\(error.localizedDescription)"
-                : "PaddleOCR-VL 无法读取此区域，保留了 \(block.source?.label ?? "另一引擎") 的结果"
+            block.review = .vlFailed(error: error.localizedDescription, kept: block.source,
+                                     hadFallback: !fallback.isEmpty)
             return
         case let .success(value):
             output = value
@@ -380,9 +379,7 @@ enum RegionReader {
             // An empty answer keeps whatever the other reader had.
             if block.label.vlTask == .table || block.label.vlTask == .formula || region.isEscalation
                 || !fallback.isEmpty {
-                block.review = fallback.isEmpty
-                    ? "PaddleOCR-VL 没有读出内容"
-                    : "PaddleOCR-VL 没有读出内容，保留了 \(block.source?.label ?? "另一引擎") 的结果"
+                block.review = .vlReadNothing(kept: block.source, hadFallback: !fallback.isEmpty)
             }
             return
         }
@@ -395,11 +392,11 @@ enum RegionReader {
 
         switch output.ending {
         case .lengthLimit:
-            block.review = "输出达到 \(limit) token 上限，内容可能不完整"
+            block.review = .outputLimit(tokens: limit)
         case .repetition:
-            block.review = "模型出现重复输出，已截断，可能漏读"
+            block.review = .repetition
         case .decodeFailed:
-            block.review = "PaddleOCR-VL 推理中断，内容可能不完整"
+            block.review = .interrupted
         case .finished, .cancelled:
             if let finding = crossCheck(block.text, against: fallback, readBy: otherReader,
                                         task: region.task, isEscalation: region.isEscalation)
@@ -421,9 +418,9 @@ enum RegionReader {
     /// ignores their order — a table read as HTML and the same table read as
     /// lines of text share their characters, not their layout.
     static func crossCheck(_ text: String, against other: String, readBy otherReader: PPTextSource?,
-                           task: VLTask, isEscalation: Bool) -> String? {
+                           task: VLTask, isEscalation: Bool) -> ReviewReason? {
         if task == .table, !looksLikeTable(text) {
-            return "没有识别出表格结构，只读出了文字"
+            return .noTableStructure
         }
         // Only prose and tables are comparable: PP-OCR's reading of a formula
         // or a seal is not a second opinion worth weighing against LaTeX.
@@ -437,13 +434,13 @@ enum RegionReader {
             // PP-OCR was unsure, so disagreeing with it is expected. Reading
             // far less than it did is not: the VLM may have skipped lines.
             return myTotal * 2 < theirTotal
-                ? "PaddleOCR-VL 读出的文字比 PP-OCRv6 少一半以上，可能漏读"
+                ? .readLessThanHalf
                 : nil
         }
         let shared = mine.reduce(0) { $0 + min($1.value, theirs[$1.key] ?? 0) }
         let agreement = Double(2 * shared) / Double(myTotal + theirTotal)
         return agreement < 0.6
-            ? "与\(otherReader?.label ?? "另一引擎")的结果差异较大（字符重合 \(Int((agreement * 100).rounded()))%），请核对"
+            ? .disagrees(with: otherReader, overlap: Int((agreement * 100).rounded()))
             : nil
     }
 
@@ -466,7 +463,7 @@ enum RegionReader {
     /// table but not on the page — cannot both be right. Lines PP-OCRv6 read
     /// with confidence that the table has fewer of, or lacks, were dropped or
     /// overwritten.
-    static func layoutCheck(table otsl: String, against lines: [PPTextLine]) -> String? {
+    static func layoutCheck(table otsl: String, against lines: [PPTextLine]) -> ReviewReason? {
         guard let table = PPDocumentAssembler.otslCells(otsl) else { return nil }
         let readable = lines.filter { $0.confidence >= 0.8 && !layoutKey($0.text).isEmpty }
         guard readable.count >= 6 else { return nil }
@@ -509,7 +506,7 @@ enum RegionReader {
             }
         }
         if contradictions >= 3 {
-            return "表格中 \(contradictions) 组单元格的行列顺序与 PP-OCRv6 看到的版面不符，可能有内容错行错列，请核对"
+            return .tableCellsMisordered(pairs: contradictions)
         }
 
         // A cell PP-OCRv6 split over two lines is still there; so is a long
@@ -528,8 +525,7 @@ enum RegionReader {
             missing += Array(repeating: lines[0].text, count: max(0, shortfall))
         }
         guard missing.count >= 2 else { return nil }
-        let examples = missing.sorted().prefix(3).map { "“\($0)”" }.joined(separator: "、")
-        return "PP-OCRv6 在表格中读到的 \(missing.count) 处内容（\(examples)\(missing.count > 3 ? " 等" : "")）不在表格里，可能有单元格漏读或错位，请核对"
+        return .tableTextMissing(count: missing.count, examples: Array(missing.sorted().prefix(3)))
     }
 
     /// Letters and digits, case-folded, with LaTeX commands left out — what a

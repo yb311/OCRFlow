@@ -17,11 +17,11 @@ struct SidebarView: View {
 
         var label: String {
             switch self {
-            case .all:       return "全部"
-            case .completed: return "已完成"
-            case .review:    return "待复核"
-            case .failed:    return "失败"
-            case .cancelled: return "已取消"
+            case .all:       return String(localized: "All")
+            case .completed: return String(localized: "Completed")
+            case .review:    return String(localized: "Needs Review")
+            case .failed:    return String(localized: "Failed")
+            case .cancelled: return String(localized: "Cancelled")
             }
         }
     }
@@ -81,28 +81,28 @@ struct SidebarView: View {
                                     || $0.status == .cancelled
                             }
                             if anyFinished && !anyProcessing {
-                                let verb = allFailed ? "重试" : "重新识别"
-                                Button(count > 1 ? "\(verb) \(count) 个文件" : verb) {
+                                let verb = allFailed ? String(localized: "Retry") : String(localized: "Recognize Again")
+                                Button(count > 1 ? String(localized: "\(verb) \(count) Files") : verb) {
                                     vm.retryItems(ids: targetIDs)
                                 }
                             }
                             if allExportable {
-                                Button(count > 1 ? "复制所有文本" : "复制文本") {
+                                Button(count > 1 ? "Copy All Text" : "Copy Text") {
                                     if count > 1 { vm.copySelectedText() }
                                     else { vm.copyText(for: item.id) }
                                 }
-                                Button(count > 1 ? "导出选中结果…" : "导出此文件结果…") {
+                                Button(count > 1 ? "Export Selected Results…" : "Export This File's Results…") {
                                     vm.exportItems(ids: targetIDs)
                                 }
                             }
                             Divider()
                             if count == 1 {
-                                Button("在 Finder 中显示") {
+                                Button("Show in Finder") {
                                     NSWorkspace.shared.selectFile(item.url.path, inFileViewerRootedAtPath: "")
                                 }
                                 Divider()
                             }
-                            Button(count > 1 ? "移除 \(count) 个文件" : "移除", role: .destructive) {
+                            Button(count > 1 ? "Remove \(count) Files" : "Remove", role: .destructive) {
                                 vm.removeItems(ids: targetIDs)
                             }
                         }
@@ -114,7 +114,7 @@ struct SidebarView: View {
             Divider()
             bottomToolbar
         }
-        .searchable(text: $query, placement: .sidebar, prompt: "搜索文件名或识别内容")
+        .searchable(text: $query, placement: .sidebar, prompt: "Search names and text")
         .onChange(of: filter) { _, _ in
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
@@ -134,11 +134,11 @@ struct SidebarView: View {
                   : filter == .failed ? "checkmark.circle" : "line.3.horizontal.decrease.circle")
                 .font(.system(size: 26))
                 .foregroundStyle(Color(.tertiaryLabelColor))
-            Text(!query.isEmpty ? "没有包含「\(query)」的文件"
-                 : filter == .failed ? "没有失败的文件" : "没有\(filter.label)的文件")
+            Text(!query.isEmpty ? "No Files Contain “\(query)”"
+                 : filter == .failed ? "No Failed Files" : "No \(filter.label) Files")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button("显示全部") {
+            Button("Show All") {
                 filter = .all
                 query = ""
             }
@@ -166,13 +166,13 @@ struct SidebarView: View {
                 Image(systemName: isEmptyStateTargeted ? "arrow.down.circle.fill" : "photo.on.rectangle.angled")
                     .font(.system(size: 28))
                     .foregroundStyle(isEmptyStateTargeted ? Color.accentColor : Color(.tertiaryLabelColor))
-                Text("尚未添加图片")
+                Text("No Images Yet")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Button {
                     vm.openFilePicker()
                 } label: {
-                    Text("添加文件…")
+                    Text("Add Files…")
                         .font(.caption)
                 }
                 .buttonStyle(.link)
@@ -201,7 +201,7 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .help("添加图片或文件夹")
+            .help("Add images or folders")
 
             // Remove selected
             Button {
@@ -213,7 +213,7 @@ struct SidebarView: View {
             }
             .buttonStyle(.borderless)
             .disabled(vm.selectedIDs.isEmpty)
-            .help(vm.selectedIDs.count > 1 ? "移除 \(vm.selectedIDs.count) 个选中文件" : "移除选中文件")
+            .help(vm.selectedIDs.count > 1 ? "Remove \(vm.selectedIDs.count) selected files" : "Remove Selected Files")
 
             // Export lives in the toolbar's 导出 menu and in this list's
             // context menu, both of which name the files they would write. A
@@ -234,16 +234,16 @@ struct SidebarView: View {
             }
             .buttonStyle(.borderless)
             .disabled(vm.items.isEmpty || vm.isProcessing)
-            .help("清空列表")
+            .help("Clear list")
             .confirmationDialog(
-                "清空整个列表？",
+                "Clear the entire list?",
                 isPresented: $showClearAllConfirm,
                 titleVisibility: .visible
             ) {
-                Button("清空 \(vm.items.count) 个文件", role: .destructive) { vm.clearAll() }
-                Button("取消", role: .cancel) {}
+                Button("Clear \(vm.items.count) Files", role: .destructive) { vm.clearAll() }
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("仅从列表中移除，不会删除磁盘上的原始文件。")
+                Text("This only removes them from the list. The original files on disk are not deleted.")
             }
 
             Spacer()
@@ -253,19 +253,19 @@ struct SidebarView: View {
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 6)
-                    .help("正在监控「\(folder.lastPathComponent)」")
+                    .help("Watching “\(folder.lastPathComponent)”")
             }
 
             // One menu instead of a row of coloured counts: the counts are in
             // the menu, and the list itself says which state each file is in.
             if !vm.items.isEmpty {
                 Menu {
-                    Picker("显示", selection: $filter) {
-                        Text("全部（\(vm.items.count)）").tag(StatusFilter.all)
-                        Text("已完成（\(vm.completedCount)）").tag(StatusFilter.completed)
-                        Text("待复核（\(vm.reviewCount)）").tag(StatusFilter.review)
-                        Text("失败（\(vm.failedCount)）").tag(StatusFilter.failed)
-                        Text("已取消（\(vm.cancelledCount)）").tag(StatusFilter.cancelled)
+                    Picker("Show", selection: $filter) {
+                        Text("All (\(vm.items.count))").tag(StatusFilter.all)
+                        Text("Completed (\(vm.completedCount))").tag(StatusFilter.completed)
+                        Text("Needs Review (\(vm.reviewCount))").tag(StatusFilter.review)
+                        Text("Failed (\(vm.failedCount))").tag(StatusFilter.failed)
+                        Text("Cancelled (\(vm.cancelledCount))").tag(StatusFilter.cancelled)
                     }
                     .pickerStyle(.inline)
                 } label: {
@@ -278,7 +278,7 @@ struct SidebarView: View {
                 .fixedSize()
                 .foregroundStyle(filter == .all ? Color.secondary : Color.accentColor)
                 .padding(.trailing, 8)
-                .help(filter == .all ? "按状态筛选" : "只显示「\(filter.label)」，点按更改")
+                .help(filter == .all ? "Filter by status" : "Showing only “\(filter.label)”. Click to change")
             }
         }
         .padding(.leading, 6)
@@ -342,15 +342,15 @@ struct SidebarRowView: View {
         case .pending:
             return "\(item.fileExtension) · \(item.fileSizeString)"
         case .processing:
-            return "识别中 \(Int((item.processingProgress * 100).rounded()))%"
+            return String(localized: "Recognizing \(item.processingProgress.percentText)")
         case .completed:
-            let pages = item.pages.count > 1 ? "\(item.pages.count) 页" : "1 页"
-            if flagCount > 0 { return "\(pages) · \(flagCount) 处待复核" }
-            return item.reusedCachedResult ? "\(pages) · 复用此前结果" : pages
+            let pages = String(localized: "\(item.pages.count) pages")
+            if flagCount > 0 { return String(localized: "\(pages) · \(flagCount) to review") }
+            return item.reusedCachedResult ? String(localized: "\(pages) · Reused earlier result") : pages
         case .failed:
-            return item.errorMessage ?? "识别失败"
+            return item.errorMessage ?? String(localized: "Recognition Failed")
         case .cancelled:
-            return "已取消"
+            return String(localized: "Cancelled")
         }
     }
 
@@ -370,7 +370,7 @@ struct SidebarRowView: View {
                     .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
-            .help(item.status == .cancelled ? "重新识别" : "重试")
+            .help(item.status == .cancelled ? "Recognize Again" : "Retry")
         } else if isHovering, item.status == .completed, !item.ocrText.isEmpty {
             Button {
                 vm.copyText(for: item.id)
@@ -380,7 +380,7 @@ struct SidebarRowView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("复制文本")
+            .help("Copy Text")
         } else {
             statusBadge
         }
@@ -431,7 +431,7 @@ struct SidebarRowView: View {
                     .background(.orange, in: Capsule())
             }
             .buttonStyle(.plain)
-            .help("\(flagCount) 处待复核，点按开始复核")
+            .help("\(flagCount) items to review. Click to start reviewing")
         case .completed:
             Image(systemName: "checkmark")
                 .font(.caption.weight(.semibold))

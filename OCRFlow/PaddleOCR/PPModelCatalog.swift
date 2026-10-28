@@ -27,7 +27,7 @@ enum PPModelCatalog {
         var label: String {
             switch self {
             case .huggingFace: return "Hugging Face"
-            case .mirror:      return "HF 镜像（国内）"
+            case .mirror:      return String(localized: "HF mirror (mainland China)")
             }
         }
     }
@@ -83,7 +83,7 @@ enum PPModelCatalog {
     static let mediumTier = Entry(
         id: "tier.medium",
         name: "PP-OCRv6 medium",
-        detail: "精度最高的一档，检测与识别均优于 small；共享内置字典",
+        detail: String(localized: "The most accurate tier, with better detection and recognition than small. Shares the built-in dictionary"),
         approximateBytes: 62_032_837 + 76_554_979,
         assets: [
             Asset(repo: "PP-OCRv6_medium_det_onnx", remoteFile: "inference.onnx",
@@ -99,15 +99,15 @@ enum PPModelCatalog {
     /// PaddlePaddle published no v6 weights for these scripts. The PP-OCRv5
     /// recognisers still work, and pair with the v6 detector unchanged.
     private static let languages: [(code: String, name: String)] = [
-        ("korean",     "韩语"),
-        ("cyrillic",   "西里尔字母"),
-        ("eslav",      "东斯拉夫语"),
-        ("arabic",     "阿拉伯语"),
-        ("devanagari", "天城文"),
-        ("el",         "希腊语"),
-        ("ta",         "泰米尔语"),
-        ("te",         "泰卢固语"),
-        ("th",         "泰语"),
+        ("korean",     String(localized: "Korean")),
+        ("cyrillic",   String(localized: "Cyrillic")),
+        ("eslav",      String(localized: "East Slavic")),
+        ("arabic",     String(localized: "Arabic")),
+        ("devanagari", String(localized: "Devanagari")),
+        ("el",         String(localized: "Greek")),
+        ("ta",         String(localized: "Tamil")),
+        ("te",         String(localized: "Telugu")),
+        ("th",         String(localized: "Thai")),
     ]
 
     static let languageRecognizers: [Entry] = languages.map { language in
@@ -116,7 +116,7 @@ enum PPModelCatalog {
         return Entry(
             id: "lang.\(language.code)",
             name: language.name,
-            detail: "PP-OCRv5 单语种识别器，搭配 PP-OCRv6 检测器使用",
+            detail: String(localized: "PP-OCRv5 single-language recognizer, used with the PP-OCRv6 detector"),
             approximateBytes: 16_500_000,
             assets: [
                 Asset(repo: repo, remoteFile: "inference.onnx", localName: model),
@@ -132,8 +132,8 @@ enum PPModelCatalog {
     /// which the official docs warn against and which measurably drops content.
     static let layoutModel = Entry(
         id: "vl.layout",
-        name: "PP-DocLayoutV3 版面分析",
-        detail: "PaddleOCR-VL 的第一阶段：切分版面并判定阅读顺序。使用 VL 引擎必装",
+        name: String(localized: "PP-DocLayoutV3 layout analysis"),
+        detail: String(localized: "The first stage of PaddleOCR-VL: splits the layout and decides the reading order. Required for the VL engine"),
         approximateBytes: 130_500_000,
         assets: [
             Asset(repo: "PP-DocLayoutV3_onnx", remoteFile: "inference.onnx",
@@ -142,8 +142,8 @@ enum PPModelCatalog {
 
     static let vlOfficial = Entry(
         id: "vl.official",
-        name: "PaddleOCR-VL-1.6（官方 F16）",
-        detail: "PaddlePaddle 官方权重，精度基准。含文本模型与视觉编码器两个文件",
+        name: String(localized: "PaddleOCR-VL-1.6 (official F16)"),
+        detail: String(localized: "Official PaddlePaddle weights, the accuracy reference. Two files: the text model and the vision encoder"),
         approximateBytes: 935_769_056 + 881_770_560,
         assets: [
             Asset(repo: "PaddleOCR-VL-1.6-GGUF", remoteFile: "PaddleOCR-VL-1.6-GGUF.gguf",
@@ -154,8 +154,8 @@ enum PPModelCatalog {
 
     static let vlQuantized = Entry(
         id: "vl.quantized",
-        name: "PaddleOCR-VL-1.6（Q4 量化）",
-        detail: "社区量化版，体积约为官方的一半、加载更快；视觉编码器也被量化，精度可能略有损失",
+        name: String(localized: "PaddleOCR-VL-1.6 (Q4 quantized)"),
+        detail: String(localized: "Community quantization, about half the size of the official weights and faster to load. The vision encoder is quantized too, so accuracy may drop slightly"),
         approximateBytes: 300_000_000 + 598_000_000,
         assets: [
             Asset(repo: "PaddleOCR-VL-1.6-GGUF-Q4", owner: "LunarOilRig",
@@ -171,8 +171,8 @@ enum PPModelCatalog {
     /// downloaded on demand rather than shipped.
     static let unwarpingModel = Entry(
         id: "pp.unwarp",
-        name: "UVDoc 图片扭曲矫正",
-        detail: "把拍歪、卷曲、对折的书页展平后再识别；扫描件用不上",
+        name: String(localized: "UVDoc page unwarping"),
+        detail: String(localized: "Flattens skewed, curled or folded pages before recognition; not needed for scans"),
         approximateBytes: 31_000_000,
         assets: [
             Asset(repo: "UVDoc_onnx", remoteFile: "inference.onnx",

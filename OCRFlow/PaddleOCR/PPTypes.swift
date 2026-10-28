@@ -37,17 +37,17 @@ enum PPModelTier: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .tiny:   return "轻量版 tiny"
-        case .small:  return "均衡版 small"
-        case .medium: return "高精度版 medium"
+        case .tiny:   return String(localized: "Lightweight (tiny)")
+        case .small:  return String(localized: "Balanced (small)")
+        case .medium: return String(localized: "High accuracy (medium)")
         }
     }
 
     var hint: String {
         switch self {
-        case .tiny:   return "6 MB，最快。覆盖 49 种语言（不含日文）"
-        case .small:  return "31 MB，速度与精度平衡，随应用内置（推荐）"
-        case .medium: return "139 MB，精度最高，需在模型管理中下载"
+        case .tiny:   return String(localized: "6 MB, fastest. Covers 49 languages (no Japanese)")
+        case .small:  return String(localized: "31 MB, balances speed and accuracy, bundled with the app (recommended)")
+        case .medium: return String(localized: "139 MB, most accurate. Download it in Model Manager")
         }
     }
 
@@ -110,24 +110,20 @@ enum PPTextOrder: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .layout:  return "版面分析（官方管线，推荐）"
-        case .columns: return "按栏排序（几何估算）"
-        case .simple:  return "自上而下（PaddleOCR 原始顺序）"
+        case .layout:  return String(localized: "Layout analysis (official pipeline, recommended)")
+        case .columns: return String(localized: "By column (geometric estimate)")
+        case .simple:  return String(localized: "Top to bottom (PaddleOCR's raw order)")
         }
     }
 
     var hint: String {
         switch self {
         case .layout:
-            return "先用 PP-DocLayoutV3 切分出栏目、标题、图表等区域并判定阅读顺序，"
-                 + "再把识别出的文字行放回各自的区域。与 PaddleOCR 官方文档解析管线一致，"
-                 + "同时给出版面结构与 Markdown。需下载版面分析模型"
+            return String(localized: "Uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places the recognized lines into their regions. Matches PaddleOCR's official document-parsing pipeline and also yields layout structure and Markdown. Requires the layout model")
         case .columns:
-            return "不依赖版面模型，按文字行之间的空白估算栏目位置。"
-                 + "多栏报刊通常正确，但署名行、右对齐编号一类的元素可能落错位置"
+            return String(localized: "Estimates columns from the gaps between lines, without a layout model. Usually right for multi-column print, but bylines and right-aligned numbers may land in the wrong place")
         case .simple:
-            return "PaddleOCR 原始顺序，同一水平线上的文字按从左到右排列；"
-                 + "多栏版面会左右串行，适合票据、表单等左右成对的内容"
+            return String(localized: "PaddleOCR's raw order: text on the same horizontal line reads left to right. Multi-column layouts get mixed across columns; suits receipts and forms with side-by-side pairs")
         }
     }
 
@@ -145,18 +141,18 @@ enum PPComputeUnit: String, CaseIterable, Identifiable, Codable {
     var label: String {
         switch self {
         case .cpu:    return "CPU"
-        case .coreML: return "Core ML（神经引擎 / GPU）"
+        case .coreML: return String(localized: "Core ML (Neural Engine / GPU)")
         }
     }
 
     var hint: String {
         switch self {
-        case .cpu:    return "多线程并行，识别结果与 Core ML 一致（推荐）"
+        case .cpu:    return String(localized: "Multithreaded, with the same results as Core ML (recommended)")
         case .coreML:
             // PP-OCR's det and rec graphs have dynamic input shapes, so Core ML
             // recompiles per shape and ends up several times slower than CPU on
             // typical pages. Kept as an escape hatch, not as an optimisation.
-            return "交由神经引擎/GPU 执行。PP-OCR 输入尺寸可变，实测通常比 CPU 慢数倍"
+            return String(localized: "Runs on the Neural Engine / GPU. PP-OCR's input sizes vary, so in practice this is usually several times slower than CPU")
         }
     }
 }
@@ -273,21 +269,19 @@ enum PPOCRError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .modelsMissing(tier, missing, path):
-            return "缺少\(tier.label)的模型文件：\(missing.joined(separator: "、"))。"
-                 + "请在「模型管理」中下载，或将文件放入 \(path) 后重试。"
+            return String(localized: "Missing model files for \(tier.label): \(missing.formatted(.list(type: .and))). Download them in Model Manager, or put the files in \(path) and try again.")
         case .dictionaryMissing:
-            return "缺少 PaddleOCR 字典文件，无法解码识别结果。"
+            return String(localized: "The PaddleOCR dictionary file is missing, so results can't be decoded.")
         case let .charsetMismatch(expected, actual):
-            return "识别模型与字典不匹配：模型输出 \(actual) 类，字典对应 \(expected) 类。"
-                 + "请确认模型旁的字典文件来自同一个版本。"
+            return String(localized: "The recognition model and dictionary don't match: the model outputs \(actual) classes, the dictionary has \(expected). Make sure the dictionary next to the model is from the same release.")
         case let .sessionFailed(msg):
-            return "PaddleOCR 模型加载失败：\(msg)"
+            return String(localized: "Couldn't load the PaddleOCR model: \(msg)")
         case let .inferenceFailed(msg):
-            return "PaddleOCR 推理失败：\(msg)"
+            return String(localized: "PaddleOCR inference failed: \(msg)")
         case let .unexpectedOutputShape(msg):
-            return "PaddleOCR 模型输出形状异常：\(msg)"
+            return String(localized: "Unexpected PaddleOCR model output shape: \(msg)")
         case .imageDecodeFailed:
-            return "无法解码图片像素数据"
+            return String(localized: "Couldn't decode the image pixels")
         }
     }
 }

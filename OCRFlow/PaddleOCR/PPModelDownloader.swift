@@ -69,8 +69,7 @@ final class PPModelDownloader: ObservableObject {
                     } catch is CancellationError {
                         failure = nil
                     } catch let retryError {
-                        failure = "\(error.localizedDescription)；已改用\(fallback.label)重试，"
-                                + "仍然失败：\(retryError.localizedDescription)"
+                        failure = String(localized: "\(error.localizedDescription). Retried with \(fallback.label), which also failed: \(retryError.localizedDescription)")
                     }
                 } else {
                     failure = error.localizedDescription
@@ -102,7 +101,7 @@ final class PPModelDownloader: ObservableObject {
     /// A HEAD against a file that exists in every mirror of the catalogue.
     private nonisolated static func probe(_ source: PPModelCatalog.Source) async -> Reachability {
         guard let url = PPModelCatalog.probeAsset.url(from: source) else {
-            return .unreachable("地址无效")
+            return .unreachable(String(localized: "Invalid address"))
         }
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
@@ -111,7 +110,7 @@ final class PPModelDownloader: ObservableObject {
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             let milliseconds = Int(Date().timeIntervalSince(started) * 1000)
-            guard let http = response as? HTTPURLResponse else { return .unreachable("无响应") }
+            guard let http = response as? HTTPURLResponse else { return .unreachable(String(localized: "No response")) }
             guard (200..<400).contains(http.statusCode) else {
                 return .unreachable("HTTP \(http.statusCode)")
             }
@@ -249,17 +248,17 @@ enum PPDownloadError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .badURL(file):
-            return "无法构造 \(file) 的下载地址"
+            return String(localized: "Couldn't build the download URL for \(file)")
         case let .httpStatus(code, host):
             return code == 404
-                ? "\(host) 上找不到该文件（HTTP 404）"
-                : "\(host) 返回 HTTP \(code)，请稍后重试或切换下载源"
+                ? String(localized: "File not found on \(host) (HTTP 404)")
+                : String(localized: "\(host) returned HTTP \(code). Try again later or switch the download source.")
         case let .cannotWrite(name):
-            return "无法写入文件 \(name)"
+            return String(localized: "Couldn't write file \(name)")
         case let .truncated(received, expected):
-            return "下载不完整：收到 \(received) 字节，应为 \(expected) 字节"
+            return String(localized: "Incomplete download: received \(received) bytes, expected \(expected)")
         case let .malformedDictionary(file):
-            return "无法从 \(file) 中解析字符字典"
+            return String(localized: "Couldn't read the character dictionary from \(file)")
         }
     }
 }

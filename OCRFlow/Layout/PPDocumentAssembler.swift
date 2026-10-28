@@ -22,7 +22,7 @@ enum PPTextSource: String, Sendable, Codable {
         switch self {
         case .visionLanguageModel: return "PaddleOCR-VL"
         case .plainOCR:            return "PP-OCRv6"
-        case .pdfTextLayer:        return "PDF 文字层"
+        case .pdfTextLayer:        return String(localized: "PDF text layer")
         }
     }
 }

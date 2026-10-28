@@ -587,7 +587,7 @@ struct MarkdownDocumentView: View {
     /// Why a region is flagged for review. Shown under the region whether or
     /// not it is being pointed at: a flag that only appears on hover is one
     /// nobody finds.
-    var noteForSource: (Int) -> String? = { _ in nil }
+    var noteForSource: (Int) -> ReviewReason? = { _ in nil }
     /// Opens the flagged region in review.
     var onReview: ((Int) -> Void)?
     /// Reads one region again with PaddleOCR-VL.
@@ -696,14 +696,14 @@ struct MarkdownDocumentView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                 }
-                .help("复制这一块")
+                .help("Copy this block")
                 if onCorrect != nil {
                     Button {
                         beginEditing(source)
                     } label: {
                         Image(systemName: "pencil")
                     }
-                    .help("纠正这一块（也可以双击）")
+                    .help("Correct this block (or double-click)")
                 }
                 if let onReread {
                     Button {
@@ -711,7 +711,7 @@ struct MarkdownDocumentView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .help("用 PaddleOCR-VL 重新识别这一块")
+                    .help("Recognize this block again with PaddleOCR-VL")
                 }
             }
             .buttonStyle(.borderless)
@@ -721,19 +721,19 @@ struct MarkdownDocumentView: View {
 
     /// Why a region needs a look, in the one colour that means "look here",
     /// with the way to deal with it beside the reason.
-    private func reviewNote(_ note: String, for source: Int) -> some View {
+    private func reviewNote(_ note: ReviewReason, for source: Int) -> some View {
         HStack(spacing: 6) {
-            if note == OCRViewModel.rereadingNote {
+            if note == .rereading {
                 ProgressView().controlSize(.mini)
             } else {
                 Image(systemName: "exclamationmark.triangle.fill")
             }
-            Text(note)
+            Text(note.message)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            if let onReview, note != OCRViewModel.rereadingNote {
-                Button("去复核 →") { onReview(source) }
+            if let onReview, note != .rereading {
+                Button("Review →") { onReview(source) }
                     .buttonStyle(.borderless)
                     .fontWeight(.semibold)
             }
@@ -761,13 +761,13 @@ struct MarkdownDocumentView: View {
         VStack(alignment: .leading, spacing: 8) {
             InlineRegionEditor(kind: kindForSource(source), text: $draft, startsEditing: true)
             HStack {
-                Text("保存后文本、Markdown 与导出都会跟着变")
+                Text("Saving updates the text, the Markdown and exports")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("取消") { editing = nil }
+                Button("Cancel") { editing = nil }
                     .controlSize(.small)
-                Button("保存") {
+                Button("Save") {
                     onCorrect?(source, draft)
                     editing = nil
                 }
@@ -1060,7 +1060,7 @@ struct MDFigureView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "photo")
                         .foregroundStyle(.tertiary)
-                    Text(caption.isEmpty ? "图片" : caption)
+                    Text(caption.isEmpty ? String(localized: "Image") : caption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -40,16 +40,16 @@ struct ContentView: View {
     private var exportSelectionTitle: String {
         let exportable = vm.selectedItems.filter(\.isExportable)
         switch exportable.count {
-        case 0:  return "导出选中结果…"
-        case 1:  return "导出「\(exportable[0].fileName)」…"
-        default: return "导出选中的 \(exportable.count) 个文件…"
+        case 0:  return String(localized: "Export Selected Results…")
+        case 1:  return String(localized: "Export “\(exportable[0].fileName)”…")
+        default: return String(localized: "Export \(exportable.count) Selected Files…")
         }
     }
 
     /// What the segmented control says for review: how many items are left,
     /// which is the number that decides whether it is worth switching.
     private func modeTitle(_ mode: WorkspaceMode, pending: Int) -> String {
-        mode == .review && pending > 0 ? "复核 \(pending)" : mode.label
+        mode == .review && pending > 0 ? String(localized: "Review \(pending)") : mode.label
     }
 
     @ToolbarContentBuilder
@@ -59,7 +59,7 @@ struct ContentView: View {
         // different lists down the side.
         ToolbarItem(placement: .principal) {
             let pending = vm.reviewEntries.count
-            Picker("模式", selection: $vm.mode) {
+            Picker("Mode", selection: $vm.mode) {
                 ForEach(WorkspaceMode.allCases) { mode in
                     Text(modeTitle(mode, pending: pending)).tag(mode)
                 }
@@ -67,7 +67,7 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .help("工作台（⌘1）· 复核（⌘2）")
+            .help("Workspace (⌘1) · Review (⌘2)")
         }
 
         // Right group
@@ -78,19 +78,19 @@ struct ContentView: View {
                 Button {
                     vm.stopProcessing()
                 } label: {
-                    Label(vm.isStopping ? "停止中…" : "停止", systemImage: "stop.circle")
+                    Label(vm.isStopping ? "Stopping…" : "Stop", systemImage: "stop.circle")
                 }
                 .disabled(vm.isStopping)
-                .help(vm.isStopping ? "正在等待当前文件停止" : "停止识别，未完成的文件标记为「已取消」")
+                .help(vm.isStopping ? "Waiting for the current files to stop" : "Stop recognition. Unfinished files are marked “Cancelled”")
             } else {
                 Button {
                     vm.startProcessing()
                 } label: {
-                    Label("开始识别", systemImage: "play.circle.fill")
+                    Label("Start Recognition", systemImage: "play.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(vm.actionableCount == 0)
-                .help(vm.actionableCount > 0 ? "识别 \(vm.actionableCount) 个文件" : "没有待识别的文件")
+                .help(vm.actionableCount > 0 ? "Recognize \(vm.actionableCount) files" : "No files to recognize")
             }
 
             // One export control, and it names what it would write. Two
@@ -99,20 +99,20 @@ struct ContentView: View {
             Menu {
                 Button(exportSelectionTitle) { vm.exportSelectedItems() }
                     .disabled(vm.exportableSelectedCount == 0)
-                Button("导出全部结果（\(vm.exportableCount) 个文件）…") { vm.exportResults() }
+                Button("Export All Results (\(vm.exportableCount) Files)…") { vm.exportResults() }
                     .disabled(vm.exportableCount == 0)
             } label: {
-                Label("导出", systemImage: "square.and.arrow.up")
+                Label("Export", systemImage: "square.and.arrow.up")
             }
             .disabled(vm.exportableCount == 0)
-            .help("导出识别结果为文本或 Markdown 文件")
+            .help("Export results as text or Markdown files")
 
             // Opens the same window as ⌘, and the app menu's 设置… item,
             // rather than a second, parallel way of showing the settings.
             SettingsLink {
-                Label("设置", systemImage: "gearshape")
+                Label("Settings", systemImage: "gearshape")
             }
-            .help("设置（⌘,）")
+            .help("Settings (⌘,)")
         }
     }
 }
@@ -133,8 +133,8 @@ private struct RunProgressView: View {
                 if let started = vm.runStartedAt {
                     TimelineView(.periodic(from: started, by: 1)) { context in
                         let seconds = Int(context.date.timeIntervalSince(started))
-                        Text("\(vm.completedCount + vm.failedCount)/\(vm.items.count) · "
-                             + String(format: "%d:%02d", seconds / 60, seconds % 60))
+                        let time = Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
+                        Text("\(vm.completedCount + vm.failedCount)/\(vm.items.count) · \(time)")
                     }
                 }
             }
@@ -142,8 +142,8 @@ private struct RunProgressView: View {
             .monospacedDigit()
             .foregroundStyle(.secondary)
             .fixedSize()
-            .help(running.isEmpty ? "识别中 \(Int((vm.totalProgress * 100).rounded()))%"
-                  : "识别中 \(Int((vm.totalProgress * 100).rounded()))%：" + running.map(\.fileName).joined(separator: "、"))
+            .help(running.isEmpty ? String(localized: "Recognizing \(vm.totalProgress.percentText)")
+                  : String(localized: "Recognizing \(vm.totalProgress.percentText): \(running.map(\.fileName).formatted(.list(type: .and)))"))
         } else if !vm.items.isEmpty && vm.totalProgress > 0 {
             Label("\(vm.completedCount)/\(vm.items.count)", systemImage: "checkmark.circle.fill")
                 .labelStyle(.titleAndIcon)
@@ -151,7 +151,7 @@ private struct RunProgressView: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .fixedSize()
-                .help("\(vm.completedCount) 个文件已完成")
+                .help("\(vm.completedCount) files done")
         }
     }
 }

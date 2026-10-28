@@ -18,11 +18,11 @@ struct PPDetector {
 
         let (values, shape) = try session.run(input: tensor, shape: [1, 3, mapH, mapW])
         guard shape.count == 4, shape[0] == 1, shape[1] == 1 else {
-            throw PPOCRError.unexpectedOutputShape("检测模型输出维度 \(shape)")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "Detection model output shape \(shape)"))
         }
         let probH = shape[2], probW = shape[3]
         guard values.count >= probH * probW else {
-            throw PPOCRError.unexpectedOutputShape("检测概率图数据不足")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "The detection probability map is incomplete"))
         }
 
         let thresh = Float(config.detThresh)

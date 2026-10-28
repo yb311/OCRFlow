@@ -43,12 +43,12 @@ struct PPDocUnwarper {
 
         let (values, shape) = try session.run(input: tensor, shape: [1, 3, height, width])
         guard shape.count == 4, shape[1] == 3 else {
-            throw PPOCRError.unexpectedOutputShape("扭曲矫正模型输出维度 \(shape)")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "Unwarping model output shape \(shape)"))
         }
         let outHeight = shape[2], outWidth = shape[3]
         let outPlane = outHeight * outWidth
         guard values.count >= 3 * outPlane else {
-            throw PPOCRError.unexpectedOutputShape("扭曲矫正模型输出数据不足")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "The unwarping model returned too little data"))
         }
 
         var bgr = [UInt8](repeating: 0, count: outPlane * 3)

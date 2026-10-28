@@ -63,7 +63,7 @@ final class PPSession {
             inputNames = try session.inputNames()
             outputNames = try session.outputNames()
             guard let input = inputNames.first, let output = outputNames.first else {
-                throw PPOCRError.sessionFailed("模型 \(modelPath.lastPathComponent) 没有可用的输入/输出")
+                throw PPOCRError.sessionFailed(String(localized: "Model \(modelPath.lastPathComponent) has no usable inputs/outputs"))
             }
             inputName = input
             outputName = output
@@ -88,14 +88,14 @@ final class PPSession {
                                           outputNames: [outputName],
                                           runOptions: nil)
             guard let result = outputs[outputName] else {
-                throw PPOCRError.inferenceFailed("模型未返回输出 \(outputName)")
+                throw PPOCRError.inferenceFailed(String(localized: "The model returned no output \(outputName)"))
             }
             let info = try result.tensorTypeAndShapeInfo()
             let outShape = info.shape.map(\.intValue)
             let raw = try result.tensorData() as Data
             let count = outShape.reduce(1, *)
             guard raw.count >= count * MemoryLayout<Float>.size else {
-                throw PPOCRError.unexpectedOutputShape("期望 \(count) 个浮点数，实际 \(raw.count) 字节")
+                throw PPOCRError.unexpectedOutputShape(String(localized: "Expected \(count) floats, got \(raw.count) bytes"))
             }
             var values = [Float](repeating: 0, count: count)
             _ = values.withUnsafeMutableBytes { dst in
@@ -147,7 +147,7 @@ final class PPSession {
             var result: [String: PPTensor] = [:]
             for name in wanted {
                 guard let value = outputs[name] else {
-                    throw PPOCRError.inferenceFailed("模型未返回输出 \(name)")
+                    throw PPOCRError.inferenceFailed(String(localized: "The model returned no output \(name)"))
                 }
                 result[name] = try Self.read(value, name: name)
             }
@@ -168,14 +168,14 @@ final class PPSession {
         switch info.elementType {
         case .float:
             guard raw.count >= count * MemoryLayout<Float>.size else {
-                throw PPOCRError.unexpectedOutputShape("\(name)：期望 \(count) 个浮点数，实际 \(raw.count) 字节")
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) floats, got \(raw.count) bytes"))
             }
             var elements = [Float](repeating: 0, count: count)
             _ = elements.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Float>.size) }
             return .float(elements, shape: shape)
         case .int32:
             guard raw.count >= count * MemoryLayout<Int32>.size else {
-                throw PPOCRError.unexpectedOutputShape("\(name)：期望 \(count) 个 int32，实际 \(raw.count) 字节")
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int32 values, got \(raw.count) bytes"))
             }
             var elements = [Int32](repeating: 0, count: count)
             _ = elements.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Int32>.size) }
@@ -184,13 +184,13 @@ final class PPSession {
             // Paddle exports sometimes widen indices to int64; narrow them so
             // callers only ever deal with one integer type.
             guard raw.count >= count * MemoryLayout<Int64>.size else {
-                throw PPOCRError.unexpectedOutputShape("\(name)：期望 \(count) 个 int64，实际 \(raw.count) 字节")
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int64 values, got \(raw.count) bytes"))
             }
             var wide = [Int64](repeating: 0, count: count)
             _ = wide.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Int64>.size) }
             return .int32(wide.map { Int32(truncatingIfNeeded: $0) }, shape: shape)
         default:
-            throw PPOCRError.unexpectedOutputShape("\(name)：不支持的输出元素类型 \(info.elementType.rawValue)")
+            throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): unsupported output element type \(info.elementType.rawValue)"))
         }
     }
 }
