@@ -240,6 +240,41 @@ struct AlternativeReading: Equatable, Codable {
             }
         }
     }
+
+    /// True when two readings say the same thing and differ only in how it is
+    /// laid out — where the lines break, full- or half-width punctuation, a
+    /// word hyphenated at a line end, a table's markup. Asking a person to
+    /// choose between those is a false alarm.
+    ///
+    /// Spaces are folded, not dropped: "Table3rows" against "Table 3 rows" is
+    /// a real difference. A minus sign is never dropped either.
+    static func isEquivalent(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        if let left = MDParser.parseHTMLTable(a), let right = MDParser.parseHTMLTable(b),
+           a.range(of: "<tr", options: .caseInsensitive) != nil,
+           b.range(of: "<tr", options: .caseInsensitive) != nil {
+            let cells = { (table: MDTable) in
+                table.rows.map { $0.cells.filter { !$0.isContinuation }.map { normalized($0.text, joiningHyphens: false) } }
+            }
+            return cells(left) == cells(right)
+        }
+        return normalized(a, joiningHyphens: false) == normalized(b, joiningHyphens: false)
+            || normalized(a, joiningHyphens: true) == normalized(b, joiningHyphens: true)
+    }
+
+    private static func normalized(_ text: String, joiningHyphens: Bool) -> String {
+        // NFKC: full-width letters, digits and punctuation become their
+        // ordinary forms.
+        var text = text.precomposedStringWithCompatibilityMapping
+        text = joiningHyphens
+            // "archi-⏎tecture" was one word broken at the margin.
+            ? text.replacingOccurrences(of: "(?<=\\p{L})-[ \\t]*\\n\\s*(?=\\p{L})", with: "",
+                                        options: .regularExpression)
+            // "point-⏎wise" is "point-wise" with a line break in it.
+            : text.replacingOccurrences(of: "-[ \\t]*\\n\\s*", with: "-", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespaces)
+    }
 }
 
 extension PPLayoutLabel: Codable {

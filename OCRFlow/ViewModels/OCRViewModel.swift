@@ -294,6 +294,7 @@ final class OCRViewModel: ObservableObject {
                 var all = restored
                 all.append(contentsOf: added.filter { !restoredURLs.contains($0.url) })
                 self.items = all
+                self.settleEquivalentReadings()
                 self.rebuildDocuments()
                 if self.selectedIDs.isEmpty, let first = all.first { self.selectedIDs = [first.id] }
                 self.isRestoringQueue = false
@@ -735,10 +736,10 @@ final class OCRViewModel: ObservableObject {
                     case .decodeFailed: block.review = .interrupted
                     case .finished, .cancelled: break
                     }
-                    // The same answer twice settles it; a different one is a
-                    // choice for the person who asked.
-                    let changed = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                        != text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // The same answer twice settles it — the same words with
+                    // the lines broken elsewhere included; a different one is
+                    // a choice for the person who asked.
+                    let changed = !AlternativeReading.isEquivalent(previous.text, text)
                     block.alternative = changed && !previous.text.isEmpty ? previous : nil
                     if changed, !previous.text.isEmpty, block.review == nil {
                         block.review = .rereadDiffers
@@ -801,6 +802,26 @@ final class OCRViewModel: ObservableObject {
             items[index].pages[entry.page].notes.removeAll { $0 == note }
         }
         store.save(items[index])
+    }
+
+    /// Clears every flag that asks a person to choose between two readings
+    /// that say the same thing — left by earlier builds, which compared them
+    /// character for character and took a moved line break for a difference.
+    private func settleEquivalentReadings() {
+        for index in items.indices {
+            var changed = false
+            for page in items[index].pages.indices {
+                for block in items[index].pages[page].blocks.indices {
+                    let region = items[index].pages[page].blocks[block]
+                    guard let alternative = region.alternative,
+                          AlternativeReading.isEquivalent(alternative.text, region.text) else { continue }
+                    items[index].pages[page].blocks[block].alternative = nil
+                    items[index].pages[page].blocks[block].review = nil
+                    changed = true
+                }
+            }
+            if changed { store.save(items[index]) }
+        }
     }
 
     /// Settles a flagged region with the text a person chose.
