@@ -1680,16 +1680,6 @@
         }
       }
     },
-    "Choose which reading to use · %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择采用哪种读法 · %@"
-          }
-        }
-      }
-    },
     "Choose…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1784,6 +1774,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点按公式即可修改"
+          }
+        }
+      }
+    },
+    "Click the other reading to use it instead · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按另一种读法即可改为采用它 · %@"
           }
         }
       }
@@ -2394,6 +2394,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改这个单元格"
+          }
+        }
+      }
+    },
+    "Edited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已修改"
           }
         }
       }
@@ -6440,16 +6450,6 @@
         }
       }
     },
-    "Use" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "采用"
-          }
-        }
-      }
-    },
     "UVDoc page unwarping" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6490,12 +6490,32 @@
         }
       }
     },
+    "Use %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "采用 %@"
+          }
+        }
+      }
+    },
     "Use GPU (Metal)" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 GPU（Metal）"
+          }
+        }
+      }
+    },
+    "Use this reading instead" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改为采用这种读法"
           }
         }
       }
@@ -6760,12 +6780,12 @@
         }
       }
     },
-    "Yellow marks where the two readings differ · %@" : {
+    "Yellow marks where the two readings differ · Click the other reading to use it instead · %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "标黄的是两种读法不同的地方 · %@"
+            "value" : "标黄的是两种读法不同的地方 · 点按另一种读法即可改为采用它 · %@"
           }
         }
       }

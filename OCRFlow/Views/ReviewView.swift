@@ -308,28 +308,24 @@ struct ReviewDetailView: View {
 
         return VStack(alignment: .leading, spacing: 6) {
             section(heading) {
-                VStack(alignment: .leading, spacing: 12) {
-                    if let alternative, let alternativeTitle {
-                        // Radio buttons, because this is a decision: which
-                        // reading goes into the document.
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text("Use").foregroundStyle(.secondary)
-                            Picker("Use", selection: Binding(
-                                get: { choice },
-                                set: { newChoice in
-                                    choice = newChoice
-                                    draft = newChoice == .alternative ? alternative.text : region.block.text
-                                })) {
-                                Text(currentTitle).tag(Choice.current)
-                                Text(alternativeTitle).tag(Choice.alternative)
-                            }
-                            .pickerStyle(.radioGroup)
-                            .horizontalRadioGroupLayout()
-                            .labelsHidden()
+                if let alternative, let alternativeTitle {
+                    // Both readings in view at once, one row each: the chosen
+                    // one is the editor, the other stays as it was read, and
+                    // what differs is marked in both.
+                    VStack(alignment: .leading, spacing: 0) {
+                        readingRow(title: currentTitle, isChosen: choice == .current,
+                                   text: region.block.text, label: region.block.label, source: region.source,
+                                   other: alternative.text, edited: edited, rereading: rereading) {
+                            choose(.current, region: region)
                         }
-                        .font(.callout)
-                        Divider()
+                        Divider().padding(.vertical, 2)
+                        readingRow(title: alternativeTitle, isChosen: choice == .alternative,
+                                   text: alternative.text, label: region.block.label, source: alternative.source,
+                                   other: region.block.text, edited: edited, rereading: rereading) {
+                            choose(.alternative, region: region)
+                        }
                     }
+                } else {
                     InlineRegionEditor(kind: kind, text: $draft, comparedTo: other)
                         .disabled(rereading)
                 }
@@ -340,6 +336,66 @@ struct ReviewDetailView: View {
         }
     }
 
+    private func choose(_ newChoice: Choice, region: Context) {
+        guard choice != newChoice else { return }
+        choice = newChoice
+        draft = newChoice == .alternative ? (region.block.alternative?.text ?? region.block.text) : region.block.text
+    }
+
+    /// One reading as a choice: a radio mark, who read it, and what they read.
+    /// The chosen row is edited where it stands; the other is a button that
+    /// chooses it.
+    @ViewBuilder
+    private func readingRow(title: String, isChosen: Bool, text: String, label: PPLayoutLabel,
+                            source: PPTextSource, other: String, edited: Bool, rereading: Bool,
+                            choose: @escaping () -> Void) -> some View {
+        let kind = RegionContentKind.of(isChosen ? draft : text, label: label, source: source)
+        let header = HStack(spacing: 8) {
+            Image(systemName: isChosen ? "largecircle.fill.circle" : "circle")
+                .foregroundStyle(isChosen ? Color.accentColor : Color.secondary)
+            Text(title)
+                .fontWeight(isChosen ? .semibold : .regular)
+                .foregroundStyle(isChosen ? Color.primary : Color.secondary)
+            if isChosen && edited {
+                Text("Edited").foregroundStyle(Color.accentColor)
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption)
+
+        Group {
+            if isChosen {
+                VStack(alignment: .leading, spacing: 6) {
+                    header
+                    InlineRegionEditor(kind: kind, text: $draft, comparedTo: other)
+                        .disabled(rereading)
+                        .padding(.leading, 22)
+                }
+            } else {
+                Button(action: choose) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        header
+                        RegionContentView(text: text, kind: kind, comparedTo: draft)
+                            .font(.body)
+                            .padding(.leading, 22)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(0.8)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Use this reading instead")
+                .accessibilityLabel("Use \(title)")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isChosen ? Color.accentColor.opacity(0.08) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityAddTraits(isChosen ? .isSelected : [])
+    }
+
     private func hint(for kind: RegionContentKind, alternatives: Bool, marked: Bool) -> String {
         let edit: String
         switch kind {
@@ -347,8 +403,8 @@ struct ReviewDetailView: View {
         case .formula: edit = String(localized: "Click the formula to edit it")
         case .text:    edit = String(localized: "Click the text to edit it")
         }
-        if marked { return String(localized: "Yellow marks where the two readings differ · \(edit)") }
-        return alternatives ? String(localized: "Choose which reading to use · \(edit)") : edit
+        if marked { return String(localized: "Yellow marks where the two readings differ · Click the other reading to use it instead · \(edit)") }
+        return alternatives ? String(localized: "Click the other reading to use it instead · \(edit)") : edit
     }
 
     private func title(source: PPTextSource, detail: String?) -> String {
