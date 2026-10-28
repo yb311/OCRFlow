@@ -3,7 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var vm: OCRViewModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var offersCrashReport = false
     @AppStorage(AppAppearance.storageKey) private var appearance: AppAppearance = .system
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -31,7 +33,16 @@ struct ContentView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             DropHelper.handle(providers: providers, vm: vm)
         }
-        .onAppear { appearance.apply() }
+        .alert("OCRFlow quit unexpectedly last time", isPresented: $offersCrashReport) {
+            Button("Report…") { openWindow(id: ReportProblemView.windowID) }
+            Button("Not Now", role: .cancel) { vm.crashLogFromLastSession = nil }
+        } message: {
+            Text("A report with the crash log helps fix it. You can review everything in it before sending.")
+        }
+        .onAppear {
+            appearance.apply()
+            offersCrashReport = vm.crashLogFromLastSession != nil
+        }
         .onChange(of: appearance) { _, value in value.apply() }
     }
 

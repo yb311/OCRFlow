@@ -991,6 +991,9 @@ struct ItemDetailView: View {
                     // A retry cannot start while a run is in flight, so the
                     // button says so instead of doing nothing when pressed.
                     .disabled(vm.isProcessing)
+                Button("Copy Diagnostic Info") { vm.copyDiagnostics(for: [item.id]) }
+                    .buttonStyle(.link)
+                    .help("Copies a report on this file for a bug report: its type, size and the error, but not its name or contents")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

@@ -252,7 +252,13 @@ final class OCRViewModel: ObservableObject {
     /// the list shows nothing actionable before then.
     @Published private(set) var isRestoringQueue = true
 
+    /// The crash log the last session left, when it ended in a crash. The
+    /// window offers to report it once, then it is cleared.
+    @Published var crashLogFromLastSession: URL?
+    private lazy var sentinel = LaunchSentinel(directory: store.directory)
+
     init() {
+        crashLogFromLastSession = sentinel.begin()
         restoreSettings()
         validateModelSelections()
         // Write the settings back in their normalised form. Without this a file
@@ -278,6 +284,7 @@ final class OCRViewModel: ObservableObject {
                 guard let self else { return }
                 self.store.saveQueue(self.items)
                 self.releaseVLEngine()
+                self.sentinel.end()
             }
         }
         restoreQueue()
@@ -975,6 +982,44 @@ final class OCRViewModel: ObservableObject {
                 .filter { !$0.isEmpty }.joined(separator: "\n\n---\n\n")
             : ""
         return (text, markdown)
+    }
+
+    // MARK: - Diagnostics
+
+    /// A report on the given files — every file when nil — and on the app,
+    /// the Mac and the settings they were read with.
+    func diagnosticReport(for ids: Set<UUID>? = nil, includingCrashLog: Bool) -> DiagnosticReport {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let system = DiagnosticReport.currentSystem
+        let files = items.filter { ids?.contains($0.id) ?? true }.map { item in
+            DiagnosticReport.FileSummary(
+                name: item.fileName,
+                fileExtension: item.url.pathExtension,
+                bytes: (try? item.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init),
+                pages: max(item.pages.count, item.pageCount),
+                status: item.status,
+                engine: item.engine,
+                error: item.errorMessage,
+                pageFailures: item.pages.flatMap(\.notes).compactMap { note in
+                    guard case .pageFailed = note.reason else { return nil }
+                    return note.message
+                })
+        }
+        return DiagnosticReport(
+            appVersion: info["CFBundleShortVersionString"] as? String ?? "?",
+            build: info["CFBundleVersion"] as? String ?? "?",
+            system: system.version, machine: system.machine, memoryGB: system.memoryGB,
+            settings: settingsSnapshot,
+            installedModels: DiagnosticReport.installedModels(in: PPModelStore.userModelsDirectory),
+            files: files,
+            crashLog: includingCrashLog ? crashLogFromLastSession.flatMap { LaunchSentinel.excerpt(of: $0) } : nil)
+    }
+
+    /// Puts a report on the given files on the clipboard, file names left out.
+    func copyDiagnostics(for ids: Set<UUID>) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(diagnosticReport(for: ids, includingCrashLog: false)
+            .text(includingFileNames: false), forType: .string)
     }
 
     // MARK: - Folder watching

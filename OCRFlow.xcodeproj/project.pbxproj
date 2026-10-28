@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		EB43135A63A94DB46B2A6407 /* DiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */; };
+		EF7849636F780E552D1A1B6A /* ReportProblemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01914E033369BFFCF0F0B /* ReportProblemView.swift */; };
+		EF8132789B61190B4A5A7092 /* LaunchSentinel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */; };
+		EF48B53D98608EFB58262624 /* DiagnosticReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */; };
 		E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */; };
 		EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */; };
 		A1000001000000000000AA01 /* OCRFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA01 /* OCRFlowApp.swift */; };
@@ -73,6 +77,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTests.swift; sourceTree = "<group>"; };
+		E4A01914E033369BFFCF0F0B /* ReportProblemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportProblemView.swift; sourceTree = "<group>"; };
+		ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSentinel.swift; sourceTree = "<group>"; };
+		EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReport.swift; sourceTree = "<group>"; };
 		E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultStoreTests.swift; sourceTree = "<group>"; };
 		E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportNamingTests.swift; sourceTree = "<group>"; };
 		E0000002000000000000FF00 /* OCRFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OCRFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -162,6 +170,7 @@
 		E0000004000000000000FF01 /* OCRFlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */,
 				E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */,
 				E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */,
 			);
@@ -229,6 +238,7 @@
 		A1000004000000000000AA05 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E4A01914E033369BFFCF0F0B /* ReportProblemView.swift */,
 				C10200000000000000000009 /* TranslationSheet.swift */,
 				C1020000000000000000000A /* ReviewView.swift */,
 				C1020000000000000000000C /* MarkdownWebView.swift */,
@@ -327,6 +337,8 @@
 		C10400000000000000000001 /* Diagnostics */ = {
 			isa = PBXGroup;
 			children = (
+				ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */,
+				EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */,
 				C10200000000000000000006 /* PipelineBenchmark.swift */,
 			);
 			path = Diagnostics;
@@ -477,6 +489,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB43135A63A94DB46B2A6407 /* DiagnosticsTests.swift in Sources */,
 				E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */,
 				EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */,
 			);
@@ -486,6 +499,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF7849636F780E552D1A1B6A /* ReportProblemView.swift in Sources */,
+				EF8132789B61190B4A5A7092 /* LaunchSentinel.swift in Sources */,
+				EF48B53D98608EFB58262624 /* DiagnosticReport.swift in Sources */,
 				C10100000000000000000009 /* TranslationSheet.swift in Sources */,
 				C1010000000000000000000A /* ReviewView.swift in Sources */,
 				C1010000000000000000000C /* MarkdownWebView.swift in Sources */,

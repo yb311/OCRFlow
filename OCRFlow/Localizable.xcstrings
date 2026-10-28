@@ -962,6 +962,16 @@
         }
       }
     },
+    "A report with the crash log helps fix it. You can review everything in it before sending." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "附上崩溃日志的报告有助于修复问题。发送前你可以查看其中的全部内容。"
+          }
+        }
+      }
+    },
     "A single PP-OCRv6 model covers 50 languages: Simplified Chinese, Traditional Chinese, English, Japanese, and 46 Latin-script languages." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1938,12 +1948,42 @@
         }
       }
     },
+    "Copies a report on this file for a bug report: its type, size and the error, but not its name or contents" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制这个文件的诊断信息用于报告问题：包含文件类型、大小和错误信息，不含文件名和内容"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制"
+          }
+        }
+      }
+    },
     "Copy All Text" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制所有文本"
+          }
+        }
+      }
+    },
+    "Copy Diagnostic Info" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制诊断信息"
           }
         }
       }
@@ -1964,6 +2004,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制译文"
+          }
+        }
+      }
+    },
+    "Copy and Open GitHub Issue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制并打开 GitHub 问题页"
           }
         }
       }
@@ -2234,6 +2284,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除"
+          }
+        }
+      }
+    },
+    "Describe what happened in the issue, and paste this report below it. It lists your Mac, your settings, the downloaded models and which files failed — never what the files say." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在问题里描述发生了什么，并把这份报告粘贴在下面。报告列出你的 Mac、设置、已下载的模型和失败的文件，绝不包含文件内容。"
           }
         }
       }
@@ -3110,12 +3170,32 @@
         }
       }
     },
+    "Include file names" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含文件名"
+          }
+        }
+      }
+    },
     "Include file names when exporting" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "导出时包含文件名"
+          }
+        }
+      }
+    },
+    "Include the crash log from the last unexpected quit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含上次意外退出的崩溃日志"
           }
         }
       }
@@ -3700,6 +3780,16 @@
         }
       }
     },
+    "Not Now" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以后再说"
+          }
+        }
+      }
+    },
     "Not chosen" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3736,6 +3826,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扫描件上的 OCR 文字层"
+          }
+        }
+      }
+    },
+    "OCRFlow Help" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCRFlow 帮助"
+          }
+        }
+      }
+    },
+    "OCRFlow quit unexpectedly last time" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCRFlow 上次意外退出"
           }
         }
       }
@@ -4360,6 +4470,16 @@
         }
       }
     },
+    "Privacy" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私"
+          }
+        }
+      }
+    },
     "Probability threshold for text in the probability map. Lower it to catch fainter text" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4980,6 +5100,46 @@
         }
       }
     },
+    "Report" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告"
+          }
+        }
+      }
+    },
+    "Report a Problem" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题"
+          }
+        }
+      }
+    },
+    "Report a Problem…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题…"
+          }
+        }
+      }
+    },
+    "Report…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告…"
+          }
+        }
+      }
+    },
     "Reread" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5324,6 +5484,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导出 Markdown 时一并保存图片"
+          }
+        }
+      }
+    },
+    "Save…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存…"
           }
         }
       }

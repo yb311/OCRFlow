@@ -53,6 +53,8 @@ private struct TestHostApp: App {
 struct OCRFlowApp: App {
     @StateObject private var viewModel = OCRViewModel()
     @StateObject private var updater = UpdaterController()
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
 
     init() {
         #if DEBUG
@@ -118,6 +120,15 @@ struct OCRFlowApp: App {
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(viewModel.exportableSelectedCount == 0)
             }
+
+            // The app ships no help book, so the standard item would only say
+            // that help is unavailable.
+            CommandGroup(replacing: .help) {
+                Button("OCRFlow Help") { openURL(AppLinks.help) }
+                Button("Privacy") { openURL(AppLinks.privacy) }
+                Divider()
+                Button("Report a Problem…") { openWindow(id: ReportProblemView.windowID) }
+            }
         }
 
         // A real settings window: ⌘, and the app menu's 设置… item come for
@@ -129,6 +140,12 @@ struct OCRFlowApp: App {
                 .environmentObject(updater)
         }
 
+        Window("Report a Problem", id: ReportProblemView.windowID) {
+            ReportProblemView()
+                .environmentObject(viewModel)
+        }
+        .defaultSize(width: 620, height: 560)
+
         // Its own window rather than a sheet on top of the settings sheet:
         // downloading gigabytes of models is a task in its own right.
         Window("Model Manager", id: ModelManagerView.windowID) {
@@ -136,4 +153,10 @@ struct OCRFlowApp: App {
         }
         .defaultSize(width: 620, height: 580)
     }
+}
+
+/// Pages on the project site the app points to.
+enum AppLinks {
+    static let help = URL(string: "https://github.com/yb311/OCRFlow#readme")!
+    static let privacy = URL(string: "https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md")!
 }
