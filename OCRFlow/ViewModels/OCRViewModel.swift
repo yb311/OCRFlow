@@ -1385,6 +1385,28 @@ final class OCRViewModel: ObservableObject {
         run(ids: items.filter { ids.contains($0.id) && isActionable($0) }.map(\.id), useCache: true)
     }
 
+    /// The engine a single file is being read with when it is not the one
+    /// selected in the settings — 「用 PaddleOCR-VL 重新识别」 on one file
+    /// leaves every other file, and the setting itself, as they were. Kept
+    /// across a stop, so carrying the file on reads the rest the same way.
+    private var engineOverrides: [UUID: OCREngine] = [:]
+
+    /// Whether 「用 PaddleOCR-VL 重新识别」 applies to this file.
+    func canReadWithVL(_ item: ImageItem) -> Bool {
+        item.status != .processing && VLModelStore.isInstalled(vlConfig.variant)
+            && !(item.status == .completed && item.engine == .paddleVL)
+    }
+
+    /// Reads one file again with PaddleOCR-VL alone, whatever engine is
+    /// selected.
+    func readWithVL(id: UUID) {
+        guard !isProcessing, let item = items.first(where: { $0.id == id }) else { return }
+        guard confirmDiscardingCorrections(in: item.isCorrected ? [item] : []) else { return }
+        engineOverrides[id] = .paddleVL
+        retryItem(id: id)
+        run(ids: [id], useCache: false)
+    }
+
     // MARK: - Export
 
     /// Export a specific set of items (defaults to all completed if ids is empty)
@@ -1788,7 +1810,8 @@ final class OCRViewModel: ObservableObject {
         items[idx].reusedCachedResult = false
 
         let url = items[idx].url
-        let settings = currentRecognitionSettings()
+        var settings = currentRecognitionSettings()
+        if let engine = engineOverrides[id] { settings.engine = engine }
         let cancelToken = cancellation
         let store = self.store
         let started = Date()
@@ -1900,6 +1923,7 @@ final class OCRViewModel: ObservableObject {
             updated.processingProgress = 1.0
             updated.resume = nil
             items[i] = updated          // single assignment → one objectWillChange
+            engineOverrides[id] = nil
             if let resumeKey { store.removePartial(for: resumeKey) }
             store.save(updated)
             store.saveQueue(items)
@@ -1917,6 +1941,7 @@ final class OCRViewModel: ObservableObject {
             updated.errorMessage = cancelToken.isCancelled ? nil : error.localizedDescription
             // Whatever pages did get read are still worth carrying on from.
             updated.resume = resumePoint(key: resumeKey, total: pageTotal)
+            if !cancelToken.isCancelled { engineOverrides[id] = nil }
             items[i] = updated
             store.save(updated)
             store.saveQueue(items)

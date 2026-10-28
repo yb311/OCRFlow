@@ -4664,6 +4664,16 @@
         }
       }
     },
+    "Recognize This File Again with PaddleOCR-VL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 PaddleOCR-VL 重新识别此文件"
+          }
+        }
+      }
+    },
     "Recognize this block again with PaddleOCR-VL" : {
       "localizations" : {
         "zh-Hans" : {

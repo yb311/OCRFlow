@@ -96,6 +96,10 @@ struct SidebarView: View {
                                     vm.retryItems(ids: targetIDs)
                                 }
                             }
+                            if count == 1, vm.canReadWithVL(item) {
+                                Button("Recognize This File Again with PaddleOCR-VL") { vm.readWithVL(id: item.id) }
+                                    .disabled(vm.isProcessing)
+                            }
                             if allExportable {
                                 Button(count > 1 ? "Copy All Text" : "Copy Text") {
                                     if count > 1 { vm.copySelectedText() }
