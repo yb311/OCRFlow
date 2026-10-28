@@ -592,9 +592,6 @@ struct MarkdownDocumentView: View {
     var onReview: ((Int) -> Void)?
     /// Reads one region again with PaddleOCR-VL.
     var onReread: ((Int) -> Void)?
-    /// A region someone asked to edit from elsewhere — a double-click in the
-    /// rendered Markdown. Opened here and cleared.
-    var editRequest: Binding<Int?> = .constant(nil)
 
     @State private var editing: Int?
     @State private var draft = ""
@@ -652,14 +649,6 @@ struct MarkdownDocumentView: View {
                 .id(block.id)
             }
         }
-        .onAppear(perform: takeEditRequest)
-        .onChange(of: editRequest.wrappedValue) { _, _ in takeEditRequest() }
-    }
-
-    private func takeEditRequest() {
-        guard let source = editRequest.wrappedValue else { return }
-        editRequest.wrappedValue = nil
-        beginEditing(source)
     }
 
     /// "3 · 表格" on the left, "PaddleOCR-VL" on the right — and, on the

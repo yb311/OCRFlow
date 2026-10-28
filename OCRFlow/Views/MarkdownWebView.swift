@@ -9,11 +9,16 @@ import WebKit
 /// right the first time, instead of one construct at a time as each turned up
 /// unrendered. Nothing is fetched; the page only reads its own folder.
 struct MarkdownWebView: NSViewRepresentable {
-    /// One region's Markdown, and whether it is flagged for review.
+    /// One region's Markdown, whether it is flagged for review, and — when it
+    /// can be corrected — its own text and what kind of text that is, which
+    /// is what a double-click edits in place.
     struct Fragment: Encodable, Equatable {
         var block: Int?
         var markdown: String
         var flagged = false
+        var text: String?
+        /// "text", "table" or "formula".
+        var kind: String?
     }
 
     let fragments: [Fragment]
@@ -21,8 +26,8 @@ struct MarkdownWebView: NSViewRepresentable {
     let figures: [NSImage?]
     var selected: Int?
     var onSelect: (Int) -> Void = { _ in }
-    /// Double-click: the person wants to change this region.
-    var onEdit: (Int) -> Void = { _ in }
+    /// A region edited in place, with its new text.
+    var onSave: (Int, String) -> Void = { _, _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -50,7 +55,7 @@ struct MarkdownWebView: NSViewRepresentable {
     func updateNSView(_ view: WKWebView, context: Context) {
         let coordinator = context.coordinator
         coordinator.onSelect = onSelect
-        coordinator.onEdit = onEdit
+        coordinator.onSave = onSave
         // Encoding the figures is the costly part, so the document is sent
         // again only when it is a different document.
         let key = DocumentKey(fragments: fragments, figureCount: figures.count,
@@ -107,7 +112,7 @@ struct MarkdownWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         weak var view: WKWebView?
         var onSelect: (Int) -> Void = { _ in }
-        var onEdit: (Int) -> Void = { _ in }
+        var onSave: (Int, String) -> Void = { _, _ in }
         fileprivate var renderedKey: DocumentKey?
         var selected: Int?
         var pending: Payload?
@@ -120,8 +125,8 @@ struct MarkdownWebView: NSViewRepresentable {
                 flush()
             } else if let block = body["select"] as? Int {
                 onSelect(block)
-            } else if let block = body["edit"] as? Int {
-                onEdit(block)
+            } else if let block = body["save"] as? Int, let text = body["text"] as? String {
+                onSave(block, text)
             }
         }
 

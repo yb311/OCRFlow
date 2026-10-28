@@ -49,6 +49,14 @@
   img.figure { display: block; max-width: 100%; max-height: 460px; border-radius: 4px; margin: 0.6em 0; }
   .figure-missing { color: var(--secondary); font-size: 12px; border: 1px dashed var(--rule);
                     border-radius: 6px; padding: 8px 12px; margin: 0.6em 0; }
+  section.editing { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .edit-text { outline: none; white-space: pre-wrap; min-height: 1.65em; padding: 0.55em 0; }
+  td[contenteditable], th[contenteditable] { outline: none; cursor: text; }
+  td[contenteditable]:focus, th[contenteditable]:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .edit-latex { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden;
+                margin: 4px 0 8px; padding: 6px 8px; border: none; border-radius: 6px; outline: none;
+                font: 12px/1.5 "SF Mono", Menlo, monospace; color: var(--secondary);
+                background: rgba(127, 127, 127, 0.12); }
   .math-error { color: var(--secondary); font-family: "SF Mono", Menlo, monospace; font-size: 12px; }
 </style>
 <script src="markdown-it.min.js"></script>
@@ -155,7 +163,22 @@
 
   // --- Document ---------------------------------------------------------------
 
+  // Each region's own text and kind, for editing it where it is shown.
+  let regions = {};
+  let editing = null;
+  let pendingPayload = null;
+
   function render(payload) {
+    // A document that changed underneath an edit waits until the edit is
+    // done; replacing it would throw the typing away.
+    if (editing) { pendingPayload = payload; return; }
+    regions = {};
+    for (const fragment of payload.fragments || []) {
+      if (fragment.block !== null && fragment.block !== undefined && fragment.text !== null
+          && fragment.text !== undefined) {
+        regions[fragment.block] = { text: fragment.text, kind: fragment.kind || "text" };
+      }
+    }
     figures = payload.figures || [];
     figureLabel = payload.figureLabel || figureLabel;
     figureOrdinal = 0;
@@ -201,20 +224,149 @@
     if (window.webkit && window.webkit.messageHandlers.ocrflow) window.webkit.messageHandlers.ocrflow.postMessage(message);
   }
 
-  // A click selects a region; a second click on the same one soon after is
-  // "change this", and the native pane opens the region's editor. Counted
-  // here rather than left to `dblclick`, which a slow or unsteady double
-  // click — and some input methods — never produce.
+  // --- Editing in place ----------------------------------------------------
+  // A double-click turns the region itself into its editor, right where it
+  // is: prose becomes editable text, a table editable cells, a formula its
+  // LaTeX with the result set live above it. Clicking elsewhere or ⌘↩ keeps
+  // the change, Esc drops it.
+
+  function stripDelimiters(tex) {
+    let t = tex.trim();
+    for (const [open, close] of [["$$", "$$"], ["\\[", "\\]"], ["\\(", "\\)"], ["$", "$"]]) {
+      if (t.startsWith(open) && t.endsWith(close) && t.length > open.length + close.length) {
+        return t.slice(open.length, t.length - close.length).trim();
+      }
+    }
+    if (t.startsWith("\\[") || t.startsWith("\\(")) t = t.slice(2);
+    return t.trim();
+  }
+
+  function caretAt(element, x, y) {
+    const range = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+    const selection = window.getSelection();
+    if (range && element.contains(range.startContainer)) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+    const end = document.createRange();
+    end.selectNodeContents(element);
+    end.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(end);
+  }
+
+  function beginEdit(section, x, y) {
+    const block = Number(section.dataset.block);
+    const region = regions[block];
+    if (!region) return;
+    if (editing) finishEdit(true);
+    const original = section.innerHTML;
+    section.classList.add("editing");
+    let read;
+
+    if (region.kind === "table") {
+      const parsed = new DOMParser().parseFromString(region.text, "text/html").querySelector("table");
+      if (!parsed) return;
+      for (const br of parsed.querySelectorAll("br")) br.replaceWith("\n");
+      const live = parsed.cloneNode(true);
+      if (!live.querySelector("th") && live.rows.length > 1) live.classList.add("implicit-header");
+      const cells = Array.from(live.querySelectorAll("td, th"));
+      for (const cell of cells) {
+        cell.textContent = cell.textContent;
+        cell.contentEditable = "plaintext-only";
+      }
+      const wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      wrap.appendChild(live);
+      section.innerHTML = "";
+      section.appendChild(wrap);
+      const target = document.elementFromPoint(x, y);
+      const cell = target && target.closest ? target.closest("td, th") : null;
+      (cell && live.contains(cell) ? cell : cells[0])?.focus();
+      read = () => {
+        const sources = parsed.querySelectorAll("td, th");
+        cells.forEach((cell, index) => {
+          if (sources[index]) sources[index].innerHTML = md.utils.escapeHtml(cell.textContent).replace(/\n/g, "<br>");
+        });
+        return parsed.outerHTML;
+      };
+    } else if (region.kind === "formula") {
+      const preview = document.createElement("div");
+      const input = document.createElement("textarea");
+      input.className = "edit-latex";
+      input.rows = 1;
+      input.value = region.text;
+      const update = () => {
+        preview.innerHTML = renderMath(stripDelimiters(input.value), true);
+        input.style.height = "auto";
+        input.style.height = input.scrollHeight + "px";
+      };
+      input.addEventListener("input", update);
+      input.addEventListener("keydown", event => {
+        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); finishEdit(true); }
+      });
+      section.innerHTML = "";
+      section.append(preview, input);
+      update();
+      input.focus();
+      read = () => input.value;
+    } else {
+      const box = document.createElement("div");
+      box.className = "edit-text";
+      box.contentEditable = "plaintext-only";
+      box.textContent = region.text;
+      section.innerHTML = "";
+      section.appendChild(box);
+      box.focus();
+      caretAt(box, x, y);
+      read = () => box.innerText.replace(/\n$/, "");
+    }
+    editing = { block: block, section: section, original: original, text: region.text, read: read };
+  }
+
+  function finishEdit(keep) {
+    if (!editing) return;
+    const current = editing;
+    editing = null;
+    const text = keep ? current.read() : current.text;
+    current.section.classList.remove("editing");
+    if (keep && text !== current.text) {
+      // The native side saves it and sends the document back, rendered.
+      regions[current.block].text = text;
+      post({ save: current.block, text: text });
+    } else {
+      current.section.innerHTML = current.original;
+    }
+    if (pendingPayload) {
+      const payload = pendingPayload;
+      pendingPayload = null;
+      render(payload);
+    }
+  }
+
+  document.addEventListener("mousedown", event => {
+    if (editing && !editing.section.contains(event.target)) finishEdit(true);
+  }, true);
+  document.addEventListener("keydown", event => {
+    if (!editing) return;
+    if (event.key === "Escape") { event.preventDefault(); finishEdit(false); }
+    else if (event.key === "Enter" && event.metaKey) { event.preventDefault(); finishEdit(true); }
+  });
+
+  // A click selects a region; a second click on the same one soon after opens
+  // it for editing. Counted here rather than left to `dblclick`, which a slow
+  // or unsteady double click — and some input methods — never produce.
   let lastClick = { block: null, time: 0 };
   document.addEventListener("click", event => {
     const section = event.target.closest("section[data-block]");
-    if (!section) return;
+    if (!section || (editing && editing.section === section)) return;
     const block = Number(section.dataset.block);
     const now = Date.now();
     if (lastClick.block === block && now - lastClick.time < 450) {
       lastClick = { block: null, time: 0 };
       window.getSelection().removeAllRanges();
-      post({ edit: block });
+      beginEdit(section, event.clientX, event.clientY);
       return;
     }
     lastClick = { block: block, time: now };

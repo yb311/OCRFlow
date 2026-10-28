@@ -114,9 +114,6 @@ struct ItemDetailView: View {
     /// True while a selection made by clicking the result list is being
     /// handled, so the list does not scroll under the pointer that made it.
     @State private var selectedInPane = false
-    /// A region to open for editing in the 区块 pane — asked for by a
-    /// double-click in the rendered Markdown.
-    @State private var editRequest: Int?
     /// Where the sidebar's search text occurs in this file, and which of
     /// those places is on show.
     @State private var searchMatches: [TextMatch] = []
@@ -865,8 +862,7 @@ struct ItemDetailView: View {
                                             vm.rereadBlock(itemID: item.id, page: pageIndex,
                                                            blockIndex: index)
                                         }
-                                        : nil,
-                                    editRequest: $editRequest)
+                                        : nil)
                                     .textSelection(.enabled)
                                     .padding(.vertical, 4)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -895,10 +891,13 @@ struct ItemDetailView: View {
                     case .source:
                         MarkdownWebView(
                             fragments: vm.documentFragments(for: item, page: pageIndex).map { fragment in
-                                MarkdownWebView.Fragment(
+                                let region = fragment.source.flatMap { blocks.indices.contains($0) ? blocks[$0] : nil }
+                                let editable = region != nil && page?.derivesFromBlocks == true
+                                return MarkdownWebView.Fragment(
                                     block: fragment.source, markdown: fragment.markdown,
-                                    flagged: fragment.source.map { blocks.indices.contains($0)
-                                        && blocks[$0].review != nil } ?? false)
+                                    flagged: region?.review != nil,
+                                    text: editable ? region?.text : nil,
+                                    kind: editable ? fragment.source.map(webKind(for:)) : nil)
                             },
                             figures: vm.renderFigures ? figures : [],
                             selected: selectedBlockIndex,
@@ -906,12 +905,9 @@ struct ItemDetailView: View {
                                 selectedInPane = true
                                 selection = .block(source)
                             },
-                            onEdit: { source in
-                                // Edited where editing lives: the region's own
-                                // block, in its own form.
-                                selection = .block(source)
-                                resultPane = .markdown
-                                editRequest = source
+                            onSave: { [pageIndex] source, text in
+                                vm.correctBlock(itemID: item.id, page: pageIndex,
+                                                blockIndex: source, text: text)
                             })
                     case .plain:
                         ScrollView {
@@ -1097,6 +1093,17 @@ struct ItemDetailView: View {
         let panes = availablePanes
         guard !panes.contains(resultPane) else { return }
         resultPane = panes.first ?? .plain
+    }
+
+    /// How the rendered Markdown edits a region in place.
+    private func webKind(for index: Int) -> String {
+        guard blocks.indices.contains(index), let page else { return "text" }
+        switch RegionContentKind.of(blocks[index].text, label: blocks[index].label,
+                                    source: blocks[index].source ?? page.blockSource) {
+        case .table:   return "table"
+        case .formula: return "formula"
+        case .text:    return "text"
+        }
     }
 
     /// What a region is: its place in the reading order and its kind.
