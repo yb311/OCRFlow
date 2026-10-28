@@ -863,7 +863,12 @@ struct ItemDetailView: View {
                                                            blockIndex: index)
                                         }
                                         : nil)
-                                    .textSelection(.enabled)
+                                    // Each region is one thing to click, select
+                                    // and double-click to edit; selecting words
+                                    // inside it took the click instead, behind
+                                    // an I-beam. Text is copied with the copy
+                                    // icon, or selected in the 纯文本 pane.
+                                    .textSelection(.disabled)
                                     .padding(.vertical, 4)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }

@@ -595,6 +595,7 @@ struct MarkdownDocumentView: View {
 
     @State private var editing: Int?
     @State private var draft = ""
+    @State private var lastTap: (source: Int, time: Date)?
 
     /// Opens a region's editor, when there is something to edit and somewhere
     /// for the correction to go.
@@ -616,7 +617,7 @@ struct MarkdownDocumentView: View {
                 let isLast = source.map { isLastBlock(of: $0, block) } ?? true
                 VStack(alignment: .leading, spacing: 6) {
                     if let source, isFirst {
-                        header(for: source, isSelected: isSelected)
+                        header(for: source, isSelected: isSelected, showsControls: isSelected || isHovered)
                     }
                     if let source, editing == source {
                         // While a region is being corrected it is edited in
@@ -640,12 +641,20 @@ struct MarkdownDocumentView: View {
                 }
                 .contentShape(Rectangle())
                 .onHover { inside in onHover(inside ? source : nil) }
-                // Double-click to change a region where it is read; declared
-                // first so it is not taken for two single clicks.
-                .onTapGesture(count: 2) {
-                    if let source, editing != source { beginEditing(source) }
+                // One click selects at once; a second on the same region soon
+                // after edits it. A count-2 gesture made every single click
+                // wait to see whether a second was coming.
+                .onTapGesture {
+                    guard let source, editing != source else { return }
+                    let now = Date()
+                    if let last = lastTap, last.source == source, now.timeIntervalSince(last.time) < 0.45 {
+                        lastTap = nil
+                        beginEditing(source)
+                    } else {
+                        lastTap = (source, now)
+                        onTap(source)
+                    }
                 }
-                .onTapGesture { if let source { onTap(source) } }
                 .id(block.id)
             }
         }
@@ -653,7 +662,7 @@ struct MarkdownDocumentView: View {
 
     /// "3 · 表格" on the left, "PaddleOCR-VL" on the right — and, on the
     /// selected region, the few things to do with it.
-    private func header(for source: Int, isSelected: Bool) -> some View {
+    private func header(for source: Int, isSelected: Bool, showsControls: Bool) -> some View {
         HStack(spacing: 8) {
             if let label = labelForSource(source) {
                 Text(label)
@@ -661,7 +670,9 @@ struct MarkdownDocumentView: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             }
             Spacer(minLength: 4)
-            if isSelected, editing == nil {
+            // On the region under the pointer, not only the selected one:
+            // the way to them is to point, not to click first and wait.
+            if showsControls, editing == nil {
                 blockControls(for: source)
             }
             if let reader = readerForSource(source) {
@@ -674,7 +685,7 @@ struct MarkdownDocumentView: View {
         .textSelection(.disabled)
     }
 
-    /// Copy, correct and re-read, as small icons on the selected region only.
+    /// Copy, correct and re-read, as small icons on the region being pointed at.
     @ViewBuilder
     private func blockControls(for source: Int) -> some View {
         if let text = textForSource(source) {
@@ -815,7 +826,7 @@ struct MarkdownDocumentView: View {
         case let .code(text):
             Text(text)
                 .font(.system(.callout, design: .monospaced))
-                .textSelection(.enabled)
+                .textSelection(.disabled)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.secondary.opacity(0.08))
@@ -830,7 +841,7 @@ struct MarkdownDocumentView: View {
             } else {
                 Text(rawSource(of: table))
                     .font(.system(.callout, design: .monospaced))
-                    .textSelection(.enabled)
+                    .textSelection(.disabled)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.08))
@@ -930,7 +941,7 @@ struct MDTableGrid: View {
                         let isHeader = cell.isHeader || (implicitHeader && row.id == 0)
                         let isFlagged = flagged.contains(MDCellRef(row: row.id, cell: cell.id))
                         MDCellText(text: cell.text, isHeader: isHeader)
-                            .textSelection(.enabled)
+                            .textSelection(.disabled)
                             .lineSpacing(2)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)

@@ -215,9 +215,8 @@
     if (block === null || block === undefined) return;
     const section = document.querySelector('section[data-block="' + block + '"]');
     if (!section) return;
+    // Marked, never scrolled to: the document stays where the reader left it.
     section.classList.add("selected");
-    const box = section.getBoundingClientRect();
-    if (box.top < 0 || box.bottom > window.innerHeight) section.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
   function post(message) {
