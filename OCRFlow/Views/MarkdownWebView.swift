@@ -109,6 +109,7 @@ struct MarkdownWebView: NSViewRepresentable {
                       Int(color.greenComponent * 255), Int(color.blueComponent * 255))
     }
 
+    @MainActor
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         weak var view: WKWebView?
         var onSelect: (Int) -> Void = { _ in }
@@ -146,7 +147,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// Links in a document open in the browser, not in the pane.
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                     decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             if action.navigationType == .linkActivated, let url = action.request.url {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)

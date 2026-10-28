@@ -711,7 +711,8 @@ struct ItemDetailView: View {
                                 vm.copyText(for: item.id)
                             }
                             withAnimation { showCopied = true }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                            Task {
+                                try? await Task.sleep(for: .seconds(1.8))
                                 withAnimation { showCopied = false }
                             }
                         } label: {
@@ -1406,7 +1407,8 @@ struct LayoutBlockOverlay: View {
 /// Now only the pages actually looked at are decoded, rendered the same way
 /// the recogniser rendered them — so the boxes fit — and a handful are kept.
 enum PagePreviews {
-    private static let cache: NSCache<NSString, NSImage> = {
+    /// `NSCache` is thread-safe, though not marked `Sendable`.
+    nonisolated(unsafe) private static let cache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 24
         return cache

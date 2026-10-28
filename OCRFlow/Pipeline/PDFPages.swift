@@ -276,7 +276,8 @@ enum PDFTextLayer {
             }
         }
 
-        private static let table: CGPDFOperatorTableRef? = {
+        /// Filled in once and only read afterwards.
+        nonisolated(unsafe) private static let table: CGPDFOperatorTableRef? = {
             guard let table = CGPDFOperatorTableCreate() else { return nil }
             CGPDFOperatorTableSetCallback(table, "q") { _, info in
                 guard let s = ContentStats.stats(info) else { return }

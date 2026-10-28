@@ -148,6 +148,9 @@ struct TranslationSheet: View {
     }
 
     private func translate(with session: TranslationSession) async {
+        // The session is handed to this task and used by nothing else, one
+        // call after another; the framework just does not mark it Sendable.
+        nonisolated(unsafe) let session = session
         isTranslating = true
         defer { isTranslating = false }
         do {
@@ -195,7 +198,11 @@ struct TranslationSheet: View {
             panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
             panel.nameFieldStringValue = "\(items[0].fileName)\(suffix).md"
             guard panel.runModal() == .OK, let url = panel.url else { return }
-            try? document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
+            do {
+                try document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                NSAlert(error: error).runModal()
+            }
             return
         }
         let panel = NSOpenPanel()
@@ -204,11 +211,22 @@ struct TranslationSheet: View {
         panel.canCreateDirectories = true
         panel.prompt = String(localized: "Export Here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
+        var failures: [String] = []
         for item in items where translations[item.id] != nil {
-            let name = "\(item.fileName)\(suffix).md"
-            try? document(for: item, bilingual: bilingual)
-                .write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
+            let url = folder.appendingPathComponent("\(item.fileName)\(suffix).md")
+            do {
+                try document(for: item, bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                failures.append(String(localized: "\(url.lastPathComponent): \(error.localizedDescription)"))
+            }
         }
-        NSWorkspace.shared.open(folder)
+        if failures.isEmpty {
+            NSWorkspace.shared.open(folder)
+        } else {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "\(failures.count) files couldn't be exported")
+            alert.informativeText = failures.prefix(8).joined(separator: "\n")
+            alert.runModal()
+        }
     }
 }

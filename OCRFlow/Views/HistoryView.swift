@@ -187,8 +187,8 @@ private struct HistoryRow: View {
             rest = rest[start.upperBound...]
             let end = rest.range(of: close) ?? rest.endIndex..<rest.endIndex
             var match = AttributedString(rest[..<end.lowerBound])
-            match.inlinePresentationIntent = .stronglyEmphasized
-            match.foregroundColor = .primary
+            match[AttributeScopes.FoundationAttributes.InlinePresentationIntentAttribute.self] = .stronglyEmphasized
+            match[AttributeScopes.SwiftUIAttributes.ForegroundColorAttribute.self] = .primary
             result += match
             rest = rest[end.upperBound...]
         }

@@ -2,6 +2,7 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import Vision
+import os
 
 /// Reads one file — every page of it — with the engine the settings name.
 ///
@@ -171,32 +172,41 @@ enum DocumentRecognizer {
                                   onPage: PageHandler?,
                                   read: @escaping @Sendable (Int, @escaping (Double) -> Void) throws -> PageResult)
         throws -> [PageResult] {
-        let lock = NSLock()
-        var pages = [PageResult?](repeating: nil, count: count)
-        var errors = [Error?](repeating: nil, count: count)
-        var fractions = [Double](repeating: 0, count: count)
-        var finished = 0
-        for (index, page) in done where pages.indices.contains(index) {
-            pages[index] = page
-            fractions[index] = 1
-            finished += 1
+        struct State {
+            var pages: [PageResult?]
+            var errors: [Error?]
+            var fractions: [Double]
+            var finished = 0
         }
+        var initial = State(pages: Array(repeating: nil, count: count),
+                            errors: Array(repeating: nil, count: count),
+                            fractions: Array(repeating: 0, count: count))
+        for (index, page) in done where initial.pages.indices.contains(index) {
+            initial.pages[index] = page
+            initial.fractions[index] = 1
+            initial.finished += 1
+        }
+        let toRead = (0..<count).filter { initial.pages[$0] == nil }
+        // Pages hold images, which are not Sendable; every access to them
+        // goes through the lock.
+        let state = OSAllocatedUnfairLock(uncheckedState: initial)
 
-        func report(_ index: Int, _ fraction: Double, finishing: Bool = false) {
-            lock.lock()
-            fractions[index] = min(max(fraction, 0), 1)
-            if finishing { finished += 1 }
-            let update = ProgressUpdate(fraction: fractions.reduce(0, +) / Double(count),
-                                        pagesDone: finished, pageCount: count)
-            lock.unlock()
+        @Sendable func report(_ index: Int, _ fraction: Double, finishing: Bool = false) {
+            let update = state.withLockUnchecked { state in
+                state.fractions[index] = min(max(fraction, 0), 1)
+                if finishing { state.finished += 1 }
+                return ProgressUpdate(fraction: state.fractions.reduce(0, +) / Double(count),
+                                      pagesDone: state.finished, pageCount: count)
+            }
             progress(update)
         }
-        progress(ProgressUpdate(fraction: Double(finished) / Double(count), pagesDone: finished, pageCount: count))
+        progress(ProgressUpdate(fraction: Double(initial.finished) / Double(count),
+                                pagesDone: initial.finished, pageCount: count))
 
         let queue = DispatchQueue(label: "OCRFlow.pages", qos: .userInitiated, attributes: .concurrent)
         let slots = DispatchSemaphore(value: count == 1 ? 1 : pagesInFlight)
         let group = DispatchGroup()
-        for index in 0..<count where pages[index] == nil {
+        for index in toRead {
             slots.wait()
             if isCancelled() {
                 slots.signal()
@@ -210,18 +220,19 @@ enum DocumentRecognizer {
                 }
                 do {
                     let page = try read(index) { report(index, $0) }
-                    lock.lock(); pages[index] = page; lock.unlock()
+                    state.withLockUnchecked { $0.pages[index] = page }
                     // The engines answer a stop by returning what they have so
                     // far, so a page that comes back after one is a fragment.
                     if !isCancelled() { onPage?(index, page) }
                 } catch {
-                    lock.lock(); errors[index] = error; lock.unlock()
+                    state.withLockUnchecked { $0.errors[index] = error }
                 }
                 report(index, 1, finishing: true)
             }
         }
         group.wait()
 
+        let (pages, errors) = state.withLockUnchecked { ($0.pages, $0.errors) }
         if isCancelled() { return pages.compactMap { $0 } }
         if pages.allSatisfy({ $0 == nil }), let first = errors.compactMap({ $0 }).first { throw first }
         return (0..<count).map { index in

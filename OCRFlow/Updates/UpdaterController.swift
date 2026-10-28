@@ -9,6 +9,7 @@ import SwiftUI
 /// opens. The two published properties exist only so SwiftUI can observe state
 /// that Sparkle exposes through KVO: `canCheckForUpdates` goes false while a
 /// check is already running, which is what greys out the menu item.
+@MainActor
 final class UpdaterController: ObservableObject {
     @Published private(set) var canCheckForUpdates = false
 

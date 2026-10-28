@@ -4,6 +4,7 @@ import Vision
 import Combine
 import UniformTypeIdentifiers
 import OnnxRuntimeBindings
+import os
 
 // MARK: - OCR Engine
 
@@ -244,7 +245,7 @@ final class OCRViewModel: ObservableObject {
     let modelDownloader = PPModelDownloader()
     private var downloaderObserver: AnyCancellable?
 
-    private var terminationObserver: NSObjectProtocol?
+    private var terminationObserver: AnyCancellable?
 
     /// The queue and its results on disk, and the recognition cache.
     let store = ResultStore()
@@ -277,16 +278,16 @@ final class OCRViewModel: ObservableObject {
         // asserts if a model is still loaded at that point, which crashes the
         // app on quit. Releasing the engine while the run loop is still alive
         // keeps the teardown in the right order.
-        terminationObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.store.saveQueue(self.items)
-                self.releaseVLEngine()
-                self.sentinel.end()
+        terminationObserver = NotificationCenter.default
+            .publisher(for: NSApplication.willTerminateNotification)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.store.saveQueue(self.items)
+                    self.releaseVLEngine()
+                    self.sentinel.end()
+                }
             }
-        }
         restoreQueue()
     }
 
@@ -315,12 +316,6 @@ final class OCRViewModel: ObservableObject {
                 store.prunePartials(keeping: Set(all.compactMap(\.resume?.key)))
                 self.loadThumbnails(for: restored.map(\.id))
             }
-        }
-    }
-
-    deinit {
-        if let terminationObserver {
-            NotificationCenter.default.removeObserver(terminationObserver)
         }
     }
 
@@ -1555,7 +1550,7 @@ final class OCRViewModel: ObservableObject {
 
         switch format {
         case .json:
-            try? Self.jsonData(targets.map(exportPayload(for:))).write(to: url)
+            reportExportFailures([write(Self.jsonData(targets.map(exportPayload(for:))), to: url)].compactMap { $0 })
         case .searchablePDF:
             writeSearchablePDFs([(targets, url)], reveal: url)
         case .excel:
@@ -1569,9 +1564,35 @@ final class OCRViewModel: ObservableObject {
                                                : "=== \(item.fileName) ===\n\(body)"
                 }
                 .joined(separator: exportSeparator.separator)
-            try? text.write(to: url, atomically: true, encoding: .utf8)
+            reportExportFailures([write(Data(text.utf8), to: url)].compactMap { $0 })
         }
     }
+
+    /// Writes one exported file; says what went wrong when it could not.
+    private func write(_ data: Data, to url: URL) -> String? {
+        do {
+            try data.write(to: url, options: .atomic)
+            return nil
+        } catch {
+            return String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")
+        }
+    }
+
+    /// Tells the user which files could not be written. A watched folder's
+    /// exports run with nobody looking, so theirs go to the log instead.
+    private func reportExportFailures(_ failures: [String], interactive: Bool = true) {
+        guard !failures.isEmpty else { return }
+        guard interactive else {
+            for failure in failures { Self.log.error("Watched-folder export failed: \(failure, privacy: .private)") }
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "\(failures.count) files couldn't be exported")
+        alert.informativeText = failures.prefix(8).joined(separator: "\n")
+        alert.runModal()
+    }
+
+    private static let log = Logger(subsystem: "com.ocrflow.app", category: "export")
 
     /// One file per source, into a folder the user picks. A batch of scans is
     /// usually wanted as a batch of documents, not as one long one.
@@ -1597,12 +1618,13 @@ final class OCRViewModel: ObservableObject {
     private func writeSeparately(_ targets: [ImageItem], format: ExportFormat, into folder: URL, reveal: URL?) {
         var pdfJobs: [([ImageItem], URL)] = []
         var workbookJobs: [([ImageItem], URL)] = []
+        var failures: [String] = []
         for (item, url) in zip(targets, Self.separateExportURLs(for: targets, format: format, in: folder)) {
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
             switch format {
             case .json:
-                try? Self.jsonData([exportPayload(for: item)]).write(to: url)
+                if let failure = write(Self.jsonData([exportPayload(for: item)]), to: url) { failures.append(failure) }
             case .searchablePDF:
                 pdfJobs.append(([item], url))
             case .excel:
@@ -1612,9 +1634,10 @@ final class OCRViewModel: ObservableObject {
                 let text = exportIncludeFilename && format == .markdown
                     ? "# \(item.fileName)\n\n\(body)"
                     : body
-                try? text.write(to: url, atomically: true, encoding: .utf8)
+                if let failure = write(Data(text.utf8), to: url) { failures.append(failure) }
             }
         }
+        reportExportFailures(failures, interactive: reveal != nil)
         if !pdfJobs.isEmpty {
             writeSearchablePDFs(pdfJobs, reveal: reveal)
         } else if !workbookJobs.isEmpty {

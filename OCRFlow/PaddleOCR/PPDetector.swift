@@ -18,7 +18,7 @@ struct PPDetector {
 
         let (values, shape) = try session.run(input: tensor, shape: [1, 3, mapH, mapW])
         guard shape.count == 4, shape[0] == 1, shape[1] == 1 else {
-            throw PPOCRError.unexpectedOutputShape(String(localized: "Detection model output shape \(shape)"))
+            throw PPOCRError.unexpectedOutputShape(String(localized: "Detection model output shape \(String(describing: shape))"))
         }
         let probH = shape[2], probW = shape[3]
         guard values.count >= probH * probW else {

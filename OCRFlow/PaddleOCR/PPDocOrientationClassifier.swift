@@ -38,7 +38,7 @@ struct PPDocOrientationClassifier {
         let (values, shape) = try session.run(
             input: tensor, shape: [1, 3, Self.cropSize, Self.cropSize])
         guard shape.count == 2, shape[1] == 4, values.count >= 4 else {
-            throw PPOCRError.unexpectedOutputShape(String(localized: "Document orientation model output shape \(shape)"))
+            throw PPOCRError.unexpectedOutputShape(String(localized: "Document orientation model output shape \(String(describing: shape))"))
         }
         var best = 0
         for i in 1..<4 where values[i] > values[best] { best = i }

@@ -12,6 +12,10 @@ import CoreServices
 /// copied in is not read half-written.
 ///
 /// Nothing in the watched folder is moved, renamed or deleted.
+///
+/// Lives on the main thread: the event stream is scheduled on the main queue
+/// and the settle timer on the main run loop.
+@MainActor
 final class FolderWatcher {
     let folder: URL
     /// Never looked into: where results are written, when that is inside the
@@ -22,8 +26,10 @@ final class FolderWatcher {
     private let shouldTake: (URL) -> Bool
     private let onFiles: ([URL]) -> Void
 
-    private var stream: FSEventStreamRef?
-    private var timer: Timer?
+    // Touched by `deinit` as well, which cannot be isolated to the main actor;
+    // the watcher is only ever released on the main thread.
+    nonisolated(unsafe) private var stream: FSEventStreamRef?
+    nonisolated(unsafe) private var timer: Timer?
     /// Files seen but not yet still: path → what they looked like last time.
     private var pending: [String: (size: Int64, modified: Date)] = [:]
     /// Files already handed over or skipped.
@@ -40,7 +46,7 @@ final class FolderWatcher {
         self.onFiles = onFiles
     }
 
-    deinit { stop() }
+    deinit { tearDown() }
 
     func start() {
         guard stream == nil else { return }
@@ -49,7 +55,9 @@ final class FolderWatcher {
                                            retain: nil, release: nil, copyDescription: nil)
         let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
             guard let info else { return }
-            Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue().rescan()
+            MainActor.assumeIsolated {
+                Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue().rescan()
+            }
         }
         stream = FSEventStreamCreate(kCFAllocatorDefault, callback, &context,
                                      [folder.path] as CFArray,
@@ -64,6 +72,10 @@ final class FolderWatcher {
     }
 
     func stop() {
+        tearDown()
+    }
+
+    nonisolated private func tearDown() {
         timer?.invalidate()
         timer = nil
         if let stream {
@@ -114,7 +126,7 @@ final class FolderWatcher {
         timer?.invalidate()
         timer = stillMoving
             ? Timer.scheduledTimer(withTimeInterval: settleInterval, repeats: false) { [weak self] _ in
-                self?.rescan()
+                MainActor.assumeIsolated { self?.rescan() }
             }
             : nil
     }

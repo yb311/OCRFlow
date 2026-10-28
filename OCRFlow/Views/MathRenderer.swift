@@ -39,7 +39,7 @@ struct MathNodeView: View {
         switch node {
         case let .run(text):
             MathRunView(text: text, size: size)
-                .alignmentGuide(.mathAxis) { $0[.firstTextBaseline] - axisOffset }
+                .alignmentGuide(.mathAxis) { [axisOffset] in $0[.firstTextBaseline] - axisOffset }
 
         case let .sequence(nodes):
             HStack(alignment: .mathAxis, spacing: 0) {
@@ -188,7 +188,7 @@ struct MathNodeView: View {
             // to show the reader as source.
             Text(name)
                 .font(.system(size: size, design: .serif))
-                .alignmentGuide(.mathAxis) { $0[.firstTextBaseline] - axisOffset }
+                .alignmentGuide(.mathAxis) { [axisOffset] in $0[.firstTextBaseline] - axisOffset }
         }
     }
 }

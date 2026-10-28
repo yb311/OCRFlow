@@ -27,13 +27,20 @@ enum PPTensor {
     }
 }
 
+/// ONNX Runtime documents its environment as safe to share across threads;
+/// the Objective-C binding just does not say so.
+extension ORTEnv: @unchecked @retroactive Sendable {}
+
 /// Thin wrapper over an ONNX Runtime session.
 ///
 /// PP-OCR's detection, recognition and orientation graphs are all single-input
 /// and single-output, which `run(input:shape:)` covers; the layout model takes
 /// three inputs and returns three outputs, which is what `run(inputs:outputNames:)`
 /// is for.
-final class PPSession {
+///
+/// Sendable because an ONNX Runtime session may run from several threads at
+/// once, and nothing here changes after `init`.
+final class PPSession: @unchecked Sendable {
     private let session: ORTSession
     private let inputName: String
     private let outputName: String

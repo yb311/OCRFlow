@@ -1011,7 +1011,7 @@ enum TextDiff {
         while index < result.endIndex {
             let next = result.characters.index(after: index)
             if marked.contains(offset), !characters[offset].isWhitespace {
-                result[index..<next].backgroundColor = Color.orange.opacity(0.35)
+                result[index..<next][AttributeScopes.SwiftUIAttributes.BackgroundColorAttribute.self] = Color.orange.opacity(0.35)
             }
             index = next
             offset += 1

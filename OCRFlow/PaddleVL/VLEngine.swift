@@ -345,8 +345,11 @@ extension VLEngine {
         }
 
         func start() {
-            for (name, body) in [("PaddleOCR-VL encode", encodeLoop),
-                                 ("PaddleOCR-VL decode", decodeLoop)] {
+            let loops: [(String, @Sendable () -> Void)] = [
+                ("PaddleOCR-VL encode", { [self] in encodeLoop() }),
+                ("PaddleOCR-VL decode", { [self] in decodeLoop() }),
+            ]
+            for (name, body) in loops {
                 let thread = Thread { [self] in
                     body()
                     exited.signal()

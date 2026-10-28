@@ -68,7 +68,7 @@ struct PPRecognizer {
             let (values, shape) = try session.run(
                 input: tensor, shape: [slice.count, 3, imgH, batchW])
             guard shape.count == 3, shape[0] == slice.count else {
-                throw PPOCRError.unexpectedOutputShape(String(localized: "Recognition model output shape \(shape)"))
+                throw PPOCRError.unexpectedOutputShape(String(localized: "Recognition model output shape \(String(describing: shape))"))
             }
             let steps = shape[1], classes = shape[2]
             // A recogniser and a dictionary from different releases decode into

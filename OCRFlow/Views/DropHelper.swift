@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import UniformTypeIdentifiers
+import os
 
 enum DropHelper {
     /// Extracts file URLs from NSItemProviders (Finder drag-and-drop).
@@ -10,8 +11,7 @@ enum DropHelper {
         guard !providers.isEmpty else { return false }
 
         let group = DispatchGroup()
-        var urls: [URL] = []
-        let lock = NSLock()
+        let urls = OSAllocatedUnfairLock(initialState: [URL]())
 
         for provider in providers {
             group.enter()
@@ -25,14 +25,13 @@ enum DropHelper {
                 // Folders are handed over as they are: the view model walks
                 // them, subfolders included, and remembers each one as the
                 // root its files' export paths are relative to.
-                lock.lock()
-                urls.append(fileURL)
-                lock.unlock()
+                urls.withLock { $0.append(fileURL) }
             }
         }
 
         group.notify(queue: .main) {
-            Task { @MainActor in vm.addImages(urls: urls) }
+            let dropped = urls.withLock { $0 }
+            MainActor.assumeIsolated { vm.addImages(urls: dropped) }
         }
         return true
     }

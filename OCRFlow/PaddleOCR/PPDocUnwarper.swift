@@ -43,7 +43,7 @@ struct PPDocUnwarper {
 
         let (values, shape) = try session.run(input: tensor, shape: [1, 3, height, width])
         guard shape.count == 4, shape[1] == 3 else {
-            throw PPOCRError.unexpectedOutputShape(String(localized: "Unwarping model output shape \(shape)"))
+            throw PPOCRError.unexpectedOutputShape(String(localized: "Unwarping model output shape \(String(describing: shape))"))
         }
         let outHeight = shape[2], outWidth = shape[3]
         let outPlane = outHeight * outWidth

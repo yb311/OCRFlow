@@ -354,6 +354,34 @@
         }
       }
     },
+    "%lld files couldn't be exported" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file couldn't be exported"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files couldn't be exported"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %lld 个文件未能导出"
+          }
+        }
+      }
+    },
     "%lld files done" : {
       "localizations" : {
         "en" : {
