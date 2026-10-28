@@ -30,7 +30,26 @@ enum AppAppearance: String, CaseIterable, Identifiable {
     }
 }
 
+/// Starts the app, or — when the process is only hosting the unit tests — an
+/// app with no windows, so a test run neither restores nor rewrites the
+/// user's queue, settings and folder watch.
 @main
+enum AppLauncher {
+    static func main() {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            TestHostApp.main()
+        } else {
+            OCRFlowApp.main()
+        }
+    }
+}
+
+private struct TestHostApp: App {
+    var body: some Scene {
+        Settings { EmptyView() }
+    }
+}
+
 struct OCRFlowApp: App {
     @StateObject private var viewModel = OCRViewModel()
     @StateObject private var updater = UpdaterController()

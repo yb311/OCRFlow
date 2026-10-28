@@ -1024,13 +1024,17 @@ final class OCRViewModel: ObservableObject {
         let format = exportFormat
         watcher = FolderWatcher(
             folder: folder, excluding: output,
-            shouldTake: { [weak self] url in
-                guard let self, let output else { return true }
+            shouldTake: { url in
+                guard let output else { return true }
                 // A file whose result is already in the output folder was
-                // read in an earlier session.
+                // read in an earlier session. A Markdown export of a result
+                // with no structure is written as plain text instead.
                 let probe = ImageItem(url: url, root: folder)
-                return !FileManager.default.fileExists(
-                    atPath: self.plannedExportURL(for: probe, format: format, in: output).path)
+                let formats = format == .markdown ? [format, .plainText] : [format]
+                return !formats.contains { format in
+                    let result = Self.separateExportURLs(for: [probe], format: format, in: output)[0]
+                    return FileManager.default.fileExists(atPath: result.path)
+                }
             },
             onFiles: { [weak self] urls in self?.addWatched(urls, root: folder) })
         watcher?.start()
@@ -1443,8 +1447,7 @@ final class OCRViewModel: ObservableObject {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [Self.contentType(for: format)]
         if targets.count == 1 {
-            let stem = (targets[0].fileName as NSString).deletingPathExtension
-            panel.nameFieldStringValue = "\(stem)_OCR.\(format.fileExtension)"
+            panel.nameFieldStringValue = "\(Self.exportStem(for: targets[0])).\(format.fileExtension)"
             panel.message = String(localized: "Export the results for “\(targets[0].fileName)”")
         } else {
             panel.nameFieldStringValue = "OCRFlow_Results.\(format.fileExtension)"
@@ -1477,7 +1480,7 @@ final class OCRViewModel: ObservableObject {
     /// usually wanted as a batch of documents, not as one long one.
     ///
     /// Files that came in through a folder are laid out the way that folder
-    /// was — `合同/2024/扫描001_OCR.md` — so a thousand results do not land
+    /// was — `合同/2024/扫描001.pdf_OCR.md` — so a thousand results do not land
     /// in one flat heap with their organisation thrown away.
     private func exportSeparately(_ targets: [ImageItem], format: ExportFormat) {
         let panel = NSOpenPanel()
@@ -1495,22 +1498,11 @@ final class OCRViewModel: ObservableObject {
     /// `reveal` is shown in Finder when the writing is done; nil writes
     /// silently, which is how a watched folder's results are exported.
     private func writeSeparately(_ targets: [ImageItem], format: ExportFormat, into folder: URL, reveal: URL?) {
-        var used = Set<String>()
         var pdfJobs: [([ImageItem], URL)] = []
         var workbookJobs: [([ImageItem], URL)] = []
-        for item in targets {
-            let directory = Self.exportDirectory(for: item, in: folder)
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let stem = (item.fileName as NSString).deletingPathExtension
-            var name = "\(stem)_OCR"
-            var suffix = 2
-            // Two source files can share a stem — `scan.png` and `scan.pdf` —
-            // and the second must not overwrite the first.
-            while !used.insert(directory.appendingPathComponent(name).path).inserted {
-                name = "\(stem)_OCR-\(suffix)"
-                suffix += 1
-            }
-            let url = directory.appendingPathComponent("\(name).\(format.fileExtension)")
+        for (item, url) in zip(targets, Self.separateExportURLs(for: targets, format: format, in: folder)) {
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                     withIntermediateDirectories: true)
             switch format {
             case .json:
                 try? Self.jsonData([exportPayload(for: item)]).write(to: url)
@@ -1535,12 +1527,29 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
-    /// Where `writeSeparately` puts an item's result when no other file
-    /// competes for the name.
-    private func plannedExportURL(for item: ImageItem, format: ExportFormat, in folder: URL) -> URL {
-        let stem = (item.fileName as NSString).deletingPathExtension
-        return Self.exportDirectory(for: item, in: folder)
-            .appendingPathComponent("\(stem)_OCR.\(format.fileExtension)")
+    /// Where each item's result goes in a separate export, in the order given.
+    /// Two items only compete for a name when both were added as loose files
+    /// with the same name from different folders; the later one is numbered.
+    nonisolated static func separateExportURLs(for items: [ImageItem], format: ExportFormat, in folder: URL) -> [URL] {
+        var used = Set<String>()
+        return items.map { item in
+            let directory = exportDirectory(for: item, in: folder)
+            var name = exportStem(for: item)
+            var suffix = 2
+            while !used.insert(directory.appendingPathComponent(name).path).inserted {
+                name = "\(exportStem(for: item))-\(suffix)"
+                suffix += 1
+            }
+            return directory.appendingPathComponent("\(name).\(format.fileExtension)")
+        }
+    }
+
+    /// A result's name keeps the source's whole name, extension included, so
+    /// `scan.png` and `scan.pdf` in one folder can never claim the same file
+    /// — not in one export, and not across a watched folder's one-at-a-time
+    /// exports either.
+    nonisolated static func exportStem(for item: ImageItem) -> String {
+        "\(item.fileName)_OCR"
     }
 
     /// Writes each group's tables to a workbook. A group with no recognised
@@ -1570,7 +1579,7 @@ final class OCRViewModel: ObservableObject {
 
     /// Where a file's result goes: under the folder it came in through, at
     /// the same place it sat in that folder.
-    private static func exportDirectory(for item: ImageItem, in folder: URL) -> URL {
+    nonisolated static func exportDirectory(for item: ImageItem, in folder: URL) -> URL {
         guard let root = item.root else { return folder }
         let relative = (item.relativePath as NSString).deletingLastPathComponent
         let base = folder.appendingPathComponent(root.lastPathComponent, isDirectory: true)

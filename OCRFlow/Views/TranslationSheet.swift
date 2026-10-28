@@ -193,7 +193,7 @@ struct TranslationSheet: View {
         if items.count == 1 {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
-            panel.nameFieldStringValue = "\((items[0].fileName as NSString).deletingPathExtension)\(suffix).md"
+            panel.nameFieldStringValue = "\(items[0].fileName)\(suffix).md"
             guard panel.runModal() == .OK, let url = panel.url else { return }
             try? document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
             return
@@ -205,7 +205,7 @@ struct TranslationSheet: View {
         panel.prompt = String(localized: "Export Here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         for item in items where translations[item.id] != nil {
-            let name = "\((item.fileName as NSString).deletingPathExtension)\(suffix).md"
+            let name = "\(item.fileName)\(suffix).md"
             try? document(for: item, bilingual: bilingual)
                 .write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
         }
