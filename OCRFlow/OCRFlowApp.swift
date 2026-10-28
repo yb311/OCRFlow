@@ -50,7 +50,27 @@ private struct TestHostApp: App {
     }
 }
 
+/// Takes the files macOS hands the app — dropped on its Dock icon, or opened
+/// with it from Finder — and adds them to the list.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set once the list exists; files that arrive before then wait.
+    var open: (([URL]) -> Void)? {
+        didSet {
+            guard let open, !waiting.isEmpty else { return }
+            open(waiting)
+            waiting = []
+        }
+    }
+    private var waiting: [URL] = []
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let open { open(urls) } else { waiting += urls }
+    }
+}
+
 struct OCRFlowApp: App {
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @StateObject private var viewModel = OCRViewModel()
     @StateObject private var updater = UpdaterController()
     @Environment(\.openWindow) private var openWindow
@@ -66,6 +86,9 @@ struct OCRFlowApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .onAppear {
+                    appDelegate.open = { [weak viewModel] urls in viewModel?.addImages(urls: urls) }
+                }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
