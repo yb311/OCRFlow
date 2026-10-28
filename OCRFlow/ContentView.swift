@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject var vm: OCRViewModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var offersCrashReport = false
+    @State private var showsWelcome = false
     @AppStorage(AppAppearance.storageKey) private var appearance: AppAppearance = .system
     @Environment(\.openWindow) private var openWindow
 
@@ -39,9 +40,13 @@ struct ContentView: View {
         } message: {
             Text("A report with the crash log helps fix it. You can review everything in it before sending.")
         }
+        .sheet(isPresented: $showsWelcome) {
+            WelcomeView(downloader: vm.modelDownloader)
+        }
         .onAppear {
             appearance.apply()
             offersCrashReport = vm.crashLogFromLastSession != nil
+            showsWelcome = !offersCrashReport && !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
         }
         .onChange(of: appearance) { _, value in value.apply() }
     }

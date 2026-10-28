@@ -8,7 +8,9 @@ import Foundation
 @MainActor
 final class PPModelDownloader: ObservableObject {
 
-    @Published var source: PPModelCatalog.Source = .huggingFace
+    /// Hugging Face is often unreachable from mainland China, where the
+    /// mirror is the one that works.
+    @Published var source: PPModelCatalog.Source = Locale.current.region == .chinaMainland ? .mirror : .huggingFace
     /// 0…1 per entry id, present only while that entry is downloading.
     @Published private(set) var progress: [String: Double] = [:]
     @Published private(set) var errors: [String: String] = [:]

@@ -1968,6 +1968,16 @@
         }
       }
     },
+    "Continue in Background" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在后台继续"
+          }
+        }
+      }
+    },
     "Copied" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2448,6 +2458,16 @@
         }
       }
     },
+    "Download (%@)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载（%@）"
+          }
+        }
+      }
+    },
     "Download PaddleOCR-VL Model" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2484,6 +2504,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拖放图片到这里"
+          }
+        }
+      }
+    },
+    "Drop in images, PDFs or whole folders" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入图片、PDF 或整个文件夹"
           }
         }
       }
@@ -2544,6 +2574,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不依赖版面模型，按文字行之间的空白估算栏目位置。多栏报刊通常正确，但署名行、右对齐编号一类的元素可能落错位置"
+          }
+        }
+      }
+    },
+    "Everything stays on your Mac" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有数据都留在你的 Mac 上"
           }
         }
       }
@@ -3026,6 +3066,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "法文"
+          }
+        }
+      }
+    },
+    "From" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源"
           }
         }
       }
@@ -3626,6 +3676,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型档位"
+          }
+        }
+      }
+    },
+    "Models can be added or removed later in Settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之后可以在设置里添加或删除模型。"
           }
         }
       }
@@ -4668,6 +4728,16 @@
         }
       }
     },
+    "Ready to use now" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在就能用"
+          }
+        }
+      }
+    },
     "Recognition" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4774,6 +4844,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "识别模型输出维度 %@"
+          }
+        }
+      }
+    },
+    "Recognition runs locally. Files and text are never uploaded." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别在本机完成，文件和文字从不上传。"
           }
         }
       }
@@ -4980,6 +5060,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在识别中…"
+          }
+        }
+      }
+    },
+    "Recommended: tables, formulas and complex layouts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐：表格、公式和复杂版面"
           }
         }
       }
@@ -5858,6 +5948,16 @@
         }
       }
     },
+    "Smart Layering, the default engine, uses a layout model to find tables, formulas and columns, and PaddleOCR-VL to read them. Without these, every page is read as plain lines of text." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认的“智能分层”引擎先用版面模型找出表格、公式和分栏，再交给 PaddleOCR-VL 识别。没有这两个模型时，每一页都只会按普通文字行识别。"
+          }
+        }
+      }
+    },
     "Software Update" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5894,6 +5994,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始识别"
+          }
+        }
+      }
+    },
+    "Start Using OCRFlow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始使用 OCRFlow"
           }
         }
       }
@@ -6198,6 +6308,16 @@
         }
       }
     },
+    "The built-in PP-OCRv6 models read Chinese, English, Japanese and 46 more languages, offline." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置的 PP-OCRv6 模型可离线识别简繁中文、英文、日文等 50 种语言。"
+          }
+        }
+      }
+    },
     "The context must fit one block's visual tokens plus its output. The per-block output limit keeps one block from stalling the whole page." : {
       "localizations" : {
         "zh-Hans" : {
@@ -6420,6 +6540,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扭曲矫正模型输出数据不足"
+          }
+        }
+      }
+    },
+    "Then press Start Recognition (⌘R). Results can be checked, corrected and exported." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "然后点“开始识别”（⌘R）。识别结果可以校对、修改和导出。"
           }
         }
       }
@@ -6710,6 +6840,16 @@
         }
       }
     },
+    "Turn scans, photos and PDFs into text you can search and edit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把扫描件、照片和 PDF 变成可以搜索、编辑的文字。"
+          }
+        }
+      }
+    },
     "Turns a chart back into a table" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6906,6 +7046,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在监控「%@」"
+          }
+        }
+      }
+    },
+    "Welcome to OCRFlow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎使用 OCRFlow"
           }
         }
       }
