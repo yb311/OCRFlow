@@ -6879,6 +6879,16 @@
           }
         }
       }
+    },
+    "“%@”: match %lld of %lld in this file (⌘G next, ⇧⌘G previous)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」在这个文件里的第 %lld 处，共 %lld 处（⌘G 下一处，⇧⌘G 上一处）"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -163,6 +163,9 @@ final class OCRViewModel: ObservableObject {
     /// A page and region the document pane should turn to, set when leaving
     /// review for "在文档中查看". The pane clears it once it has moved.
     @Published var documentFocus: DocumentFocus?
+    /// What the sidebar is searching for. The document pane reads it too, to
+    /// open a file found by its contents at the place it says that.
+    @Published var searchQuery = ""
     @Published var isProcessing = false
     /// Set between pressing 停止 and the last in-flight image actually letting
     /// go. A run cannot be restarted in that window: the worker still holds the

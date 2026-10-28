@@ -6,8 +6,9 @@ struct SidebarView: View {
     @State private var showClearAllConfirm = false
     @State private var filter: StatusFilter = .all
     /// Searches file names and everything recognised in them. The results are
-    /// kept between launches, so this searches every batch still listed.
-    @State private var query = ""
+    /// kept between launches, so this searches every batch still listed. Held
+    /// by the view model, so the document pane can turn to what was found.
+    private var query: String { vm.searchQuery }
 
     /// Narrows the list to one status. In a batch of a few hundred files the
     /// failures are the ones worth looking at, and scrolling for them is the
@@ -56,8 +57,6 @@ struct SidebarView: View {
             // List or empty state
             if vm.items.isEmpty {
                 emptyState
-            } else if visibleItems.isEmpty {
-                filteredEmptyState
             } else {
                 List(visibleItems, selection: selectionBinding) { item in
                     SidebarRowView(item: item, query: query)
@@ -123,12 +122,18 @@ struct SidebarView: View {
                 }
                 .listStyle(.sidebar)
                 .onDeleteCommand { vm.removeSelectedItems() }
+                // Shown over the list rather than in its place: the search
+                // field lives on the list, and swapping the list out the
+                // moment nothing matched took the field away mid-word.
+                .overlay {
+                    if visibleItems.isEmpty { filteredEmptyState }
+                }
             }
 
             Divider()
             bottomToolbar
         }
-        .searchable(text: $query, placement: .sidebar, prompt: "Search names and text")
+        .searchable(text: $vm.searchQuery, placement: .sidebar, prompt: "Search names and text")
         .onChange(of: filter) { _, _ in
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
@@ -154,7 +159,7 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
             Button("Show All") {
                 filter = .all
-                query = ""
+                vm.searchQuery = ""
             }
                 .buttonStyle(.link)
                 .controlSize(.small)

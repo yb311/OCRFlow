@@ -117,8 +117,55 @@ struct ItemDetailView: View {
     /// A region to open for editing in the 区块 pane — asked for by a
     /// double-click in the rendered Markdown.
     @State private var editRequest: Int?
+    /// Where the sidebar's search text occurs in this file, and which of
+    /// those places is on show.
+    @State private var searchMatches: [TextMatch] = []
+    @State private var matchIndex = 0
+    /// The file and the text the matches were last turned to for. A
+    /// correction made while searching changes the matches but should not
+    /// pull the page away from the region being corrected.
+    @State private var searchedFor = ""
 
     private var pageCount: Int { max(item.pages.count, sourcePageCount) }
+
+    private var searchNeedle: String { vm.searchQuery.trimmingCharacters(in: .whitespaces) }
+
+    /// Changes whenever the places to find could have.
+    private var searchKey: String {
+        "\(item.id)#\(searchNeedle)#\(item.status)#\(item.ocrText.count)"
+    }
+
+    /// Finds the search text in this file and turns to the first place it
+    /// occurs: a file found by what it says opens where it says it.
+    private func updateSearchMatches() {
+        let matches = item.status == .completed ? item.matches(of: searchNeedle) : []
+        let target = "\(item.id)#\(searchNeedle)#\(item.status)"
+        guard matches != searchMatches || target != searchedFor else { return }
+        searchMatches = matches
+        guard target != searchedFor else {
+            matchIndex = min(matchIndex, max(matches.count - 1, 0))
+            return
+        }
+        searchedFor = target
+        matchIndex = 0
+        // Coming back from review to a particular region wins over the search.
+        if !matches.isEmpty, vm.documentFocus?.itemID != item.id { showMatch(0) }
+    }
+
+    private func showMatch(_ index: Int) {
+        guard searchMatches.indices.contains(index) else { return }
+        matchIndex = index
+        let match = searchMatches[index]
+        pageIndex = match.page
+        let target: PreviewSelection? = switch match.place {
+        case let .block(block): .block(block)
+        case let .line(line):   .line(line)
+        case .page:             nil
+        }
+        // Selected once the page change has been handled, which clears the
+        // selection of the page being left.
+        Task { @MainActor in selection = target }
+    }
 
     /// Turns to the page and region review asked for, if it asked about this
     /// file, and lets the request go.
@@ -212,6 +259,7 @@ struct ItemDetailView: View {
             HStack {
                 if pageCount > 1 { pageStepper }
                 if item.pages.count > 1 { rereadPageButton }
+                if !searchMatches.isEmpty { matchStepper }
                 Spacer()
                 // Both engines draw boxes now, so both can hide them; the
                 // button used to appear only when there were text lines, which
@@ -394,6 +442,10 @@ struct ItemDetailView: View {
             pageIndex = 0
             showingNotes = true
             applyDocumentFocus()
+            // Whichever of this and the search's own `onChange` runs second
+            // turns the new file to its first match.
+            searchedFor = ""
+            updateSearchMatches()
         }
         .onChange(of: pageIndex) { _, _ in
             selection = nil
@@ -403,6 +455,10 @@ struct ItemDetailView: View {
         // selected. Runs after `onChange(of: item.id)` has reset the pane.
         .onAppear { applyDocumentFocus() }
         .onChange(of: vm.documentFocus) { _, _ in applyDocumentFocus() }
+        // Runs after `onChange(of: item.id)` has turned a new file to its
+        // first page, so the search can turn it on to the first match.
+        .onAppear { updateSearchMatches() }
+        .onChange(of: searchKey) { _, _ in updateSearchMatches() }
         .task(id: previewKey) {
             let index = pageIndex
             pageImage = nil
@@ -461,6 +517,33 @@ struct ItemDetailView: View {
             .disabled(!vm.canRereadPage(item))
             .help(vm.isProcessing ? "Recognition is in progress. You can recognize this page again once it finishes" : "Recognize this page again; other pages stay as they are")
         }
+    }
+
+    /// Steps through the places the sidebar's search found in this file.
+    private var matchStepper: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(matchIndex + 1)/\(searchMatches.count)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Button {
+                showMatch((matchIndex - 1 + searchMatches.count) % searchMatches.count)
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            Button {
+                showMatch((matchIndex + 1) % searchMatches.count)
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .keyboardShortcut("g", modifiers: .command)
+        }
+        .buttonStyle(.borderless)
+        .help("“\(searchNeedle)”: match \(matchIndex + 1) of \(searchMatches.count) in this file (⌘G next, ⇧⌘G previous)")
     }
 
     /// The auxiliary regions this page actually contains, in the order the

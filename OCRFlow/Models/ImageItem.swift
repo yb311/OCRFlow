@@ -169,3 +169,37 @@ struct ImageItem: Identifiable, Equatable {
         self.engine = nil
     }
 }
+
+/// One place a search found its text in a result: a page, and the region or
+/// line on it the text was read from, when there is one.
+struct TextMatch: Equatable {
+    enum Place: Equatable {
+        case block(Int)
+        case line(Int)
+        /// Text with no box behind it: a page read as a whole.
+        case page
+    }
+
+    let page: Int
+    let place: Place
+}
+
+extension ImageItem {
+    /// Every place `needle` occurs, page by page and in reading order on each
+    /// page, so stepping through them reads the document front to back.
+    func matches(of needle: String) -> [TextMatch] {
+        guard !needle.isEmpty else { return [] }
+        return pages.enumerated().flatMap { index, page -> [TextMatch] in
+            if !page.blocks.isEmpty {
+                return page.blocks.indices
+                    .filter { page.blocks[$0].text.localizedCaseInsensitiveContains(needle) }
+                    .sorted { page.blocks[$0].readingOrder < page.blocks[$1].readingOrder }
+                    .map { TextMatch(page: index, place: .block($0)) }
+            }
+            let lines = page.lines.indices.filter { page.lines[$0].text.localizedCaseInsensitiveContains(needle) }
+            if !lines.isEmpty { return lines.map { TextMatch(page: index, place: .line($0)) } }
+            let whole = page.rawMarkdown.isEmpty ? page.rawText : page.rawMarkdown
+            return whole.localizedCaseInsensitiveContains(needle) ? [TextMatch(page: index, place: .page)] : []
+        }
+    }
+}
