@@ -311,6 +311,7 @@ final class OCRViewModel: ObservableObject {
                 self.recalcProgress()
                 self.updateWatcher()
                 store.pruneResults(keeping: Set(all.map(\.id)))
+                self.recordMissingHistory()
                 store.prunePartials(keeping: Set(all.compactMap(\.resume?.key)))
                 self.loadThumbnails(for: restored.map(\.id))
             }
@@ -982,6 +983,57 @@ final class OCRViewModel: ObservableObject {
                 .filter { !$0.isEmpty }.joined(separator: "\n\n---\n\n")
             : ""
         return (text, markdown)
+    }
+
+    // MARK: - History
+
+    /// Writes a history row for every finished file that has none — results
+    /// read before the history existed, or whose row was lost.
+    private func recordMissingHistory() {
+        let finished = items.filter(\.isExportable)
+        let store = self.store
+        Task.detached(priority: .utility) {
+            let recorded = store.history.recorded(among: finished.map(\.id))
+            for item in finished where !recorded.contains(item.id) {
+                store.recordInHistory(item)
+            }
+        }
+    }
+
+    /// Brings a document from the history into the list: selects it when it
+    /// is still there, puts its kept result back when it is not, and failing
+    /// both adds the file to be read again.
+    func openFromHistory(_ entry: HistoryIndex.Entry) {
+        mode = .workspace
+        let url = URL(fileURLWithPath: entry.path)
+        if let listed = items.first(where: { $0.id == entry.id }) ?? items.first(where: { $0.url == url }) {
+            selectedIDs = [listed.id]
+            return
+        }
+        guard let pages = store.historyPages(for: entry.id) else {
+            add([(url, nil)])
+            if let added = items.first(where: { $0.url == url }) { selectedIDs = [added.id] }
+            return
+        }
+        store.restoreFromHistory(entry.id)
+        var item = ImageItem(url: url, id: entry.id)
+        item.status = .completed
+        item.engine = entry.engine
+        item.pages = pages
+        items.append(item)
+        rebuildDocument(at: items.count - 1)
+        selectedIDs = [entry.id]
+        recalcProgress()
+        store.saveQueue(items)
+        loadThumbnails(for: [entry.id])
+    }
+
+    func forgetHistory(_ ids: Set<UUID>) {
+        store.forget(Array(ids))
+    }
+
+    func clearHistory() {
+        store.clearHistory(keeping: Set(items.map(\.id)))
     }
 
     // MARK: - Diagnostics
@@ -1982,7 +2034,7 @@ final class OCRViewModel: ObservableObject {
             items[i] = updated          // single assignment → one objectWillChange
             engineOverrides[id] = nil
             if let resumeKey { store.removePartial(for: resumeKey) }
-            store.save(updated)
+            store.save(updated, isNewReading: true)
             store.saveQueue(items)
             exportIfWatched(updated)
         } catch {

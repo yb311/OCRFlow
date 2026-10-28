@@ -140,6 +140,13 @@ struct OCRFlowApp: App {
                 .environmentObject(updater)
         }
 
+        Window("History", id: HistoryView.windowID) {
+            HistoryView()
+                .environmentObject(viewModel)
+        }
+        .defaultSize(width: 900, height: 600)
+        .keyboardShortcut("y", modifiers: .command)
+
         Window("Report a Problem", id: ReportProblemView.windowID) {
             ReportProblemView()
                 .environmentObject(viewModel)

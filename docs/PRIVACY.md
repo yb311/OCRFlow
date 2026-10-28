@@ -12,9 +12,9 @@ locally. There are no accounts, no analytics and no tracking.
 - The history and its search index, in the same folder.
 - Downloaded models, in `~/Library/Application Support/OCRFlow/Models`.
 
-Removing an entry from the history, or choosing **Clear History**, deletes
-what was kept for it. Deleting the `OCRFlow` folder above removes everything
-the app has stored.
+Removing an entry from the history deletes its text and result. **Clear
+History** deletes all of them, and the recognition cache too. Deleting the
+`OCRFlow` folder above removes everything the app has stored.
 
 ## When the app goes online
 
@@ -52,7 +52,7 @@ macOS wrote, with your home folder replaced by `~`.
 - 历史记录及其搜索索引,也在同一个文件夹里。
 - 下载的模型,存放在 `~/Library/Application Support/OCRFlow/Models`。
 
-从历史记录里删除一条,或选择**清除历史记录**,会一并删除为它保存的数据。删除上面的 `OCRFlow` 文件夹,就会清除应用存储的全部数据。
+从历史记录里删除一条,会删除它的文字和识别结果。**清除历史记录**会删除全部记录,连同识别缓存一起清空。删除上面的 `OCRFlow` 文件夹,就会清除应用存储的全部数据。
 
 ## 应用什么时候会联网
 

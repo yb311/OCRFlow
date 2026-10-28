@@ -1728,6 +1728,26 @@
         }
       }
     },
+    "Clear History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除历史记录"
+          }
+        }
+      }
+    },
+    "Clear History…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除历史记录…"
+          }
+        }
+      }
+    },
     "Clear Recognition Cache" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1754,6 +1774,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清空整个列表？"
+          }
+        }
+      }
+    },
+    "Clear the whole history?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除全部历史记录吗？"
           }
         }
       }
@@ -2288,6 +2318,16 @@
         }
       }
     },
+    "Delete from History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中删除"
+          }
+        }
+      }
+    },
     "Describe what happened in the issue, and paste this report below it. It lists your Mac, your settings, the downloaded models and which files failed — never what the files say." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2384,6 +2424,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文档标题"
+          }
+        }
+      }
+    },
+    "Documents appear here once they have been recognized, and stay after they leave the list." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文档识别完成后会出现在这里，从列表移除后也会保留。"
           }
         }
       }
@@ -3100,6 +3150,16 @@
         }
       }
     },
+    "History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录"
+          }
+        }
+      }
+    },
     "How far to expand each layout region when cropping. Cropping tight to the text cuts off stroke edges and the model misses characters. Corresponds to the official unclip_ratio" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3706,6 +3766,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有包含「%@」的文件"
+          }
+        }
+      }
+    },
+    "No History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有历史记录"
           }
         }
       }
@@ -5330,6 +5400,16 @@
         }
       }
     },
+    "Results of files no longer in the list are deleted, along with the recognition cache. Files still in the list stay." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已不在列表里的文件，其识别结果会被删除，识别缓存也会一并清空。仍在列表里的文件不受影响。"
+          }
+        }
+      }
+    },
     "Resume" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5543,7 +5623,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索文件名或识别内容"
+            "value" : "搜索文件名和文字"
           }
         }
       }
@@ -5554,6 +5634,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可搜索 PDF"
+          }
+        }
+      }
+    },
+    "Select a document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个文档"
           }
         }
       }
@@ -5664,6 +5754,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Finder 中显示"
+          }
+        }
+      }
+    },
+    "Show in List" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在列表中显示"
           }
         }
       }

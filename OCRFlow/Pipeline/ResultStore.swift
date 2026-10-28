@@ -24,7 +24,13 @@ final class ResultStore: @unchecked Sendable {
     static let pipelineVersion = 2
 
     let directory: URL
+    /// Every document read, kept after it leaves the list.
+    let history: HistoryIndex
     private var resultsDirectory: URL { directory.appendingPathComponent("Results", isDirectory: true) }
+    /// The results of documents no longer in the list, kept for the history.
+    /// A result lives in `Results` while its file is listed and moves here
+    /// when it is removed, corrections and all.
+    private var historyDirectory: URL { directory.appendingPathComponent("History", isDirectory: true) }
     private var cacheDirectory: URL { directory.appendingPathComponent("Cache", isDirectory: true) }
     private var partialDirectory: URL { directory.appendingPathComponent("Partial", isDirectory: true) }
     private var queueFile: URL { directory.appendingPathComponent("queue.json") }
@@ -35,7 +41,9 @@ final class ResultStore: @unchecked Sendable {
 
     init(directory: URL = ResultStore.defaultDirectory) {
         self.directory = directory
-        for folder in [directory, resultsDirectory, cacheDirectory, partialDirectory] {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        history = HistoryIndex(file: directory.appendingPathComponent("history.sqlite"))
+        for folder in [resultsDirectory, historyDirectory, cacheDirectory, partialDirectory] {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
     }
@@ -83,9 +91,10 @@ final class ResultStore: @unchecked Sendable {
         }
     }
 
-    /// Writes one item's pages. Called when a result lands and whenever it is
-    /// corrected.
-    func save(_ item: ImageItem) {
+    /// Writes one item's pages, and its text to the history. Called when a
+    /// result lands — `isNewReading` — and whenever it is corrected.
+    func save(_ item: ImageItem, isNewReading: Bool = false) {
+        if item.isExportable { recordInHistory(item, isNewReading: isNewReading) }
         let pages = item.pages
         let file = resultFile(for: item.id)
         io.async {
@@ -98,11 +107,24 @@ final class ResultStore: @unchecked Sendable {
         }
     }
 
+    func recordInHistory(_ item: ImageItem, isNewReading: Bool = false) {
+        history.record(id: item.id, path: item.url.path, name: item.fileName, engine: item.engine,
+                       pages: item.pages.count, isNewReading: isNewReading, text: item.ocrText)
+    }
+
+    /// Takes files out of the list. A finished result moves to the history;
+    /// anything else had nothing worth keeping.
     func remove(_ ids: [UUID]) {
-        let files = ids.map(resultFile(for:))
-        io.async {
-            for file in files { try? FileManager.default.removeItem(at: file) }
+        io.async { [self] in
+            for id in ids { retire(resultFile(for: id)) }
         }
+    }
+
+    /// Moves a listed file's result to the history folder.
+    private func retire(_ file: URL) {
+        let destination = historyDirectory.appendingPathComponent(file.lastPathComponent)
+        try? FileManager.default.removeItem(at: destination)
+        try? FileManager.default.moveItem(at: file, to: destination)
     }
 
     /// Reads the list back, results and all. Slow for a large library —
@@ -137,16 +159,59 @@ final class ResultStore: @unchecked Sendable {
         }
     }
 
-    /// Deletes the stored results of files no longer in the list — what a
-    /// crash between removing a file and deleting its result leaves behind.
+    /// Moves the results of files no longer in the list to the history —
+    /// what a crash between removing a file and moving its result leaves.
     func pruneResults(keeping ids: Set<UUID>) {
-        io.async { [resultsDirectory] in
+        io.async { [self] in
             let files = (try? FileManager.default.contentsOfDirectory(at: resultsDirectory,
                                                                      includingPropertiesForKeys: nil)) ?? []
             for file in files {
                 let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent)
-                if id.map(ids.contains) != true { try? FileManager.default.removeItem(at: file) }
+                if id.map(ids.contains) != true { retire(file) }
             }
+        }
+    }
+
+    // MARK: - History
+
+    /// The pages kept for a document no longer in the list.
+    func historyPages(for id: UUID) -> [PageResult]? {
+        io.sync {}
+        guard let data = try? Data(contentsOf: historyDirectory.appendingPathComponent("\(id.uuidString).json")) else {
+            return nil
+        }
+        return try? JSONDecoder().decode([PageResult].self, from: data)
+    }
+
+    /// Moves a document's result from the history back into the list.
+    func restoreFromHistory(_ id: UUID) {
+        io.sync {
+            let file = resultFile(for: id)
+            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.moveItem(
+                at: historyDirectory.appendingPathComponent(file.lastPathComponent), to: file)
+        }
+    }
+
+    /// Deletes documents from the history, text and results both. A document
+    /// still in the list keeps its result there.
+    func forget(_ ids: [UUID]) {
+        history.remove(ids)
+        io.async { [historyDirectory] in
+            for id in ids {
+                try? FileManager.default.removeItem(at: historyDirectory.appendingPathComponent("\(id.uuidString).json"))
+            }
+        }
+    }
+
+    /// Deletes the whole history except the files still in the list, and the
+    /// recognition cache with it: the cache holds the same text.
+    func clearHistory(keeping listed: Set<UUID>) {
+        _ = history.removeAll(keeping: listed)
+        clearCache()
+        io.async { [historyDirectory] in
+            try? FileManager.default.removeItem(at: historyDirectory)
+            try? FileManager.default.createDirectory(at: historyDirectory, withIntermediateDirectories: true)
         }
     }
 

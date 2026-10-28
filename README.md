@@ -20,7 +20,7 @@ A native macOS app for batch OCR (Optical Character Recognition) and document pa
 - **Quality review** — regions are flagged with the specific reason they deserve a look (low confidence, output cut off by the token limit, a decoder loop, two readers disagreeing); a 待复核 filter collects them, each region can be corrected or re-read with the VLM, and corrections are never overwritten without asking
 - **Persistent queue and result cache** — the list, every result and every correction survive quitting; a file already read with the same settings (matched by content, not name) is not read again
 - **Watched folder** — files that land in a folder are read once they have finished copying, and their results exported to an output folder in the same structure
-- **Full-text search** across everything recognised
+- **History and full-text search** — every document read stays in the history (⌘Y) after it leaves the list, searchable by any phrase in it, Chinese included, and can be put back in the list with its corrections
 - **Document parsing** — the PaddleOCR-VL engine runs the official two-stage pipeline: layout analysis finds the blocks and their reading order, the VLM reads each one with the prompt that suits it (text, table, formula, chart, seal), and the results are reassembled as Markdown
 - **Full PaddleOCR pipeline** — text detection, document and text-line orientation correction, and CTC recognition, with per-line boxes and confidence scores drawn over the preview
 - **Three model tiers** — tiny / small / medium, from 6 MB to 139 MB, swappable without restarting
