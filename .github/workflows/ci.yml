@@ -48,5 +48,13 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      - name: Unit tests
+        run: |
+          xcodebuild -project OCRFlow.xcodeproj -scheme OCRFlow \
+            -configuration Debug \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY=- \
+            test
+
       - name: Check markup leaks
         run: Scripts/check-markup-leaks.sh
