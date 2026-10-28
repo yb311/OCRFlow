@@ -4210,6 +4210,16 @@
         }
       }
     },
+    "Page %lld has manual edits" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 页有手动修改"
+          }
+        }
+      }
+    },
     "Page %lld · %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4538,6 +4548,16 @@
         }
       }
     },
+    "Recognition is in progress. You can recognize this page again once it finishes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别进行中，完成后可重新识别这一页"
+          }
+        }
+      }
+    },
     "Recognition is running. Engine and model changes only affect files started afterwards." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4654,6 +4674,16 @@
         }
       }
     },
+    "Recognize this page again; other pages stay as they are" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别这一页，其他页不变"
+          }
+        }
+      }
+    },
     "Recognizing" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4694,12 +4724,42 @@
         }
       }
     },
+    "Recognizing page %lld again failed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 页重新识别失败"
+          }
+        }
+      }
+    },
     "Recognizing page %lld/%lld" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "识别中 %lld/%lld 页"
+          }
+        }
+      }
+    },
+    "Recognizing this page again replaces these edits with the new result. Other pages are not affected." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别这一页会用新的识别结果替换这些修改，其他页不受影响。"
+          }
+        }
+      }
+    },
+    "Recognizing this page again…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重新识别这一页…"
           }
         }
       }

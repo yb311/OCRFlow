@@ -211,6 +211,7 @@ struct ItemDetailView: View {
         VStack(spacing: 0) {
             HStack {
                 if pageCount > 1 { pageStepper }
+                if item.pages.count > 1 { rereadPageButton }
                 Spacer()
                 // Both engines draw boxes now, so both can hide them; the
                 // button used to appear only when there were text lines, which
@@ -439,6 +440,27 @@ struct ItemDetailView: View {
         }
         .buttonStyle(.borderless)
         .help("Turn page (⌥← / ⌥→)")
+    }
+
+    /// Reads the page on show again, by itself.
+    @ViewBuilder
+    private var rereadPageButton: some View {
+        if vm.rereadingPages.contains(OCRViewModel.PageRef(itemID: item.id, page: pageIndex)) {
+            ProgressView()
+                .controlSize(.small)
+                .scaleEffect(0.7)
+                .frame(width: 16, height: 16)
+                .help("Recognizing this page again…")
+        } else {
+            Button {
+                vm.rereadPage(itemID: item.id, page: pageIndex)
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .disabled(!vm.canRereadPage(item))
+            .help(vm.isProcessing ? "Recognition is in progress. You can recognize this page again once it finishes" : "Recognize this page again; other pages stay as they are")
+        }
     }
 
     /// The auxiliary regions this page actually contains, in the order the

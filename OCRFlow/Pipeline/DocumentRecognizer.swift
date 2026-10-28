@@ -98,11 +98,37 @@ enum DocumentRecognizer {
                           progress: @escaping Progress,
                           onPage: PageHandler? = nil) throws -> [PageResult] {
         if url.pathExtension.lowercased() == "pdf" {
-            return try recognizePDF(at: url, settings: settings, engines: engines, done: done,
-                                    isCancelled: isCancelled, progress: progress, onPage: onPage)
+            guard let source = PDFSource(url: url) else { throw OCRError.pdfOpenFailed }
+            let count = source.pageCount
+            guard count > 0 else { throw OCRError.pdfOpenFailed }
+            return try readPages(count: count, done: done, isCancelled: isCancelled,
+                                 progress: progress, onPage: onPage) { index, report in
+                try recognizePDFPage(index, of: source, settings: settings, engines: engines,
+                                     isCancelled: isCancelled, progress: report)
+            }
         }
-        return try recognizeImageFile(at: url, settings: settings, engines: engines, done: done,
-                                      isCancelled: isCancelled, progress: progress, onPage: onPage)
+        let count = PageImages.frameCount(of: url)
+        guard count > 0 else { throw OCRError.imageLoadFailed }
+        progress(ProgressUpdate(fraction: 0.05, pagesDone: done.count, pageCount: count))
+        return try readPages(count: count, done: done, isCancelled: isCancelled,
+                             progress: progress, onPage: onPage) { index, report in
+            try recognizeImagePage(index, at: url, settings: settings, engines: engines,
+                                   isCancelled: isCancelled, progress: report)
+        }
+    }
+
+    /// Reads one page of a file again, on its own — the rest of the document
+    /// stays as it is.
+    static func recognize(page index: Int, of url: URL, settings: Settings, engines: Engines,
+                          isCancelled: @escaping @Sendable () -> Bool,
+                          progress: ((Double) -> Void)?) throws -> PageResult {
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let source = PDFSource(url: url), index < source.pageCount else { throw OCRError.pdfOpenFailed }
+            return try recognizePDFPage(index, of: source, settings: settings, engines: engines,
+                                        isCancelled: isCancelled, progress: progress)
+        }
+        return try recognizeImagePage(index, at: url, settings: settings, engines: engines,
+                                      isCancelled: isCancelled, progress: progress)
     }
 
     /// How many pages a file has, without reading any of them.
@@ -113,37 +139,21 @@ enum DocumentRecognizer {
 
     // MARK: - Files
 
-    private static func recognizeImageFile(at url: URL, settings: Settings, engines: Engines,
-                                           done: [Int: PageResult],
+    private static func recognizeImagePage(_ index: Int, at url: URL, settings: Settings, engines: Engines,
                                            isCancelled: @escaping @Sendable () -> Bool,
-                                           progress: @escaping Progress,
-                                           onPage: PageHandler?) throws -> [PageResult] {
-        let count = PageImages.frameCount(of: url)
-        guard count > 0 else { throw OCRError.imageLoadFailed }
-        progress(ProgressUpdate(fraction: 0.05, pagesDone: done.count, pageCount: count))
-        return try readPages(count: count, done: done, isCancelled: isCancelled,
-                             progress: progress, onPage: onPage) { index, report in
-            guard let image = PageImages.image(at: url, frame: index) else { throw OCRError.imageLoadFailed }
-            return try recognize(page: image, pdf: nil, settings: settings, engines: engines,
-                                 isCancelled: isCancelled, progress: report)
-        }
+                                           progress: ((Double) -> Void)?) throws -> PageResult {
+        guard let image = PageImages.image(at: url, frame: index) else { throw OCRError.imageLoadFailed }
+        return try recognize(page: image, pdf: nil, settings: settings, engines: engines,
+                             isCancelled: isCancelled, progress: progress)
     }
 
-    private static func recognizePDF(at url: URL, settings: Settings, engines: Engines,
-                                     done: [Int: PageResult],
-                                     isCancelled: @escaping @Sendable () -> Bool,
-                                     progress: @escaping Progress,
-                                     onPage: PageHandler?) throws -> [PageResult] {
-        guard let source = PDFSource(url: url) else { throw OCRError.pdfOpenFailed }
-        let count = source.pageCount
-        guard count > 0 else { throw OCRError.pdfOpenFailed }
-        return try readPages(count: count, done: done, isCancelled: isCancelled,
-                             progress: progress, onPage: onPage) { index, report in
-            guard let rendered = source.render(page: index) else { throw OCRError.imageLoadFailed }
-            return try recognize(page: rendered.image, pdf: (source, index, rendered),
-                                 settings: settings, engines: engines,
-                                 isCancelled: isCancelled, progress: report)
-        }
+    private static func recognizePDFPage(_ index: Int, of source: PDFSource, settings: Settings, engines: Engines,
+                                         isCancelled: @escaping @Sendable () -> Bool,
+                                         progress: ((Double) -> Void)?) throws -> PageResult {
+        guard let rendered = source.render(page: index) else { throw OCRError.imageLoadFailed }
+        return try recognize(page: rendered.image, pdf: (source, index, rendered),
+                             settings: settings, engines: engines,
+                             isCancelled: isCancelled, progress: progress)
     }
 
     /// Reads `count` pages, a couple at a time, and returns them in order.

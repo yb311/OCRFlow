@@ -764,6 +764,77 @@ final class OCRViewModel: ObservableObject {
         store.save(items[index])
     }
 
+    /// One page of one file.
+    struct PageRef: Hashable {
+        let itemID: UUID
+        let page: Int
+    }
+
+    /// Pages being read again on their own right now.
+    @Published private(set) var rereadingPages: Set<PageRef> = []
+
+    /// Whether one page of this result can be read again by itself. Not
+    /// while a run is going: the page would compete with it for the engines,
+    /// and a run that reaches this file would replace the page anyway.
+    func canRereadPage(_ item: ImageItem) -> Bool {
+        item.status == .completed && !isProcessing && !isStopping
+    }
+
+    /// Reads one page of a finished file again and puts it in place of the
+    /// old one; every other page, corrections included, stays as it is.
+    ///
+    /// The page is read with the engine the rest of the file was, so the
+    /// document does not end up half one engine and half another; the other
+    /// settings are the current ones, which is the point of asking — a page
+    /// read badly with one set of settings is read again with better ones.
+    ///
+    /// The old page's regions are not offered as alternatives, the way
+    /// rereading one region is: a page read again comes back with its own
+    /// regions, and there is no reliable way to pair them with the old ones.
+    func rereadPage(itemID: UUID, page: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              canRereadPage(items[index]), items[index].pages.indices.contains(page) else { return }
+        let item = items[index]
+        let ref = PageRef(itemID: itemID, page: page)
+        guard !rereadingPages.contains(ref) else { return }
+        if item.pages[page].blocks.contains(where: \.isCorrected) {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Page \(page + 1) has manual edits")
+            alert.informativeText = String(localized: "Recognizing this page again replaces these edits with the new result. Other pages are not affected.")
+            alert.addButton(withTitle: String(localized: "Recognize Again"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
+            alert.buttons.first?.hasDestructiveAction = true
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        var settings = currentRecognitionSettings()
+        if let engine = item.engine { settings.engine = engine }
+        let url = item.url
+        rereadingPages.insert(ref)
+
+        Task {
+            defer { rereadingPages.remove(ref) }
+            do {
+                let engines = try await loadEngines(for: settings)
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try DocumentRecognizer.recognize(page: page, of: url, settings: settings, engines: engines,
+                                                     isCancelled: { false }, progress: nil)
+                }.value
+                // The file may have been removed, or read again as a whole,
+                // while this page was being read.
+                guard let i = items.firstIndex(where: { $0.id == itemID }), items[i].status == .completed,
+                      items[i].pages.indices.contains(page) else { return }
+                items[i].pages[page] = result
+                rebuildDocument(at: i)
+                store.save(items[i])
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Recognizing page \(page + 1) again failed")
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
+    }
+
     // MARK: - Review
 
     /// Everything flagged for a person to look at, file by file, page by page,
