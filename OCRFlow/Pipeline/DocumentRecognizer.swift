@@ -70,33 +70,59 @@ enum DocumentRecognizer {
         var vlUnavailable: String?
     }
 
-    typealias Progress = @Sendable (Double) -> Void
+    /// How far one file has got: the share of the work done, and how many of
+    /// its pages are finished — which, for a file of five hundred pages, says
+    /// more than a percentage does.
+    struct ProgressUpdate: Sendable {
+        var fraction: Double
+        var pagesDone: Int
+        var pageCount: Int
+    }
+
+    typealias Progress = @Sendable (ProgressUpdate) -> Void
+
+    /// Hands over each page the moment it has been read in full, so it can be
+    /// kept before the rest of the file is done.
+    typealias PageHandler = @Sendable (Int, PageResult) -> Void
 
     /// Pages of one file read at once. Two is enough to keep the GPU fed —
     /// one page's layout and PP-OCR run while the other's regions are with
     /// the VLM — without holding a stack of rendered pages in memory.
     static let pagesInFlight = 2
 
+    /// Reads a file, skipping the pages in `done` — what an earlier, stopped
+    /// run of the same file with the same settings already read.
     static func recognize(url: URL, settings: Settings, engines: Engines,
+                          done: [Int: PageResult] = [:],
                           isCancelled: @escaping @Sendable () -> Bool,
-                          progress: @escaping Progress) throws -> [PageResult] {
+                          progress: @escaping Progress,
+                          onPage: PageHandler? = nil) throws -> [PageResult] {
         if url.pathExtension.lowercased() == "pdf" {
-            return try recognizePDF(at: url, settings: settings, engines: engines,
-                                    isCancelled: isCancelled, progress: progress)
+            return try recognizePDF(at: url, settings: settings, engines: engines, done: done,
+                                    isCancelled: isCancelled, progress: progress, onPage: onPage)
         }
-        return try recognizeImageFile(at: url, settings: settings, engines: engines,
-                                      isCancelled: isCancelled, progress: progress)
+        return try recognizeImageFile(at: url, settings: settings, engines: engines, done: done,
+                                      isCancelled: isCancelled, progress: progress, onPage: onPage)
+    }
+
+    /// How many pages a file has, without reading any of them.
+    static func pageCount(of url: URL) -> Int {
+        if url.pathExtension.lowercased() == "pdf" { return PDFSource(url: url)?.pageCount ?? 0 }
+        return PageImages.frameCount(of: url)
     }
 
     // MARK: - Files
 
     private static func recognizeImageFile(at url: URL, settings: Settings, engines: Engines,
+                                           done: [Int: PageResult],
                                            isCancelled: @escaping @Sendable () -> Bool,
-                                           progress: @escaping Progress) throws -> [PageResult] {
+                                           progress: @escaping Progress,
+                                           onPage: PageHandler?) throws -> [PageResult] {
         let count = PageImages.frameCount(of: url)
         guard count > 0 else { throw OCRError.imageLoadFailed }
-        progress(0.05)
-        return try readPages(count: count, isCancelled: isCancelled, progress: progress) { index, report in
+        progress(ProgressUpdate(fraction: 0.05, pagesDone: done.count, pageCount: count))
+        return try readPages(count: count, done: done, isCancelled: isCancelled,
+                             progress: progress, onPage: onPage) { index, report in
             guard let image = PageImages.image(at: url, frame: index) else { throw OCRError.imageLoadFailed }
             return try recognize(page: image, pdf: nil, settings: settings, engines: engines,
                                  isCancelled: isCancelled, progress: report)
@@ -104,12 +130,15 @@ enum DocumentRecognizer {
     }
 
     private static func recognizePDF(at url: URL, settings: Settings, engines: Engines,
+                                     done: [Int: PageResult],
                                      isCancelled: @escaping @Sendable () -> Bool,
-                                     progress: @escaping Progress) throws -> [PageResult] {
+                                     progress: @escaping Progress,
+                                     onPage: PageHandler?) throws -> [PageResult] {
         guard let source = PDFSource(url: url) else { throw OCRError.pdfOpenFailed }
         let count = source.pageCount
         guard count > 0 else { throw OCRError.pdfOpenFailed }
-        return try readPages(count: count, isCancelled: isCancelled, progress: progress) { index, report in
+        return try readPages(count: count, done: done, isCancelled: isCancelled,
+                             progress: progress, onPage: onPage) { index, report in
             guard let rendered = source.render(page: index) else { throw OCRError.imageLoadFailed }
             return try recognize(page: rendered.image, pdf: (source, index, rendered),
                                  settings: settings, engines: engines,
@@ -122,27 +151,42 @@ enum DocumentRecognizer {
     /// A page that fails is kept as an empty page that says why, so one
     /// unreadable page in a hundred does not throw the other ninety-nine
     /// away. Only a file none of whose pages could be read fails as a whole.
-    private static func readPages(count: Int, isCancelled: @escaping @Sendable () -> Bool,
+    ///
+    /// Pages already in `done` are not read again. Each page read here goes
+    /// to `onPage` once it is complete — never one a stop cut short, and never
+    /// one that failed, which is worth trying again next time.
+    private static func readPages(count: Int, done: [Int: PageResult],
+                                  isCancelled: @escaping @Sendable () -> Bool,
                                   progress: @escaping Progress,
+                                  onPage: PageHandler?,
                                   read: @escaping @Sendable (Int, @escaping (Double) -> Void) throws -> PageResult)
         throws -> [PageResult] {
         let lock = NSLock()
         var pages = [PageResult?](repeating: nil, count: count)
         var errors = [Error?](repeating: nil, count: count)
         var fractions = [Double](repeating: 0, count: count)
+        var finished = 0
+        for (index, page) in done where pages.indices.contains(index) {
+            pages[index] = page
+            fractions[index] = 1
+            finished += 1
+        }
 
-        func report(_ index: Int, _ fraction: Double) {
+        func report(_ index: Int, _ fraction: Double, finishing: Bool = false) {
             lock.lock()
             fractions[index] = min(max(fraction, 0), 1)
-            let total = fractions.reduce(0, +) / Double(count)
+            if finishing { finished += 1 }
+            let update = ProgressUpdate(fraction: fractions.reduce(0, +) / Double(count),
+                                        pagesDone: finished, pageCount: count)
             lock.unlock()
-            progress(total)
+            progress(update)
         }
+        progress(ProgressUpdate(fraction: Double(finished) / Double(count), pagesDone: finished, pageCount: count))
 
         let queue = DispatchQueue(label: "OCRFlow.pages", qos: .userInitiated, attributes: .concurrent)
         let slots = DispatchSemaphore(value: count == 1 ? 1 : pagesInFlight)
         let group = DispatchGroup()
-        for index in 0..<count {
+        for index in 0..<count where pages[index] == nil {
             slots.wait()
             if isCancelled() {
                 slots.signal()
@@ -157,10 +201,13 @@ enum DocumentRecognizer {
                 do {
                     let page = try read(index) { report(index, $0) }
                     lock.lock(); pages[index] = page; lock.unlock()
+                    // The engines answer a stop by returning what they have so
+                    // far, so a page that comes back after one is a fragment.
+                    if !isCancelled() { onPage?(index, page) }
                 } catch {
                     lock.lock(); errors[index] = error; lock.unlock()
                 }
-                report(index, 1)
+                report(index, 1, finishing: true)
             }
         }
         group.wait()

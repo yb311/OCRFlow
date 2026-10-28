@@ -125,6 +125,14 @@ private struct RunProgressView: View {
     var body: some View {
         if vm.isProcessing {
             let running = vm.items.filter { $0.status == .processing }
+            // A long document is most of a run on its own; its pages say how
+            // far through it is, which the file count cannot.
+            let document = running.first { $0.pageCount > 1 }
+            let names = running.map { item in
+                item.pageCount > 1
+                    ? String(localized: "\(item.fileName) (\(item.pagesDone)/\(item.pageCount) pages read)")
+                    : item.fileName
+            }
             HStack(spacing: 6) {
                 ProcessingRingView(progress: vm.totalProgress)
                     .frame(width: 14, height: 14)
@@ -133,8 +141,10 @@ private struct RunProgressView: View {
                 if let started = vm.runStartedAt {
                     TimelineView(.periodic(from: started, by: 1)) { context in
                         let seconds = Int(context.date.timeIntervalSince(started))
+                        let files = "\(vm.completedCount + vm.failedCount)/\(vm.items.count)"
                         let time = Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
-                        Text("\(vm.completedCount + vm.failedCount)/\(vm.items.count) · \(time)")
+                        Text(document.map { String(localized: "\($0.pagesDone)/\($0.pageCount) pages · \(files) · \(time)") }
+                             ?? "\(files) · \(time)")
                     }
                 }
             }
@@ -143,7 +153,7 @@ private struct RunProgressView: View {
             .foregroundStyle(.secondary)
             .fixedSize()
             .help(running.isEmpty ? String(localized: "Recognizing \(vm.totalProgress.percentText)")
-                  : String(localized: "Recognizing \(vm.totalProgress.percentText): \(running.map(\.fileName).formatted(.list(type: .and)))"))
+                  : String(localized: "Recognizing \(vm.totalProgress.percentText): \(names.formatted(.list(type: .and)))"))
         } else if !vm.items.isEmpty && vm.totalProgress > 0 {
             Label("\(vm.completedCount)/\(vm.items.count)", systemImage: "checkmark.circle.fill")
                 .labelStyle(.titleAndIcon)

@@ -80,6 +80,16 @@ struct SidebarView: View {
                                 $0.status == .completed || $0.status == .failed
                                     || $0.status == .cancelled
                             }
+                            // A document stopped part-way carries on from where it
+                            // got to; 重新识别 below starts it over.
+                            let resumable = targetItems.filter { $0.resume != nil && $0.status != .processing }
+                            if !resumable.isEmpty {
+                                Button(resumable.count > 1 ? String(localized: "Resume \(resumable.count) Files")
+                                                           : String(localized: "Resume")) {
+                                    vm.resumeItems(ids: Set(resumable.map(\.id)))
+                                }
+                                .disabled(vm.isProcessing)
+                            }
                             if anyFinished && !anyProcessing {
                                 let verb = allFailed ? String(localized: "Retry") : String(localized: "Recognize Again")
                                 Button(count > 1 ? String(localized: "\(verb) \(count) Files") : verb) {
@@ -340,8 +350,10 @@ struct SidebarRowView: View {
     private var statusLine: String {
         switch item.status {
         case .pending:
+            if let resume = item.resume { return Self.resumeLine(resume) }
             return "\(item.fileExtension) · \(item.fileSizeString)"
         case .processing:
+            if item.pageCount > 1 { return String(localized: "Recognizing page \(item.pagesDone)/\(item.pageCount)") }
             return String(localized: "Recognizing \(item.processingProgress.percentText)")
         case .completed:
             let pages = String(localized: "\(item.pages.count) pages")
@@ -350,8 +362,13 @@ struct SidebarRowView: View {
         case .failed:
             return item.errorMessage ?? String(localized: "Recognition Failed")
         case .cancelled:
+            if let resume = item.resume { return Self.resumeLine(resume) }
             return String(localized: "Cancelled")
         }
+    }
+
+    static func resumeLine(_ resume: ResumePoint) -> String {
+        String(localized: "\(resume.read)/\(resume.total) pages read; can resume")
     }
 
     /// On hover, failed/completed rows swap their status badge for the
@@ -362,15 +379,17 @@ struct SidebarRowView: View {
             Button {
                 // Runs it, rather than only flipping the badge back to 待处理
                 // and waiting for a separate 开始识别 — same as the context
-                // menu's 重试 and the detail pane's button.
-                vm.retryItems(ids: [item.id])
+                // menu's 重试 and the detail pane's button. A document
+                // stopped part-way carries on rather than starting over.
+                if item.resume != nil { vm.resumeItems(ids: [item.id]) }
+                else { vm.retryItems(ids: [item.id]) }
             } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
                     .font(.callout)
                     .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
-            .help(item.status == .cancelled ? "Recognize Again" : "Retry")
+            .help(item.resume != nil ? "Resume" : item.status == .cancelled ? "Recognize Again" : "Retry")
         } else if isHovering, item.status == .completed, !item.ocrText.isEmpty {
             Button {
                 vm.copyText(for: item.id)

@@ -45,8 +45,10 @@ struct DetailView: View {
                 }
             }
             if !rerunnable.isEmpty {
+                // Carries a document stopped part-way on from where it got
+                // to; one that failed has nothing kept and is read in full.
                 Button("Recognize \(rerunnable.count) Unfinished Files Again") {
-                    vm.retryItems(ids: Set(rerunnable.map(\.id)))
+                    vm.resumeItems(ids: Set(rerunnable.map(\.id)))
                 }
                 .buttonStyle(.bordered)
                 .disabled(vm.isProcessing)
@@ -664,7 +666,9 @@ struct ItemDetailView: View {
             statusPlaceholder(
                 icon: "circle.dashed",
                 title: String(localized: "Waiting for Recognition"),
-                subtitle: String(localized: "Click Start Recognition in the toolbar to process this file"),
+                subtitle: item.resume.map {
+                    String(localized: "\($0.read) of \($0.total) pages read last time. Click Start Recognition to read only the remaining pages")
+                } ?? String(localized: "Click Start Recognition in the toolbar to process this file"),
                 color: .secondary
             )
 
@@ -678,7 +682,9 @@ struct ItemDetailView: View {
                 VStack(spacing: 6) {
                     ProgressView(value: item.processingProgress)
                         .tint(.accentColor)
-                    Text(item.processingProgress.percentText)
+                    Text(item.pageCount > 1
+                         ? String(localized: "\(item.processingProgress.percentText) · \(item.pagesDone)/\(item.pageCount) pages read")
+                         : item.processingProgress.percentText)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
@@ -828,15 +834,33 @@ struct ItemDetailView: View {
                 Text("Cancelled")
                     .font(.title3)
                     .fontWeight(.semibold)
-                Text("Recognition stopped partway through. Only part of this page was read, so no result was kept.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                Button("Recognize Again") { vm.retryItems(ids: [item.id]) }
-                    .buttonStyle(.borderedProminent)
+                if let resume = item.resume {
+                    // The pages read before the stop are kept; reading on
+                    // reads only the rest.
+                    Text("Recognition stopped partway, with \(resume.read) of \(resume.total) pages read. Resuming reads only the remaining pages.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                    HStack(spacing: 10) {
+                        Button("Resume") { vm.resumeItems(ids: [item.id]) }
+                            .buttonStyle(.borderedProminent)
+                        Button("Start Over") { vm.retryItems(ids: [item.id]) }
+                            .buttonStyle(.bordered)
+                    }
                     .controlSize(.regular)
                     .disabled(vm.isProcessing)
+                } else {
+                    Text("Recognition stopped partway through. Only part of this page was read, so no result was kept.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                    Button("Recognize Again") { vm.retryItems(ids: [item.id]) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                        .disabled(vm.isProcessing)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 

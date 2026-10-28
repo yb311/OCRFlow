@@ -80,6 +80,16 @@
         }
       }
     },
+    "%@ (%lld/%lld pages read)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@（已读 %lld/%lld 页）"
+          }
+        }
+      }
+    },
     "%@ returned HTTP %lld. Try again later or switch the download source." : {
       "localizations" : {
         "zh-Hans" : {
@@ -124,6 +134,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · %lld 处待复核"
+          }
+        }
+      }
+    },
+    "%@ · %lld/%lld pages read" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 已读 %lld/%lld 页"
           }
         }
       }
@@ -560,6 +580,16 @@
         }
       }
     },
+    "%lld of %lld pages read last time. Click Start Recognition to read only the remaining pages" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次已读 %lld/%lld 页，点击「开始识别」只读剩下的页"
+          }
+        }
+      }
+    },
     "%lld pages" : {
       "localizations" : {
         "en" : {
@@ -738,6 +768,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld/%lld"
+          }
+        }
+      }
+    },
+    "%lld/%lld pages read; can resume" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已读 %lld/%lld 页，可继续"
+          }
+        }
+      }
+    },
+    "%lld/%lld pages · %@ · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld 页 · %3$@ · %4$@"
           }
         }
       }
@@ -4518,6 +4568,16 @@
         }
       }
     },
+    "Recognition stopped partway, with %lld of %lld pages read. Resuming reads only the remaining pages." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别在中途停止，已读 %lld/%lld 页。继续识别只读剩下的页。"
+          }
+        }
+      }
+    },
     "Recognize %lld Unfinished Files Again" : {
       "localizations" : {
         "en" : {
@@ -4630,6 +4690,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新识别会用新的识别结果替换这些修改。要保留修改，请先导出。"
+          }
+        }
+      }
+    },
+    "Recognizing page %lld/%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别中 %lld/%lld 页"
           }
         }
       }
@@ -5016,6 +5086,44 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "识别结果"
+          }
+        }
+      }
+    },
+    "Resume" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续识别"
+          }
+        }
+      }
+    },
+    "Resume %lld Files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Resume %lld File"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Resume %lld Files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续识别 %lld 个文件"
           }
         }
       }
@@ -5416,6 +5524,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "西班牙文"
+          }
+        }
+      }
+    },
+    "Start Over" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从头重新识别"
           }
         }
       }

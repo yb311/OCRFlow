@@ -301,6 +301,7 @@ final class OCRViewModel: ObservableObject {
                 self.recalcProgress()
                 self.updateWatcher()
                 store.pruneResults(keeping: Set(all.map(\.id)))
+                store.prunePartials(keeping: Set(all.compactMap(\.resume?.key)))
                 self.loadThumbnails(for: restored.map(\.id))
             }
         }
@@ -1158,6 +1159,9 @@ final class OCRViewModel: ObservableObject {
                 selectedIDs = []
             }
         }
+        for item in items where ids.contains(item.id) && item.status != .processing {
+            if let key = item.resume?.key { store.removePartial(for: key) }
+        }
         items.removeAll { ids.contains($0.id) }
         recalcProgress()
         store.remove(Array(ids))
@@ -1166,6 +1170,7 @@ final class OCRViewModel: ObservableObject {
 
     func clearAll() {
         store.remove(items.map(\.id))
+        store.prunePartials(keeping: [])
         items.removeAll()
         selectedIDs = []
         totalProgress = 0
@@ -1298,7 +1303,15 @@ final class OCRViewModel: ObservableObject {
         if let idx = items.firstIndex(where: { $0.id == id }) {
             items[idx].status = .pending
             items[idx].clearResults()
+            // Read from the first page: `processItem` drops the pages kept
+            // when it is told not to use what was read before.
+            items[idx].resume = nil
         }
+    }
+
+    /// Carries stopped documents on from the page they got to.
+    func resumeItems(ids: Set<UUID>) {
+        run(ids: items.filter { ids.contains($0.id) && isActionable($0) }.map(\.id), useCache: true)
     }
 
     // MARK: - Export
@@ -1699,6 +1712,8 @@ final class OCRViewModel: ObservableObject {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].status = .processing
         items[idx].processingProgress = 0
+        items[idx].pagesDone = 0
+        items[idx].pageCount = 0
         items[idx].reusedCachedResult = false
 
         let url = items[idx].url
@@ -1706,12 +1721,17 @@ final class OCRViewModel: ObservableObject {
         let cancelToken = cancellation
         let store = self.store
         let started = Date()
+        // Where this file's pages are kept as they are read, once known.
+        var resumeKey: String?
+        var pageTotal = 0
 
-        let reportProgress: @Sendable (Double) -> Void = { [weak self] value in
+        let reportProgress: DocumentRecognizer.Progress = { [weak self] update in
             Task { @MainActor [weak self] in
                 guard let self, let i = self.items.firstIndex(where: { $0.id == id }),
                       self.items[i].status == .processing else { return }
-                self.items[i].processingProgress = value
+                self.items[i].processingProgress = update.fraction
+                self.items[i].pagesDone = update.pagesDone
+                self.items[i].pageCount = update.pageCount
                 self.recalcProgress()
             }
         }
@@ -1723,35 +1743,74 @@ final class OCRViewModel: ObservableObject {
                 layoutAvailable: engines.paddle?.hasLayoutAnalysis ?? false,
                 unwarping: engines.unwarper != nil)
 
-            // Decoding and recognition run entirely off the main actor, so
-            // several files make real progress at once when `startProcessing`
-            // fans a batch out across a task group, instead of each one
-            // blocking the actor in turn.
-            let outcome = try await Task.detached(priority: .userInitiated) { () -> (pages: [PageResult], cached: Bool) in
+            // Hashing a large file and reading back the pages an earlier run
+            // kept both take a moment; neither belongs on the main actor.
+            let prepared = await Task.detached(priority: .userInitiated) {
+                () -> (key: String?, cached: [PageResult]?, count: Int, done: [Int: PageResult]) in
                 let key = ResultStore.cacheKey(for: url, fingerprint: fingerprint)
                 if useCache, let key, let pages = store.cachedPages(for: key) {
-                    return (pages, true)
+                    return (key, pages, pages.count, [:])
                 }
-                let pages = try DocumentRecognizer.recognize(url: url, settings: settings, engines: engines,
-                                                             isCancelled: { cancelToken.isCancelled },
-                                                             progress: reportProgress)
-                // Only a complete, clean reading is worth serving again.
-                let failedPage = pages.contains { $0.size == .zero }
-                if let key, !cancelToken.isCancelled, !failedPage {
-                    store.cache(pages, for: key)
+                // Only a document long enough to be stopped part-way is worth
+                // keeping page by page.
+                let count = DocumentRecognizer.pageCount(of: url)
+                guard let key, count > 1 else { return (key, nil, count, [:]) }
+                // Asked to read the file again: what was kept is not used.
+                guard useCache else {
+                    store.removePartial(for: key)
+                    return (key, nil, count, [:])
                 }
-                return (pages, false)
+                return (key, nil, count, store.partialPages(for: key))
             }.value
+
+            let outcome: (pages: [PageResult], cached: Bool)
+            if let cached = prepared.cached {
+                outcome = (cached, true)
+            } else {
+                if let key = prepared.key, prepared.count > 1 {
+                    resumeKey = key
+                    pageTotal = prepared.count
+                    // Saved now, so a crash part-way still knows where the
+                    // pages it read are.
+                    if let i = items.firstIndex(where: { $0.id == id }) {
+                        items[i].resume = ResumePoint(key: key, total: prepared.count, read: prepared.done.count)
+                        store.saveQueue(items)
+                    }
+                }
+                let keepKey = resumeKey
+                let done = prepared.done
+                // Decoding and recognition run entirely off the main actor, so
+                // several files make real progress at once when
+                // `startProcessing` fans a batch out across a task group,
+                // instead of each one blocking the actor in turn.
+                outcome = try await Task.detached(priority: .userInitiated) { () -> (pages: [PageResult], cached: Bool) in
+                    let pages = try DocumentRecognizer.recognize(
+                        url: url, settings: settings, engines: engines, done: done,
+                        isCancelled: { cancelToken.isCancelled },
+                        progress: reportProgress,
+                        onPage: keepKey.map { key in
+                            { @Sendable index, page in store.savePartialPage(page, index: index, for: key) }
+                        })
+                    // Only a complete, clean reading is worth serving again.
+                    let failedPage = pages.contains { $0.size == .zero }
+                    if let key = prepared.key, !cancelToken.isCancelled, !failedPage {
+                        store.cache(pages, for: key)
+                    }
+                    return (pages, false)
+                }.value
+            }
 
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
             // The engines answer a cancellation by returning early, so a
             // stopped run comes back like any other — just with part of the
             // page missing. Saving that as a result is what made a stopped
             // newspaper look like a page of nothing but image placeholders.
+            // The pages finished before the stop are kept apart, for 继续识别.
             guard !cancelToken.isCancelled || outcome.cached else {
                 var stopped = items[i]
                 stopped.clearResults()
                 stopped.status = .cancelled
+                stopped.resume = resumePoint(key: resumeKey, total: pageTotal)
                 items[i] = stopped
                 store.saveQueue(items)
                 return
@@ -1768,7 +1827,9 @@ final class OCRViewModel: ObservableObject {
             updated.elapsed = Date().timeIntervalSince(started)
             updated.reusedCachedResult = outcome.cached
             updated.processingProgress = 1.0
+            updated.resume = nil
             items[i] = updated          // single assignment → one objectWillChange
+            if let resumeKey { store.removePartial(for: resumeKey) }
             store.save(updated)
             store.saveQueue(items)
             exportIfWatched(updated)
@@ -1783,10 +1844,20 @@ final class OCRViewModel: ObservableObject {
             // a problem with the file.
             updated.status = cancelToken.isCancelled ? .cancelled : .failed
             updated.errorMessage = cancelToken.isCancelled ? nil : error.localizedDescription
+            // Whatever pages did get read are still worth carrying on from.
+            updated.resume = resumePoint(key: resumeKey, total: pageTotal)
             items[i] = updated
             store.save(updated)
             store.saveQueue(items)
         }
+    }
+
+    /// Where a document that stopped part-way got to, counted from the pages
+    /// actually on disk; nil when it got nowhere.
+    private func resumePoint(key: String?, total: Int) -> ResumePoint? {
+        guard let key else { return nil }
+        let read = store.partialPageCount(for: key)
+        return read > 0 ? ResumePoint(key: key, total: total, read: read) : nil
     }
 
     private func currentRecognitionSettings() -> DocumentRecognizer.Settings {

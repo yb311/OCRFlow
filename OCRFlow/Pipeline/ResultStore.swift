@@ -11,6 +11,10 @@ import CryptoKit
 /// the output — so a file read once is not read again: not when it is added a
 /// second time, not when it was renamed, not when it sits in two folders.
 ///
+/// A long document also leaves its pages here one by one as they are read,
+/// under the same key, so a run stopped at page 300 of 500 — by 停止, by
+/// quitting, or by a crash — carries on from page 301.
+///
 /// All disk work happens on a private serial queue; callers hand over values
 /// and move on.
 final class ResultStore: @unchecked Sendable {
@@ -22,6 +26,7 @@ final class ResultStore: @unchecked Sendable {
     let directory: URL
     private var resultsDirectory: URL { directory.appendingPathComponent("Results", isDirectory: true) }
     private var cacheDirectory: URL { directory.appendingPathComponent("Cache", isDirectory: true) }
+    private var partialDirectory: URL { directory.appendingPathComponent("Partial", isDirectory: true) }
     private var queueFile: URL { directory.appendingPathComponent("queue.json") }
     private let io = DispatchQueue(label: "OCRFlow.store", qos: .utility)
 
@@ -30,7 +35,7 @@ final class ResultStore: @unchecked Sendable {
 
     init(directory: URL = ResultStore.defaultDirectory) {
         self.directory = directory
-        for folder in [directory, resultsDirectory, cacheDirectory] {
+        for folder in [directory, resultsDirectory, cacheDirectory, partialDirectory] {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
     }
@@ -56,6 +61,11 @@ final class ResultStore: @unchecked Sendable {
         var engine: OCREngine?
         var elapsed: TimeInterval?
         var errorMessage: String?
+        /// Where a stopped document got to. How many pages it has read is
+        /// counted from what is on disk, not stored, so a crash between a
+        /// page landing and the list being saved cannot make them disagree.
+        var resumeKey: String?
+        var resumeTotal: Int?
     }
 
     /// Writes the list itself: which files, in which order, in which state.
@@ -64,7 +74,8 @@ final class ResultStore: @unchecked Sendable {
             Entry(id: item.id, path: item.url.path, root: item.root?.path,
                   // A file being read when the app went away was not read.
                   status: item.status == .processing ? .pending : item.status,
-                  engine: item.engine, elapsed: item.elapsed, errorMessage: item.errorMessage)
+                  engine: item.engine, elapsed: item.elapsed, errorMessage: item.errorMessage,
+                  resumeKey: item.resume?.key, resumeTotal: item.resume?.total)
         }
         io.async { [queueFile] in
             guard let data = try? JSONEncoder().encode(entries) else { return }
@@ -109,6 +120,10 @@ final class ResultStore: @unchecked Sendable {
             item.engine = entry.engine
             item.elapsed = entry.elapsed
             item.errorMessage = entry.errorMessage
+            if let key = entry.resumeKey, let total = entry.resumeTotal, item.status != .completed {
+                let read = partialPageCount(for: key)
+                item.resume = read > 0 ? ResumePoint(key: key, total: total, read: read) : nil
+            }
             // Only a finished file's result is shown; anything else is about
             // to be read again.
             if item.status == .completed, let data = try? Data(contentsOf: resultFile(for: entry.id)),
@@ -137,6 +152,62 @@ final class ResultStore: @unchecked Sendable {
 
     private func resultFile(for id: UUID) -> URL {
         resultsDirectory.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    // MARK: - Pages of a document still being read
+
+    /// Keeps one page of a document being read, the moment it is done. One
+    /// file per page: rewriting everything read so far after every page would
+    /// make the five-hundredth page cost as much as the first five hundred.
+    func savePartialPage(_ page: PageResult, index: Int, for key: String) {
+        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        io.async {
+            guard let data = try? JSONEncoder().encode(page) else { return }
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try? data.write(to: folder.appendingPathComponent("\(index).json"), options: .atomic)
+        }
+    }
+
+    /// The pages an earlier run of this file, read this way, got through,
+    /// by index.
+    func partialPages(for key: String) -> [Int: PageResult] {
+        io.sync {}   // pages still on their way to disk count too
+        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let decoder = JSONDecoder()
+        var pages: [Int: PageResult] = [:]
+        for file in files {
+            guard let index = Int(file.deletingPathExtension().lastPathComponent),
+                  let data = try? Data(contentsOf: file),
+                  let page = try? decoder.decode(PageResult.self, from: data) else { continue }
+            pages[index] = page
+        }
+        return pages
+    }
+
+    func partialPageCount(for key: String) -> Int {
+        io.sync {}
+        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        return files.filter { $0.hasSuffix(".json") }.count
+    }
+
+    func removePartial(for key: String) {
+        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        io.async { try? FileManager.default.removeItem(at: folder) }
+    }
+
+    /// Deletes the pages of documents no file in the list is waiting to
+    /// finish — left by a file that was removed, or read again with other
+    /// settings.
+    func prunePartials(keeping keys: Set<String>) {
+        io.async { [partialDirectory] in
+            let folders = (try? FileManager.default.contentsOfDirectory(at: partialDirectory,
+                                                                       includingPropertiesForKeys: nil)) ?? []
+            for folder in folders where !keys.contains(folder.lastPathComponent) {
+                try? FileManager.default.removeItem(at: folder)
+            }
+        }
     }
 
     // MARK: - Recognition cache

@@ -22,6 +22,16 @@ enum ProcessingStatus: String, Equatable, Codable {
     }
 }
 
+/// How far a stopped document got, and where its pages are kept.
+struct ResumePoint: Equatable {
+    /// The recognition cache key the pages are stored under: the file's
+    /// bytes and the settings. Either changing gives a different key, and the
+    /// pages kept under this one are not used.
+    var key: String
+    var total: Int
+    var read: Int
+}
+
 struct ImageItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
@@ -38,6 +48,12 @@ struct ImageItem: Identifiable, Equatable {
     var pages: [PageResult]
     var errorMessage: String?
     var processingProgress: Double   // 0.0 – 1.0, used when status == .processing
+    /// Pages finished and pages in all, while a multi-page file is being read.
+    var pagesDone = 0
+    var pageCount = 0
+    /// Set while a multi-page document is part-way read: it was stopped, the
+    /// app quit, or it is being read right now.
+    var resume: ResumePoint?
     /// Which engine produced the result currently attached, so an export can
     /// say where the text came from.
     var engine: OCREngine?
@@ -94,6 +110,8 @@ struct ImageItem: Identifiable, Equatable {
         engine = nil
         errorMessage = nil
         processingProgress = 0
+        pagesDone = 0
+        pageCount = 0
         elapsed = nil
     }
 
@@ -134,6 +152,7 @@ struct ImageItem: Identifiable, Equatable {
         lhs.id == rhs.id && lhs.status == rhs.status &&
         lhs.ocrText == rhs.ocrText && lhs.markdown == rhs.markdown &&
         lhs.processingProgress == rhs.processingProgress &&
+        lhs.pagesDone == rhs.pagesDone && lhs.resume == rhs.resume &&
         lhs.pages == rhs.pages && lhs.thumbnail === rhs.thumbnail &&
         lhs.errorMessage == rhs.errorMessage
     }
