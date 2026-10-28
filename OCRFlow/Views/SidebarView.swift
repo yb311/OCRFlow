@@ -218,7 +218,8 @@ struct SidebarView: View {
             Button {
                 vm.openFilePicker()
             } label: {
-                Image(systemName: "plus")
+                Label("Add Files", systemImage: "plus")
+                    .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -229,7 +230,8 @@ struct SidebarView: View {
             Button {
                 vm.removeSelectedItems()
             } label: {
-                Image(systemName: "minus")
+                Label("Remove Selected Files", systemImage: "minus")
+                    .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -250,7 +252,8 @@ struct SidebarView: View {
             Button {
                 showClearAllConfirm = true
             } label: {
-                Image(systemName: "trash")
+                Label("Clear List", systemImage: "trash")
+                    .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -276,6 +279,7 @@ struct SidebarView: View {
                     .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 6)
                     .help("Watching “\(folder.lastPathComponent)”")
+                    .accessibilityLabel("Watching “\(folder.lastPathComponent)”")
             }
 
             // One menu instead of a row of coloured counts: the counts are in
@@ -291,9 +295,10 @@ struct SidebarView: View {
                     }
                     .pickerStyle(.inline)
                 } label: {
-                    Image(systemName: filter == .all
+                    Label("Filter by Status", systemImage: filter == .all
                           ? "line.3.horizontal.decrease.circle"
                           : "line.3.horizontal.decrease.circle.fill")
+                        .labelStyle(.iconOnly)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -350,6 +355,25 @@ struct SidebarRowView: View {
         }
         .padding(.vertical, 3)
         .onHover { isHovering = $0 }
+        // One element for VoiceOver — the name and where it stands — with the
+        // hover buttons offered as actions, since a pointer is what shows them.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.fileName)
+        .accessibilityValue(snippet ?? statusLine)
+        .accessibilityActions {
+            if item.status == .failed || item.status == .cancelled {
+                Button(item.resume != nil ? "Resume" : item.status == .cancelled ? "Recognize Again" : "Retry") {
+                    if item.resume != nil { vm.resumeItems(ids: [item.id]) }
+                    else { vm.retryItems(ids: [item.id]) }
+                }
+            }
+            if item.status == .completed, !item.ocrText.isEmpty {
+                Button("Copy Text") { vm.copyText(for: item.id) }
+            }
+            if item.status == .completed, flagCount > 0 {
+                Button("Start Reviewing") { vm.startReview(itemID: item.id) }
+            }
+        }
     }
 
     /// How many things on this file are flagged for review.
@@ -486,6 +510,13 @@ struct ProcessingRingView: View {
     var progress: Double
 
     var body: some View {
+        ring
+            .accessibilityElement()
+            .accessibilityLabel("Progress")
+            .accessibilityValue(progress.percentText)
+    }
+
+    private var ring: some View {
         ZStack {
             Circle()
                 .stroke(Color.secondary.opacity(0.25), lineWidth: 2)

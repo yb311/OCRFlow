@@ -1032,6 +1032,16 @@
         }
       }
     },
+    "Add Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件"
+          }
+        }
+      }
+    },
     "Add Files…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1744,6 +1754,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除历史记录…"
+          }
+        }
+      }
+    },
+    "Clear List" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空列表"
           }
         }
       }
@@ -2960,6 +2980,16 @@
         }
       }
     },
+    "Filter by Status" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按状态筛选"
+          }
+        }
+      }
+    },
     "Filter by status" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2976,6 +3006,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "适合窗口"
+          }
+        }
+      }
+    },
+    "Fit to Window (⌘0)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适合窗口（⌘0）"
           }
         }
       }
@@ -3780,12 +3820,42 @@
         }
       }
     },
+    "Next" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个"
+          }
+        }
+      }
+    },
     "Next (⌘])" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一处（⌘]）"
+          }
+        }
+      }
+    },
+    "Next Match" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个匹配"
+          }
+        }
+      }
+    },
+    "Next Page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一页"
           }
         }
       }
@@ -4470,6 +4540,36 @@
         }
       }
     },
+    "Page %lld of %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 页，共 %2$lld 页"
+          }
+        }
+      }
+    },
+    "Page %lld of %lld, needs review" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 页，共 %2$lld 页，需要复核"
+          }
+        }
+      }
+    },
+    "Page %lld of “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%2$@」第 %1$lld 页"
+          }
+        }
+      }
+    },
     "Page %lld · %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4580,12 +4680,42 @@
         }
       }
     },
+    "Previous" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一个"
+          }
+        }
+      }
+    },
     "Previous (⌘[)" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "上一处（⌘[）"
+          }
+        }
+      }
+    },
+    "Previous Match" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一个匹配"
+          }
+        }
+      }
+    },
+    "Previous Page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一页"
           }
         }
       }
@@ -4644,6 +4774,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同时处理 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Progress" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进度"
           }
         }
       }
@@ -4950,6 +5090,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用 PaddleOCR-VL 重新识别此文件"
+          }
+        }
+      }
+    },
+    "Recognize This Page Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新识别这一页"
           }
         }
       }
@@ -5998,6 +6148,16 @@
         }
       }
     },
+    "Start Reviewing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始复核"
+          }
+        }
+      }
+    },
     "Start Using OCRFlow" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7020,6 +7180,16 @@
         }
       }
     },
+    "Warning" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "警告"
+          }
+        }
+      }
+    },
     "Watch" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7220,6 +7390,16 @@
         }
       }
     },
+    "Zoom %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放 %@"
+          }
+        }
+      }
+    },
     "Zoom In" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7230,12 +7410,32 @@
         }
       }
     },
+    "Zoom In (⌘+)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大（⌘+）"
+          }
+        }
+      }
+    },
     "Zoom Out" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩小"
+          }
+        }
+      }
+    },
+    "Zoom Out (⌘-)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小（⌘-）"
           }
         }
       }

@@ -251,6 +251,7 @@ struct ReviewDetailView: View {
                 Text(message).foregroundStyle(.secondary)
             } else {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .accessibilityLabel("Warning")
                 Text(message)
             }
         }
@@ -353,6 +354,7 @@ struct ReviewDetailView: View {
         let header = HStack(spacing: 8) {
             Image(systemName: isChosen ? "largecircle.fill.circle" : "circle")
                 .foregroundStyle(isChosen ? Color.accentColor : Color.secondary)
+                .accessibilityHidden(true)
             Text(title)
                 .fontWeight(isChosen ? .semibold : .regular)
                 .foregroundStyle(isChosen ? Color.primary : Color.secondary)
@@ -433,16 +435,21 @@ struct ReviewDetailView: View {
         HStack(spacing: 6) {
             Text(entry.fileName).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("Page \(entry.page + 1) · \(region.map { "\($0.readingOrder + 1) \($0.label.label)" } ?? String(localized: "Whole page"))")
                 .fontWeight(.medium)
             Spacer()
             Text("\(index + 1) / \(count)")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Button { move(by: -1, in: entries) } label: { Image(systemName: "chevron.left") }
+            Button { move(by: -1, in: entries) } label: {
+                Label("Previous", systemImage: "chevron.left").labelStyle(.iconOnly)
+            }
                 .keyboardShortcut("[", modifiers: .command)
                 .help("Previous (⌘[)")
-            Button { move(by: 1, in: entries) } label: { Image(systemName: "chevron.right") }
+            Button { move(by: 1, in: entries) } label: {
+                Label("Next", systemImage: "chevron.right").labelStyle(.iconOnly)
+            }
                 .keyboardShortcut("]", modifiers: .command)
                 .help("Next (⌘])")
         }

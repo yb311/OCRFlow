@@ -251,90 +251,166 @@ struct ItemDetailView: View {
 
     // MARK: - Image panel
 
-    private var imagePanel: some View {
-        VStack(spacing: 0) {
-            HStack {
-                if pageCount > 1 { pageStepper }
-                if item.pages.count > 1 { rereadPageButton }
-                if !searchMatches.isEmpty { matchStepper }
-                Spacer()
-                // Both engines draw boxes now, so both can hide them; the
-                // button used to appear only when there were text lines, which
-                // left the VL pipeline's blocks stuck on screen.
-                if !lines.isEmpty || !blocks.isEmpty {
-                    Button {
-                        vm.showTextBoxes.toggle()
-                    } label: {
-                        Image(systemName: vm.showTextBoxes
-                              ? "square.grid.3x3.fill" : "square.grid.3x3")
-                    }
-                    .accessibilityLabel("Text Boxes")
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
-                    .help(vm.showTextBoxes
-                          ? "Show all boxes (turn off to show only the block under the pointer)"
-                          : "Show only the block under the pointer (turn on to see all boxes at once)")
-
-                    // The auxiliary regions this page actually has, each one
-                    // switchable from here: the decision is about what is on
-                    // the page in front of you, so it belongs next to it.
-                    let auxiliary = presentAuxiliaryLabels
-                    if !auxiliary.isEmpty {
-                        Menu {
-                            ForEach(auxiliary, id: \.rawValue) { label in
-                                Toggle(label.label, isOn: Binding(
-                                    get: { vm.keptAuxiliary.contains(label) },
-                                    set: { vm.setAuxiliary(label, kept: $0) }))
-                            }
-                        } label: {
-                            Image(systemName: vm.droppedLabels.isDisjoint(with: auxiliary)
-                                  ? "text.badge.checkmark" : "text.badge.minus")
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        .help("Whether headers, footers, page numbers and other auxiliary content on this page go into the result (dashed boxes are excluded)")
-                    }
-                    Divider().frame(height: 14)
+    /// Page, search and box controls over the image, with the zoom on the right.
+    private var imageHeader: some View {
+        HStack {
+            if pageCount > 1 { pageStepper }
+            if item.pages.count > 1 { rereadPageButton }
+            if !searchMatches.isEmpty { matchStepper }
+            Spacer()
+            // Both engines draw boxes now, so both can hide them; the
+            // button used to appear only when there were text lines, which
+            // left the VL pipeline's blocks stuck on screen.
+            if !lines.isEmpty || !blocks.isEmpty {
+                Button {
+                    vm.showTextBoxes.toggle()
+                } label: {
+                    Label("Text Boxes", systemImage: vm.showTextBoxes
+                          ? "square.grid.3x3.fill" : "square.grid.3x3")
+                        .labelStyle(.iconOnly)
                 }
-                // Zoom controls
-                HStack(spacing: 4) {
-                    Button {
-                        zoom(to: imageZoom - zoomStep(below: imageZoom))
-                    } label: {
-                        Image(systemName: "minus.magnifyingglass")
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(imageZoom <= Self.minZoom)
-                    .help("Zoom Out")
+                .accessibilityAddTraits(vm.showTextBoxes ? .isSelected : [])
+                .buttonStyle(.borderless)
+                .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
+                .help(vm.showTextBoxes
+                      ? "Show all boxes (turn off to show only the block under the pointer)"
+                      : "Show only the block under the pointer (turn on to see all boxes at once)")
 
-                    Text(imageZoom.percentText)
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .frame(width: 42)
-
-                    Button {
-                        zoom(to: imageZoom + zoomStep(above: imageZoom))
+                // The auxiliary regions this page actually has, each one
+                // switchable from here: the decision is about what is on
+                // the page in front of you, so it belongs next to it.
+                let auxiliary = presentAuxiliaryLabels
+                if !auxiliary.isEmpty {
+                    Menu {
+                        ForEach(auxiliary, id: \.rawValue) { label in
+                            Toggle(label.label, isOn: Binding(
+                                get: { vm.keptAuxiliary.contains(label) },
+                                set: { vm.setAuxiliary(label, kept: $0) }))
+                        }
                     } label: {
-                        Image(systemName: "plus.magnifyingglass")
+                        Label("Auxiliary Content", systemImage: vm.droppedLabels.isDisjoint(with: auxiliary)
+                              ? "text.badge.checkmark" : "text.badge.minus")
+                            .labelStyle(.iconOnly)
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(imageZoom >= Self.maxZoom)
-                    .help("Zoom In")
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Whether headers, footers, page numbers and other auxiliary content on this page go into the result (dashed boxes are excluded)")
+                }
+                Divider().frame(height: 14)
+            }
+            zoomControls
+        }
+        .padding(.horizontal, 12)
+        .frame(height: Self.paneHeaderHeight)
+        .background(.bar)
+    }
 
-                    Button {
-                        zoom(to: 1.0)
-                    } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(imageZoom == 1.0)
-                    .help("Fit to Window")
+    private var zoomControls: some View {
+        HStack(spacing: 4) {
+            Button {
+                zoom(to: imageZoom - zoomStep(below: imageZoom))
+            } label: {
+                Label("Zoom Out", systemImage: "minus.magnifyingglass").labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(imageZoom <= Self.minZoom)
+            .help("Zoom Out (⌘-)")
+
+            Text(imageZoom.percentText)
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 42)
+                .accessibilityLabel("Zoom \(imageZoom.percentText)")
+
+            Button {
+                zoom(to: imageZoom + zoomStep(above: imageZoom))
+            } label: {
+                Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("=", modifiers: .command)
+            .disabled(imageZoom >= Self.maxZoom)
+            .help("Zoom In (⌘+)")
+
+            Button {
+                zoom(to: 1.0)
+            } label: {
+                Label("Fit to Window", systemImage: "arrow.up.left.and.arrow.down.right")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("0", modifiers: .command)
+            .disabled(imageZoom == 1.0)
+            .help("Fit to Window (⌘0)")
+        }
+    }
+
+    /// The page at the current zoom, its boxes over it, answering clicks and
+    /// the pointer.
+    private func pageCanvas(_ thumb: NSImage, fitted: CGSize) -> some View {
+        Image(nsImage: thumb)
+            .resizable()
+            .interpolation(imageZoom > 2 ? .none : .high)
+            .accessibilityLabel(Text(verbatim: pageImageLabel))
+            .frame(width: fitted.width * imageZoom,
+                   height: fitted.height * imageZoom)
+            .overlay {
+                // Only a finished run's boxes belong on the
+                // image. With the toggle off they appear one at
+                // a time, under the pointer.
+                if item.status == .completed, !blocks.isEmpty {
+                    LayoutBlockOverlay(blocks: blocks,
+                                       imageSize: pixelSize,
+                                       selected: selectedBlockIndex,
+                                       highlighted: hoveredBlockIndex,
+                                       showsAll: vm.showTextBoxes,
+                                       dropped: vm.droppedLabels)
+                }
+                if item.status == .completed, !lines.isEmpty {
+                    TextBoxOverlay(lines: lines,
+                                   imageSize: pixelSize,
+                                   selected: selectedLineIndex,
+                                   highlighted: hoveredLineIndex,
+                                   showsAll: vm.showTextBoxes)
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(height: Self.paneHeaderHeight)
-            .background(.bar)
+            // Declared before the single tap so a double click
+            // zooms instead of selecting twice.
+            .onTapGesture(count: 2) { zoom(to: imageZoom == 1 ? 2 : 1) }
+            .onTapGesture(count: 1, coordinateSpace: .local) { point in
+                let size = CGSize(width: fitted.width * imageZoom,
+                                  height: fitted.height * imageZoom)
+                withAnimation(.easeOut(duration: 0.15)) {
+                    selection = hitTest(point, renderedSize: size)
+                }
+            }
+            // Hovering is the fast way to ask "what did it read
+            // here?" — no click, no second pane, the answer
+            // lights up where it already is.
+            .onContinuousHover(coordinateSpace: .local) { phase in
+                switch phase {
+                case let .active(point):
+                    let size = CGSize(width: fitted.width * imageZoom,
+                                      height: fitted.height * imageZoom)
+                    hoveringPage = true
+                    let hit = hitTest(point, renderedSize: size)
+                    if hit != hovered { hovered = hit }
+                case .ended:
+                    hoveringPage = false
+                    hovered = nil
+                }
+            }
+    }
+
+    private var pageImageLabel: String {
+        pageCount > 1 ? String(localized: "Page \(pageIndex + 1) of “\(item.fileName)”") : item.fileName
+    }
+
+    private var imagePanel: some View {
+        VStack(spacing: 0) {
+            imageHeader
 
             Divider()
 
@@ -347,57 +423,7 @@ struct ItemDetailView: View {
                     let fitted = Self.fittedSize(for: pixelSize, in: geo.size,
                                                  inset: Self.previewInset)
                     ScrollView([.horizontal, .vertical]) {
-                        Image(nsImage: thumb)
-                            .resizable()
-                            .interpolation(imageZoom > 2 ? .none : .high)
-                            .frame(width: fitted.width * imageZoom,
-                                   height: fitted.height * imageZoom)
-                            .overlay {
-                                // Only a finished run's boxes belong on the
-                                // image. With the toggle off they appear one at
-                                // a time, under the pointer.
-                                if item.status == .completed, !blocks.isEmpty {
-                                    LayoutBlockOverlay(blocks: blocks,
-                                                       imageSize: pixelSize,
-                                                       selected: selectedBlockIndex,
-                                                       highlighted: hoveredBlockIndex,
-                                                       showsAll: vm.showTextBoxes,
-                                                       dropped: vm.droppedLabels)
-                                }
-                                if item.status == .completed, !lines.isEmpty {
-                                    TextBoxOverlay(lines: lines,
-                                                   imageSize: pixelSize,
-                                                   selected: selectedLineIndex,
-                                                   highlighted: hoveredLineIndex,
-                                                   showsAll: vm.showTextBoxes)
-                                }
-                            }
-                            // Declared before the single tap so a double click
-                            // zooms instead of selecting twice.
-                            .onTapGesture(count: 2) { zoom(to: imageZoom == 1 ? 2 : 1) }
-                            .onTapGesture(count: 1, coordinateSpace: .local) { point in
-                                let size = CGSize(width: fitted.width * imageZoom,
-                                                  height: fitted.height * imageZoom)
-                                withAnimation(.easeOut(duration: 0.15)) {
-                                    selection = hitTest(point, renderedSize: size)
-                                }
-                            }
-                            // Hovering is the fast way to ask "what did it read
-                            // here?" — no click, no second pane, the answer
-                            // lights up where it already is.
-                            .onContinuousHover(coordinateSpace: .local) { phase in
-                                switch phase {
-                                case let .active(point):
-                                    let size = CGSize(width: fitted.width * imageZoom,
-                                                      height: fitted.height * imageZoom)
-                                    hoveringPage = true
-                                    let hit = hitTest(point, renderedSize: size)
-                                    if hit != hovered { hovered = hit }
-                                case .ended:
-                                    hoveringPage = false
-                                    hovered = nil
-                                }
-                            }
+                        pageCanvas(thumb, fitted: fitted)
                             .padding(Self.previewInset / 2)
                             // Keeps the image centred while it is smaller than
                             // the pane, and lets it overflow once it is larger.
@@ -472,21 +498,24 @@ struct ItemDetailView: View {
             Button {
                 pageIndex = max(0, pageIndex - 1)
             } label: {
-                Image(systemName: "chevron.left")
+                Label("Previous Page", systemImage: "chevron.left").labelStyle(.iconOnly)
             }
             .keyboardShortcut(.leftArrow, modifiers: .option)
             .disabled(pageIndex == 0)
 
-            Text("\(pageIndex + 1) / \(pageCount)")
+            Text(verbatim: "\(pageIndex + 1) / \(pageCount)")
                 .font(.caption)
                 .monospacedDigit()
                 .foregroundStyle(page?.needsReview == true ? Color.orange : .secondary)
                 .frame(minWidth: 44)
+                .accessibilityLabel(page?.needsReview == true
+                                    ? String(localized: "Page \(pageIndex + 1) of \(pageCount), needs review")
+                                    : String(localized: "Page \(pageIndex + 1) of \(pageCount)"))
 
             Button {
                 pageIndex = min(pageCount - 1, pageIndex + 1)
             } label: {
-                Image(systemName: "chevron.right")
+                Label("Next Page", systemImage: "chevron.right").labelStyle(.iconOnly)
             }
             .keyboardShortcut(.rightArrow, modifiers: .option)
             .disabled(pageIndex >= pageCount - 1)
@@ -508,7 +537,7 @@ struct ItemDetailView: View {
             Button {
                 vm.rereadPage(itemID: item.id, page: pageIndex)
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Label("Recognize This Page Again", systemImage: "arrow.clockwise").labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
             .disabled(!vm.canRereadPage(item))
@@ -529,13 +558,13 @@ struct ItemDetailView: View {
             Button {
                 showMatch((matchIndex - 1 + searchMatches.count) % searchMatches.count)
             } label: {
-                Image(systemName: "chevron.up")
+                Label("Previous Match", systemImage: "chevron.up").labelStyle(.iconOnly)
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
             Button {
                 showMatch((matchIndex + 1) % searchMatches.count)
             } label: {
-                Image(systemName: "chevron.down")
+                Label("Next Match", systemImage: "chevron.down").labelStyle(.iconOnly)
             }
             .keyboardShortcut("g", modifiers: .command)
         }
@@ -686,7 +715,8 @@ struct ItemDetailView: View {
                                 withAnimation { showCopied = false }
                             }
                         } label: {
-                            Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                            Label(showCopied ? "Copied" : "Copy", systemImage: showCopied ? "checkmark" : "doc.on.doc")
+                                .labelStyle(.iconOnly)
                                 .foregroundStyle(showCopied ? Color.accentColor : Color.secondary)
                                 .frame(width: 18)
                         }
@@ -697,9 +727,8 @@ struct ItemDetailView: View {
                         Button {
                             translating = true
                         } label: {
-                            Image(systemName: "character.bubble")
+                            Label("Translate", systemImage: "character.bubble").labelStyle(.iconOnly)
                         }
-                        .accessibilityLabel("Translate")
                         .help("Translate the results on this Mac with macOS's built-in translation")
                         .sheet(isPresented: $translating) {
                             TranslationSheet(items: [item])
@@ -710,7 +739,7 @@ struct ItemDetailView: View {
                         Button {
                             vm.exportItems(ids: [item.id])
                         } label: {
-                            Image(systemName: "square.and.arrow.up")
+                            Label("Export", systemImage: "square.and.arrow.up").labelStyle(.iconOnly)
                         }
                         .help("Export only the results for “\(item.fileName)”")
                     }
