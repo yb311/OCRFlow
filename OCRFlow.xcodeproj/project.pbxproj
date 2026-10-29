@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F1000001000000000000B001 /* ScreenGrabber.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B001 /* ScreenGrabber.swift */; };
+		F1000001000000000000B002 /* CaptureOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B002 /* CaptureOverlay.swift */; };
+		F1000001000000000000B003 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B003 /* ScreenCapture.swift */; };
 		F1000001000000000000A001 /* DockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A001 /* DockIcon.swift */; };
 		F1000001000000000000A002 /* FloatingCaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A002 /* FloatingCaptureButton.swift */; };
 		F1000001000000000000A003 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A003 /* MenuBarMenu.swift */; };
@@ -27,6 +30,7 @@
 		EF8132789B61190B4A5A7092 /* LaunchSentinel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */; };
 		EF48B53D98608EFB58262624 /* DiagnosticReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */; };
 		E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */; };
+		F1000001000000000000C001 /* CaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000C001 /* CaptureTests.swift */; };
 		EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */; };
 		A1000001000000000000AA01 /* OCRFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA01 /* OCRFlowApp.swift */; };
 		A1000001000000000000AA02 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA02 /* ContentView.swift */; };
@@ -92,6 +96,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F1000002000000000000B001 /* ScreenGrabber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGrabber.swift; sourceTree = "<group>"; };
+		F1000002000000000000B002 /* CaptureOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOverlay.swift; sourceTree = "<group>"; };
+		F1000002000000000000B003 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
 		F1000002000000000000A001 /* DockIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIcon.swift; sourceTree = "<group>"; };
 		F1000002000000000000A002 /* FloatingCaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingCaptureButton.swift; sourceTree = "<group>"; };
 		F1000002000000000000A003 /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
@@ -112,6 +119,7 @@
 		ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSentinel.swift; sourceTree = "<group>"; };
 		EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReport.swift; sourceTree = "<group>"; };
 		E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultStoreTests.swift; sourceTree = "<group>"; };
+		F1000002000000000000C001 /* CaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureTests.swift; sourceTree = "<group>"; };
 		E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportNamingTests.swift; sourceTree = "<group>"; };
 		E0000002000000000000FF00 /* OCRFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OCRFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000002000000000000AA00 /* OCRFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OCRFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -197,6 +205,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F1000004000000000000B000 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				F1000002000000000000B001 /* ScreenGrabber.swift */,
+				F1000002000000000000B002 /* CaptureOverlay.swift */,
+				F1000002000000000000B003 /* ScreenCapture.swift */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
 		F1000004000000000000A000 /* Presence */ = {
 			isa = PBXGroup;
 			children = (
@@ -215,6 +233,7 @@
 				EE8A099FA9F3963CEC5AFCA7 /* HistoryTests.swift */,
 				E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */,
 				E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */,
+				F1000002000000000000C001 /* CaptureTests.swift */,
 				E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */,
 			);
 			path = OCRFlowTests;
@@ -241,6 +260,7 @@
 				A1000004000000000000AA05 /* Views */,
 				B1000004000000000000040A /* Updates */,
 				F1000004000000000000A000 /* Presence */,
+				F1000004000000000000B000 /* Capture */,
 				B10000040000000000000A01 /* PaddleOCR */,
 				B1000004000000000000010A /* Layout */,
 				B1000004000000000000020A /* PaddleVL */,
@@ -547,6 +567,7 @@
 				E0C4CF9F1B72E5212F9A97ED /* HistoryTests.swift in Sources */,
 				EB43135A63A94DB46B2A6407 /* DiagnosticsTests.swift in Sources */,
 				E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */,
+				F1000001000000000000C001 /* CaptureTests.swift in Sources */,
 				EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -619,6 +640,9 @@
 				B10000010000000000000A08 /* PPDocUnwarper.swift in Sources */,
 				B100000100000000000000AC /* MathSyntax.swift in Sources */,
 				B1000001000000000000040B /* UpdaterController.swift in Sources */,
+				F1000001000000000000B001 /* ScreenGrabber.swift in Sources */,
+				F1000001000000000000B002 /* CaptureOverlay.swift in Sources */,
+				F1000001000000000000B003 /* ScreenCapture.swift in Sources */,
 				F1000001000000000000A001 /* DockIcon.swift in Sources */,
 				F1000001000000000000A002 /* FloatingCaptureButton.swift in Sources */,
 				F1000001000000000000A003 /* MenuBarMenu.swift in Sources */,

@@ -40,7 +40,7 @@ final class FloatingCaptureButton {
         let view = FloatingButtonView(state: state)
         view.onClick = { [weak model] in model?.captureScreenshot() }
         view.onDrop = { [weak self] in self?.settle() }
-        view.menu = Self.menu(model: model)
+        view.makeMenu = { [weak model] in model.map(Self.menu(model:)) }
         panel.contentView = view
 
         panel.setFrame(frame(for: Parking.saved), display: false)
@@ -48,12 +48,7 @@ final class FloatingCaptureButton {
         model.$isProcessing.combineLatest(model.$totalProgress)
             .sink { [state] processing, progress in state.progress = processing ? progress : nil }
             .store(in: &subscriptions)
-        // Out of the way while the crosshair is up, so it is not in the picture.
-        model.$isCapturing
-            .sink { [panel] capturing in
-                if capturing { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
-            }
-            .store(in: &subscriptions)
+        panel.orderFrontRegardless()
 
         // A display unplugged or rearranged: back to the same place on
         // whatever screens are left.
@@ -130,9 +125,15 @@ final class FloatingCaptureButton {
 
     private static func menu(model: OCRViewModel) -> NSMenu {
         let menu = NSMenu()
+        menu.autoenablesItems = false
         menu.addItem(MenuAction.item(String(localized: "Capture Screenshot")) { [weak model] in
             model?.captureScreenshot()
         })
+        let again = MenuAction.item(String(localized: "Capture Same Area Again")) { [weak model] in
+            model?.captureSameAreaAgain()
+        }
+        again.isEnabled = model.lastCaptureTarget != nil
+        menu.addItem(again)
         menu.addItem(MenuAction.item(String(localized: "Open OCRFlow")) { [weak model] in
             model?.showMainWindow?()
         })
@@ -165,12 +166,6 @@ private final class MenuAction: NSObject {
     }
 }
 
-private extension NSScreen {
-    var displayID: CGDirectDisplayID? {
-        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-    }
-}
-
 // MARK: - The button
 
 @MainActor
@@ -188,6 +183,8 @@ private final class FloatingButtonState: ObservableObject {
 private final class FloatingButtonView: NSView {
     var onClick: () -> Void = {}
     var onDrop: () -> Void = {}
+    /// Made on each right-click, so what it offers is current.
+    var makeMenu: () -> NSMenu? = { nil }
 
     private let state: FloatingButtonState
     private var dragStart: (pointer: NSPoint, origin: NSPoint)?
@@ -284,7 +281,7 @@ private final class FloatingButtonView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        guard let menu else { return }
+        guard let menu = makeMenu() else { return }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 

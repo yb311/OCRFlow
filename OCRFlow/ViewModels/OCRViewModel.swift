@@ -982,28 +982,30 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Capture shortcut
 
-    /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one.
+    /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one, and
+    /// the same place again with ⌥⇧⌘3.
     @Published var globalCaptureShortcut = true {
         didSet { persistSettings(); if !isRestoringSettings { updateCaptureShortcut() } }
     }
-    /// True when another app already holds the shortcut.
+    /// True when another app already holds ⌥⇧⌘2.
     @Published private(set) var captureShortcutTaken = false
-    private var captureHotKey: GlobalHotKey?
+    /// True when another app already holds ⌥⇧⌘3.
+    @Published private(set) var captureAgainShortcutTaken = false
+    private var captureHotKeys: [GlobalHotKey] = []
     /// Brings the main window to the front, opening one if it was closed —
     /// for a capture made from another app, or the menu bar. Set by the app.
     var showMainWindow: (() -> Void)?
 
     private func updateCaptureShortcut() {
-        captureHotKey?.unregister()
-        captureHotKey = nil
+        captureHotKeys.forEach { $0.unregister() }
+        captureHotKeys = []
         captureShortcutTaken = false
+        captureAgainShortcutTaken = false
         guard globalCaptureShortcut else { return }
-        let hotKey = GlobalHotKey.capture { [weak self] in self?.captureScreenshot() }
-        if hotKey.register() {
-            captureHotKey = hotKey
-        } else {
-            captureShortcutTaken = true
-        }
+        let capture = GlobalHotKey.capture { [weak self] in self?.captureScreenshot() }
+        let again = GlobalHotKey.captureAgain { [weak self] in self?.captureSameAreaAgain() }
+        if capture.register() { captureHotKeys.append(capture) } else { captureShortcutTaken = true }
+        if again.register() { captureHotKeys.append(again) } else { captureAgainShortcutTaken = true }
     }
 
     // MARK: - Presence
@@ -1154,48 +1156,83 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Screenshot
 
-    /// While the crosshair is up. The floating button steps aside meanwhile,
-    /// so it is not in the picture.
+    /// From the moment capture is asked for until the picture is taken or
+    /// the user gives up, so a second press does not start a second one.
     @Published private(set) var isCapturing = false
+    /// Where the last screenshot was taken, so the same place can be taken
+    /// again — the next page of a document shown on screen, say.
+    @Published private(set) var lastCaptureTarget: CaptureTarget?
+    /// Screenshots taken while a run was busy, read once it ends.
+    private var capturesWaiting = Set<UUID>()
 
-    /// Lets the user drag out a part of the screen, then reads it like any
-    /// other file. The capture is kept in the library folder, so the entry in
-    /// the list keeps working after a relaunch.
+    /// Lets the user drag out a part of the screen or click a window, then
+    /// reads it like any other file.
     func captureScreenshot() {
-        // A second press while the crosshair is up would start a second one.
         guard !isCapturing else { return }
+        isCapturing = true
+        Task {
+            let taken = await ScreenCapture.choose()
+            isCapturing = false
+            guard let taken else { return }
+            lastCaptureTarget = taken.target
+            // Taken from another app: the result is what the user is
+            // waiting to see.
+            receiveCapture(taken.image, show: true)
+        }
+    }
+
+    /// Takes the same place as last time again, straight away. If it is gone
+    /// — the window closed — the user chooses again.
+    func captureSameAreaAgain() {
+        guard let target = lastCaptureTarget else { return captureScreenshot() }
+        guard !isCapturing else { return }
+        isCapturing = true
+        Task {
+            let result = await ScreenCapture.retake(target)
+            isCapturing = false
+            switch result {
+            case .taken(let image):
+                // The app in front stays in front: the next page is turned
+                // there.
+                receiveCapture(image, show: false)
+            case .gone:
+                lastCaptureTarget = nil
+                captureScreenshot()
+            case .failed:
+                break
+            }
+        }
+    }
+
+    /// Kept in the library folder, so the entry in the list keeps working
+    /// after a relaunch.
+    private func receiveCapture(_ image: CGImage, show: Bool) {
         let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let url = folder.appendingPathComponent(String(localized: "Screenshot \(formatter.string(from: Date())).png"))
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        // -i: drag out a region (space bar switches to a window); -x: no sound.
-        process.arguments = ["-i", "-x", url.path]
-        process.terminationHandler = { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.isCapturing = false
-                // Escape leaves no file behind, and nothing is added.
-                guard FileManager.default.fileExists(atPath: url.path) else { return }
-                // Taken from another app with the global shortcut: the result
-                // is what the user is waiting to see.
-                self.showMainWindow?()
-                let before = Set(self.items.map(\.id))
-                self.add([(url, nil)])
-                if let new = self.items.first(where: { !before.contains($0.id) }) {
-                    self.selectedIDs = [new.id]
-                    if !self.isProcessing { self.run(ids: [new.id], useCache: false) }
-                }
-            }
+        let name = String(localized: "Screenshot \(formatter.string(from: Date()))")
+        // Several in one second, when taking page after page.
+        var url = folder.appendingPathComponent(name).appendingPathExtension("png")
+        var count = 1
+        while FileManager.default.fileExists(atPath: url.path) {
+            count += 1
+            url = folder.appendingPathComponent("\(name) \(count)").appendingPathExtension("png")
         }
-        isCapturing = true
-        do {
-            try process.run()
-        } catch {
-            isCapturing = false
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        else { return }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return }
+
+        if show { showMainWindow?() }
+        let before = Set(items.map(\.id))
+        add([(url, nil)])
+        guard let new = items.first(where: { !before.contains($0.id) }) else { return }
+        selectedIDs = [new.id]
+        if isProcessing {
+            capturesWaiting.insert(new.id)
+        } else {
+            run(ids: [new.id], useCache: false)
         }
     }
 
@@ -1323,12 +1360,15 @@ final class OCRViewModel: ObservableObject {
             isProcessing = false
             isStopping = false
             runStartedAt = nil
-            // Files the watcher found while this run was busy.
-            if watchBacklog {
-                watchBacklog = false
-                let waiting = items.filter { watchedIDs.contains($0.id) && $0.status == .pending }.map(\.id)
-                run(ids: waiting, useCache: true)
-            }
+            // Files the watcher found, and screenshots taken, while this run
+            // was busy.
+            let watched = watchBacklog ? watchedIDs : []
+            watchBacklog = false
+            let waiting = items.filter {
+                (watched.contains($0.id) || capturesWaiting.contains($0.id)) && $0.status == .pending
+            }.map(\.id)
+            capturesWaiting.removeAll()
+            run(ids: waiting, useCache: true)
         }
     }
 

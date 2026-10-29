@@ -1560,6 +1560,16 @@
         }
       }
     },
+    "Capture Same Area Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次截取同一区域"
+          }
+        }
+      }
+    },
     "Capture Screenshot" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2586,12 +2596,12 @@
         }
       }
     },
-    "Drag out part of the screen and it is recognized right away, without switching to OCRFlow first" : {
+    "Drag out part of the screen or click a window, and it is recognized right away. %@ takes the same area again, for page after page" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拖选屏幕的一部分，立即识别，无需先切换到 OCRFlow"
+            "value" : "拖选屏幕的一部分或点按一个窗口，马上就会识别。%@ 可再次截取同一区域，适合一页接一页地截。"
           }
         }
       }
@@ -4148,6 +4158,16 @@
         }
       }
     },
+    "OCRFlow needs permission to record the screen" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCRFlow 需要录制屏幕的权限"
+          }
+        }
+      }
+    },
     "OCRFlow quit unexpectedly last time" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4254,6 +4274,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开 OCRFlow"
+          }
+        }
+      }
+    },
+    "Open System Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开系统设置"
           }
         }
       }
@@ -5996,12 +6026,12 @@
         }
       }
     },
-    "Screenshot %@.png" : {
+    "Screenshot %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "截图 %@.png"
+            "value" : "截图 %@"
           }
         }
       }
@@ -6902,6 +6932,16 @@
         }
       }
     },
+    "The screen could not be captured" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法截取屏幕"
+          }
+        }
+      }
+    },
     "The text is already in the selected language" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7234,6 +7274,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "去除行首尾空格"
+          }
+        }
+      }
+    },
+    "Turn on OCRFlow in Privacy & Security → Screen & System Audio Recording, then reopen it. Screenshots are read on this Mac and never leave it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“隐私与安全性 → 录屏与系统录音”中打开 OCRFlow，然后重新打开它。截图只在这台 Mac 上识别，不会离开这台电脑。"
           }
         }
       }

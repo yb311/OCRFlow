@@ -8,8 +8,9 @@ import Carbon.HIToolbox
 /// Monitoring permission, and the keys never reach the app in front.
 @MainActor
 final class GlobalHotKey {
-    /// The capture shortcut, as the menu would write it.
+    /// The capture shortcuts, as the menu would write them.
     static let captureTitle = "⌥⇧⌘2"
+    static let captureAgainTitle = "⌥⇧⌘3"
 
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
@@ -18,13 +19,20 @@ final class GlobalHotKey {
     /// ⌥⇧⌘2: the in-app capture shortcut, ⇧⌘2, with ⌥ added so it does not
     /// take the plain one from whichever app is in front.
     static func capture(_ action: @escaping () -> Void) -> GlobalHotKey {
-        GlobalHotKey(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(optionKey | shiftKey | cmdKey), action: action)
+        GlobalHotKey(id: 1, keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(optionKey | shiftKey | cmdKey), action: action)
     }
 
+    /// ⌥⇧⌘3: the same place as the last capture, again.
+    static func captureAgain(_ action: @escaping () -> Void) -> GlobalHotKey {
+        GlobalHotKey(id: 2, keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(optionKey | shiftKey | cmdKey), action: action)
+    }
+
+    private let id: UInt32
     private let keyCode: UInt32
     private let modifiers: UInt32
 
-    init(keyCode: UInt32, modifiers: UInt32, action: @escaping () -> Void) {
+    init(id: UInt32, keyCode: UInt32, modifiers: UInt32, action: @escaping () -> Void) {
+        self.id = id
         self.keyCode = keyCode
         self.modifiers = modifiers
         self.action = action
@@ -34,16 +42,21 @@ final class GlobalHotKey {
     func register() -> Bool {
         guard hotKey == nil else { return true }
         var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let status = InstallEventHandler(GetApplicationEventTarget(), { _, _, context in
-            guard let context else { return OSStatus(eventNotHandledErr) }
+        let status = InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
+            guard let event, let context else { return OSStatus(eventNotHandledErr) }
             let hotKey = Unmanaged<GlobalHotKey>.fromOpaque(context).takeUnretainedValue()
+            // Every hot key's handler hears every press; each takes only its own.
+            var pressed = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+            guard pressed.id == hotKey.id else { return OSStatus(eventNotHandledErr) }
             // Delivered through the main run loop.
             MainActor.assumeIsolated { hotKey.action() }
             return noErr
         }, 1, &type, Unmanaged.passUnretained(self).toOpaque(), &handler)
         guard status == noErr else { return false }
-        let id = EventHotKeyID(signature: OSType(0x4F43_5246), id: 1)   // 'OCRF'
-        guard RegisterEventHotKey(keyCode, modifiers, id, GetApplicationEventTarget(), 0, &hotKey) == noErr else {
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4F43_5246), id: id)   // 'OCRF'
+        guard RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey) == noErr else {
             unregister()
             return false
         }

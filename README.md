@@ -29,7 +29,8 @@ A native macOS app for batch OCR (Optical Character Recognition) and document pa
 - **In-app model manager** — download the `medium` tier and extra language models from inside the app, with a mainland-China mirror
 - **Text post-processing** — merge line breaks, remove empty lines, trim whitespace, fix hyphenated words
 - **Flexible export** — Markdown, plain text, per-page JSON, **searchable PDF** (invisible text layer over the original page, vectors untouched) and **Excel** (each recognised table one sheet, merged cells kept); combined into one file or one per source with the folder structure kept
-- **Screenshot recognition** from any app — ⌥⇧⌘2, the menu bar, or a small floating button — and **on-device translation** of results (Apple's Translation framework). Can live in the menu bar with no Dock icon
+- **Screenshot recognition** from any app — ⌥⇧⌘2, the menu bar, or a small floating button. Drag out an area or click a window on the frozen screen; ⌥⇧⌘3 takes the same area again, for page after page. Can live in the menu bar with no Dock icon
+- **On-device translation** of results (Apple's Translation framework)
 - **Private** — the PaddleOCR models ship inside the app and recognition runs entirely on your Mac; files and text are never uploaded. The app goes online only for model downloads you start and the update check. See [Privacy](docs/PRIVACY.md)
 - **macOS-native** — built with SwiftUI, feels right at home on macOS
 

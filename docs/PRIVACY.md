@@ -11,6 +11,9 @@ locally. There are no accounts, no analytics and no tracking.
   `~/Library/Application Support/OCRFlow/Library`.
 - The history and its search index, in the same folder.
 - Downloaded models, in `~/Library/Application Support/OCRFlow/Models`.
+- Screenshots, in the `Screenshots` folder inside `Library`. Capturing needs
+  macOS's Screen Recording permission; the app looks at the screen only when
+  you capture.
 
 Removing an entry from the history deletes its text and result. **Clear
 History** deletes all of them, and the recognition cache too. Deleting the
@@ -51,6 +54,7 @@ macOS wrote, with your home folder replaced by `~`.
 - 队列、识别结果、修改记录和识别缓存,存放在 `~/Library/Application Support/OCRFlow/Library`。
 - 历史记录及其搜索索引,也在同一个文件夹里。
 - 下载的模型,存放在 `~/Library/Application Support/OCRFlow/Models`。
+- 截图,存放在 `Library` 里的 `Screenshots` 文件夹。截图需要 macOS 的“录屏”权限;只有在你截图时,应用才会读取屏幕。
 
 从历史记录里删除一条,会删除它的文字和识别结果。**清除历史记录**会删除全部记录,连同识别缓存一起清空。删除上面的 `OCRFlow` 文件夹,就会清除应用存储的全部数据。
 

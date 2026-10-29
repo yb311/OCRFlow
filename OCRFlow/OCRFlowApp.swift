@@ -133,6 +133,12 @@ struct OCRFlowApp: App {
                     viewModel.captureScreenshot()
                 }
                 .keyboardShortcut("2", modifiers: [.command, .shift])
+
+                Button("Capture Same Area Again") {
+                    viewModel.captureSameAreaAgain()
+                }
+                .keyboardShortcut("3", modifiers: [.command, .shift, .option])
+                .disabled(viewModel.lastCaptureTarget == nil)
             }
 
             CommandGroup(before: .sidebar) {
