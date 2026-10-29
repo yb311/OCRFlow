@@ -5,12 +5,13 @@ import AppKit
 enum ScreenCapture {
     /// Holds the screen still and lets the user choose a part of it or a
     /// window. Nil when cancelled, or when it could not be taken — the user
-    /// has been told why.
-    static func choose() async -> (image: CGImage, target: CaptureTarget)? {
+    /// has been told why. `returnFocus` puts the app that was in front back
+    /// in front afterwards, for the user to carry on in.
+    static func choose(returnFocus: Bool = false) async -> (image: CGImage, target: CaptureTarget)? {
         guard isAllowed() else { return nil }
         do {
             let shots = try await ScreenGrabber.displays(excluding: ownHelperWindows)
-            switch await CaptureOverlay.choose(from: shots) {
+            switch await CaptureOverlay.choose(from: shots, returnFocus: returnFocus) {
             case nil:
                 return nil
             case let .region(target, image):
@@ -44,6 +45,11 @@ enum ScreenCapture {
             report(error)
             return .failed
         }
+    }
+
+    /// The place as it is now, with no flash and no message if it fails.
+    static func grab(_ target: CaptureTarget, maxWidth: Int? = nil) async throws -> CGImage {
+        try await ScreenGrabber.capture(target, excluding: ownHelperWindows, maxWidth: maxWidth)
     }
 
     /// The floating button and anything else of the app's that floats over
@@ -118,7 +124,7 @@ enum ScreenCapture {
     }
 
     /// Where the target is now, in screen coordinates.
-    private static func frame(of target: CaptureTarget) -> CGRect? {
+    static func frame(of target: CaptureTarget) -> CGRect? {
         switch target {
         case let .region(display, rect):
             guard let screen = NSScreen.screens.first(where: { $0.displayID == display }) else { return nil }

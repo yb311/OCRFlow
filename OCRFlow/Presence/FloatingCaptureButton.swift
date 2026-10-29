@@ -134,6 +134,9 @@ final class FloatingCaptureButton {
         }
         again.isEnabled = model.lastCaptureTarget != nil
         menu.addItem(again)
+        menu.addItem(MenuAction.item(String(localized: "Capture Page by Page…")) { [weak model] in
+            model?.capturePageByPage()
+        })
         menu.addItem(MenuAction.item(String(localized: "Open OCRFlow")) { [weak model] in
             model?.showMainWindow?()
         })

@@ -17,8 +17,9 @@ final class CaptureOverlay {
     }
 
     /// Nil when the user cancels.
-    static func choose(from shots: [CGDirectDisplayID: CGImage]) async -> Choice? {
+    static func choose(from shots: [CGDirectDisplayID: CGImage], returnFocus: Bool = false) async -> Choice? {
         let overlay = CaptureOverlay(shots: shots)
+        overlay.returnFocus = returnFocus
         current = overlay
         return await withCheckedContinuation { continuation in
             overlay.continuation = continuation
@@ -41,6 +42,9 @@ final class CaptureOverlay {
     private var panels: [OverlayWindow] = []
     private var continuation: CheckedContinuation<Choice?, Never>?
     private var previousApp: NSRunningApplication?
+    /// Give the app that was in front back its place even when something
+    /// was chosen.
+    private var returnFocus = false
 
     /// Where a drag started, and the screen it is kept to.
     private var dragStart: (point: NSPoint, screen: NSScreen)?
@@ -100,7 +104,7 @@ final class CaptureOverlay {
         NSCursor.pop()
         for panel in panels { panel.orderOut(nil) }
         panels.removeAll()
-        if choice == nil { previousApp?.activate() }
+        if choice == nil || returnFocus { previousApp?.activate() }
         Self.current = nil
         continuation.resume(returning: choice)
     }

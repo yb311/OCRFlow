@@ -1560,6 +1560,16 @@
         }
       }
     },
+    "Capture Page by Page…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逐页截取…"
+          }
+        }
+      }
+    },
     "Capture Same Area Again" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1596,6 +1606,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在屏幕顶部的图标里截图、打开文件和进入设置"
+          }
+        }
+      }
+    },
+    "Capturing page %lld…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在截取第 %lld 页…"
           }
         }
       }
@@ -2542,6 +2562,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文档识别完成后会出现在这里，从列表移除后也会保留。"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
           }
         }
       }
@@ -4158,6 +4188,16 @@
         }
       }
     },
+    "OCRFlow needs Accessibility permission to turn pages" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCRFlow 需要辅助功能权限来翻页"
+          }
+        }
+      }
+    },
     "OCRFlow needs permission to record the screen" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4748,6 +4788,16 @@
         }
       }
     },
+    "Page 1 is captured. Now go to the next page the way you normally would — click, press a key or scroll — then click Done." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 1 页已截取。现在像平常一样翻到下一页——点按、按键或滚动都可以——然后点按“完成”。"
+          }
+        }
+      }
+    },
     "Page break" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4794,6 +4844,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图片扭曲矫正"
+          }
+        }
+      }
+    },
+    "Pages %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多页截图 %@"
           }
         }
       }
@@ -5408,6 +5468,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "推荐：表格、公式和复杂版面"
+          }
+        }
+      }
+    },
+    "Recorded: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已录制：%lld"
           }
         }
       }
@@ -6166,6 +6236,16 @@
         }
       }
     },
+    "Show OCRFlow how to turn the page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演示一次如何翻页"
+          }
+        }
+      }
+    },
     "Show all boxes (turn off to show only the block under the pointer)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6462,6 +6542,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止中…"
+          }
+        }
+      }
+    },
+    "Stops by itself at the last page. Press Esc to stop now; leave the mouse and keyboard alone meanwhile." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到最后一页会自动停止。按 Esc 可立即停止；截取期间请不要动鼠标和键盘。"
           }
         }
       }
@@ -7112,6 +7202,16 @@
         }
       }
     },
+    "To repeat your clicks and key presses, turn on OCRFlow in Privacy & Security → Accessibility. What you do is only watched while you show it how to turn a page, and is never stored." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为了重复你的点按和按键，请在“隐私与安全性 → 辅助功能”中打开 OCRFlow。只有在你演示翻页时才会记录你的操作，而且不会保存。"
+          }
+        }
+      }
+    },
     "Top to bottom (PaddleOCR's raw order)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7494,6 +7594,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "等待你在“系统设置”中允许"
+          }
+        }
+      }
+    },
+    "Waiting for you…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等你操作…"
           }
         }
       }

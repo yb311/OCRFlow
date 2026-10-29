@@ -16,6 +16,7 @@ struct MenuBarMenu: View {
             .keyboardShortcut(vm.globalCaptureShortcut && !vm.captureAgainShortcutTaken
                               ? KeyboardShortcut("3", modifiers: [.command, .shift, .option]) : nil)
             .disabled(vm.lastCaptureTarget == nil)
+        Button("Capture Page by Page…") { vm.capturePageByPage() }
         Button("Open Images…") {
             OCRFlowApp.showMainWindow(openWindow)
             vm.openFilePicker()

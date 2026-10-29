@@ -804,7 +804,7 @@ struct SettingsView: View {
                     if !vm.showInMenuBar {
                         hint("To hide the Dock icon, show OCRFlow in the menu bar first.")
                     }
-                    toggleRow(isOn: Binding(get: { opensAtLogin }, set: setOpensAtLogin),
+                    toggleRow(isOn: Binding(get: { opensAtLogin }, set: { setOpensAtLogin($0) }),
                               title: "Open at login",
                               subtitle: "Starts with your Mac, so capturing is ready straight away")
                     if loginItemNeedsApproval {

@@ -10,6 +10,9 @@
 		F1000001000000000000B001 /* ScreenGrabber.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B001 /* ScreenGrabber.swift */; };
 		F1000001000000000000B002 /* CaptureOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B002 /* CaptureOverlay.swift */; };
 		F1000001000000000000B003 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B003 /* ScreenCapture.swift */; };
+		F1000001000000000000B004 /* PageFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B004 /* PageFingerprint.swift */; };
+		F1000001000000000000B005 /* StepRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B005 /* StepRecorder.swift */; };
+		F1000001000000000000B006 /* PageByPageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B006 /* PageByPageCapture.swift */; };
 		F1000001000000000000A001 /* DockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A001 /* DockIcon.swift */; };
 		F1000001000000000000A002 /* FloatingCaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A002 /* FloatingCaptureButton.swift */; };
 		F1000001000000000000A003 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000A003 /* MenuBarMenu.swift */; };
@@ -99,6 +102,9 @@
 		F1000002000000000000B001 /* ScreenGrabber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGrabber.swift; sourceTree = "<group>"; };
 		F1000002000000000000B002 /* CaptureOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOverlay.swift; sourceTree = "<group>"; };
 		F1000002000000000000B003 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
+		F1000002000000000000B004 /* PageFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageFingerprint.swift; sourceTree = "<group>"; };
+		F1000002000000000000B005 /* StepRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepRecorder.swift; sourceTree = "<group>"; };
+		F1000002000000000000B006 /* PageByPageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageByPageCapture.swift; sourceTree = "<group>"; };
 		F1000002000000000000A001 /* DockIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIcon.swift; sourceTree = "<group>"; };
 		F1000002000000000000A002 /* FloatingCaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingCaptureButton.swift; sourceTree = "<group>"; };
 		F1000002000000000000A003 /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
@@ -211,6 +217,9 @@
 				F1000002000000000000B001 /* ScreenGrabber.swift */,
 				F1000002000000000000B002 /* CaptureOverlay.swift */,
 				F1000002000000000000B003 /* ScreenCapture.swift */,
+				F1000002000000000000B004 /* PageFingerprint.swift */,
+				F1000002000000000000B005 /* StepRecorder.swift */,
+				F1000002000000000000B006 /* PageByPageCapture.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -643,6 +652,9 @@
 				F1000001000000000000B001 /* ScreenGrabber.swift in Sources */,
 				F1000001000000000000B002 /* CaptureOverlay.swift in Sources */,
 				F1000001000000000000B003 /* ScreenCapture.swift in Sources */,
+				F1000001000000000000B004 /* PageFingerprint.swift in Sources */,
+				F1000001000000000000B005 /* StepRecorder.swift in Sources */,
+				F1000001000000000000B006 /* PageByPageCapture.swift in Sources */,
 				F1000001000000000000A001 /* DockIcon.swift in Sources */,
 				F1000001000000000000A002 /* FloatingCaptureButton.swift in Sources */,
 				F1000001000000000000A003 /* MenuBarMenu.swift in Sources */,

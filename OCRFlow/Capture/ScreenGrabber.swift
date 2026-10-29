@@ -35,8 +35,10 @@ enum ScreenGrabber {
         return shots
     }
 
-    /// The same place again, as it is now.
-    static func capture(_ target: CaptureTarget, excluding windowIDs: [CGWindowID]) async throws -> CGImage {
+    /// The same place again, as it is now. `maxWidth` makes a smaller
+    /// picture, for looking at rather than keeping.
+    static func capture(_ target: CaptureTarget, excluding windowIDs: [CGWindowID],
+                        maxWidth: Int? = nil) async throws -> CGImage {
         let content = try await shareableContent()
         switch target {
         case let .region(displayID, rect):
@@ -45,12 +47,12 @@ enum ScreenGrabber {
             }
             let excluded = content.windows.filter { windowIDs.contains($0.windowID) }
             let filter = SCContentFilter(display: display, excludingWindows: excluded)
-            return try await image(of: filter, rect: rect)
+            return try await image(of: filter, rect: rect, maxWidth: maxWidth)
         case let .window(windowID):
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
                 throw Failure.gone
             }
-            return try await image(of: SCContentFilter(desktopIndependentWindow: window), rect: nil)
+            return try await image(of: SCContentFilter(desktopIndependentWindow: window), rect: nil, maxWidth: maxWidth)
         }
     }
 
@@ -65,9 +67,10 @@ enum ScreenGrabber {
 
     /// `rect` is in points from the top-left of what the filter shows; nil
     /// takes all of it.
-    private static func image(of filter: SCContentFilter, rect: CGRect?) async throws -> CGImage {
-        let scale = CGFloat(filter.pointPixelScale)
+    private static func image(of filter: SCContentFilter, rect: CGRect?, maxWidth: Int? = nil) async throws -> CGImage {
         let size = rect?.size ?? filter.contentRect.size
+        var scale = CGFloat(filter.pointPixelScale)
+        if let maxWidth, size.width * scale > CGFloat(maxWidth) { scale = CGFloat(maxWidth) / max(size.width, 1) }
         let config = SCStreamConfiguration()
         if let rect { config.sourceRect = rect }
         config.width = max(1, Int((size.width * scale).rounded()))

@@ -1204,27 +1204,56 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
-    /// Kept in the library folder, so the entry in the list keeps working
-    /// after a relaunch.
-    private func receiveCapture(_ image: CGImage, show: Bool) {
-        let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let name = String(localized: "Screenshot \(formatter.string(from: Date()))")
-        // Several in one second, when taking page after page.
-        var url = folder.appendingPathComponent(name).appendingPathExtension("png")
-        var count = 1
-        while FileManager.default.fileExists(atPath: url.path) {
-            count += 1
-            url = folder.appendingPathComponent("\(name) \(count)").appendingPathExtension("png")
+    /// Captures a document shown on screen page after page, into one
+    /// multi-page file read as one document.
+    func capturePageByPage() {
+        guard !isCapturing else { return }
+        isCapturing = true
+        Task {
+            let pages = await PageByPageCapture().run()
+            isCapturing = false
+            guard let folder = pages.first?.deletingLastPathComponent() else { return }
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let url = newCaptureURL(named: String(localized: "Pages \(Self.captureDate())"), extension: "tiff")
+            guard PageByPageCapture.assemble(pages, into: url) else { return }
+            showMainWindow?()
+            addCapture(url)
         }
+    }
+
+    private func receiveCapture(_ image: CGImage, show: Bool) {
+        let url = newCaptureURL(named: String(localized: "Screenshot \(Self.captureDate())"), extension: "png")
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { return }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { return }
-
         if show { showMainWindow?() }
+        addCapture(url)
+    }
+
+    private static func captureDate() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        return formatter.string(from: Date())
+    }
+
+    /// In the library folder, so the entry in the list keeps working after a
+    /// relaunch. Numbered when there are several in one second, as there are
+    /// when taking page after page.
+    private func newCaptureURL(named name: String, extension pathExtension: String) -> URL {
+        let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var url = folder.appendingPathComponent(name).appendingPathExtension(pathExtension)
+        var count = 1
+        while FileManager.default.fileExists(atPath: url.path) {
+            count += 1
+            url = folder.appendingPathComponent("\(name) \(count)").appendingPathExtension(pathExtension)
+        }
+        return url
+    }
+
+    /// Adds a capture to the list, selected, and reads it.
+    private func addCapture(_ url: URL) {
         let before = Set(items.map(\.id))
         add([(url, nil)])
         guard let new = items.first(where: { !before.contains($0.id) }) else { return }
