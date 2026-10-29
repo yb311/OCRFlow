@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 /// A small round button that stays above every other window, on every Space
@@ -18,11 +17,11 @@ final class FloatingCaptureButton {
     static let edgeGap: CGFloat = 6
 
     private let panel: NSPanel
-    private let state = FloatingButtonState()
-    private var subscriptions: Set<AnyCancellable> = []
+    private let state: FloatingButtonState
     private var screenObserver: NSObjectProtocol?
 
     init(model: OCRViewModel) {
+        state = FloatingButtonState(model: model)
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: Self.side, height: Self.side),
                         styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
@@ -45,9 +44,6 @@ final class FloatingCaptureButton {
 
         panel.setFrame(frame(for: Parking.saved), display: false)
 
-        model.$isProcessing.combineLatest(model.$totalProgress)
-            .sink { [state] processing, progress in state.progress = processing ? progress : nil }
-            .store(in: &subscriptions)
         panel.orderFrontRegardless()
 
         // A display unplugged or rearranged: back to the same place on
@@ -55,7 +51,7 @@ final class FloatingCaptureButton {
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 guard let self else { return }
                 self.panel.setFrame(self.frame(for: Parking.saved), display: true)
             }
@@ -64,7 +60,6 @@ final class FloatingCaptureButton {
 
     func close() {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
-        subscriptions.removeAll()
         panel.orderOut(nil)
     }
 
@@ -172,14 +167,25 @@ private final class MenuAction: NSObject {
 // MARK: - The button
 
 @MainActor
-private final class FloatingButtonState: ObservableObject {
-    @Published var hovered = false
-    @Published var pressed = false
-    @Published var dragging = false
+@Observable
+private final class FloatingButtonState {
+    var hovered = false
+    var pressed = false
+    var dragging = false
     /// Faded back after the pointer has been away a while.
-    @Published var resting = false
+    var resting = false
+
+    @ObservationIgnored private weak var model: OCRViewModel?
+
+    init(model: OCRViewModel) {
+        self.model = model
+    }
+
     /// Recognition progress, while a run is going.
-    @Published var progress: Double?
+    var progress: Double? {
+        guard let model, model.isProcessing else { return nil }
+        return model.totalProgress
+    }
 }
 
 /// Takes the mouse, and tells a click from a drag. The look is SwiftUI's.
@@ -304,7 +310,7 @@ private final class FloatingButtonView: NSView {
 }
 
 private struct FloatingButtonFace: View {
-    @ObservedObject var state: FloatingButtonState
+    let state: FloatingButtonState
 
     var body: some View {
         let lifted = state.hovered || state.dragging

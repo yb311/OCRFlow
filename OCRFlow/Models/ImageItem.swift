@@ -73,14 +73,14 @@ struct ImageItem: Identifiable, Equatable {
     /// keeps the source's structure: `2024/合同/扫描001.pdf`.
     var relativePath: String {
         guard let root else { return fileName }
-        let base = root.standardizedFileURL.path
-        let path = url.standardizedFileURL.path
-        guard path.hasPrefix(base + "/") else { return fileName }
-        return String(path.dropFirst(base.count + 1))
+        let base = root.standardizedFileURL.pathComponents
+        let path = url.standardizedFileURL.pathComponents
+        guard path.count > base.count, path.starts(with: base) else { return fileName }
+        return path.dropFirst(base.count).joined(separator: "/")
     }
 
     var fileSizeString: String {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false)),
               let size = attrs[.size] as? Int64 else { return "—" }
         return size.formatted(.byteCount(style: .file))
     }

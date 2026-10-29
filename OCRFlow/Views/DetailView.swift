@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DetailView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @State private var translating = false
 
     var body: some View {
@@ -58,7 +58,7 @@ struct DetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $translating) {
             TranslationSheet(items: vm.selectedItems.filter(\.isExportable))
-                .environmentObject(vm)
+                .environment(vm)
         }
     }
 }
@@ -66,7 +66,7 @@ struct DetailView: View {
 // MARK: - Item detail
 
 struct ItemDetailView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     let item: ImageItem
 
     /// Zoom, where 1 means "as large as fits the pane". The image is laid out
@@ -460,7 +460,7 @@ struct ItemDetailView: View {
         }
         // A different file starts at "fits the pane" rather than inheriting the
         // zoom someone set for the previous one.
-        .onChange(of: item.id) { _, _ in
+        .onChange(of: item.id) {
             imageZoom = 1.0
             selection = nil
             pageIndex = 0
@@ -471,18 +471,18 @@ struct ItemDetailView: View {
             searchedFor = ""
             updateSearchMatches()
         }
-        .onChange(of: pageIndex) { _, _ in
+        .onChange(of: pageIndex) {
             selection = nil
             hovered = nil
         }
         // Coming back from review: open the page in question with its region
         // selected. Runs after `onChange(of: item.id)` has reset the pane.
         .onAppear { applyDocumentFocus() }
-        .onChange(of: vm.documentFocus) { _, _ in applyDocumentFocus() }
+        .onChange(of: vm.documentFocus) { applyDocumentFocus() }
         // Runs after `onChange(of: item.id)` has turned a new file to its
         // first page, so the search can turn it on to the first match.
         .onAppear { updateSearchMatches() }
-        .onChange(of: searchKey) { _, _ in updateSearchMatches() }
+        .onChange(of: searchKey) { updateSearchMatches() }
         .task(id: previewKey) {
             let index = pageIndex
             pageImage = nil
@@ -738,7 +738,7 @@ struct ItemDetailView: View {
                         .help("Translate the results on this Mac with macOS's built-in translation")
                         .sheet(isPresented: $translating) {
                             TranslationSheet(items: [item])
-                                .environmentObject(vm)
+                                .environment(vm)
                         }
                     }
 
@@ -967,7 +967,7 @@ struct ItemDetailView: View {
                 // A pane that no longer applies to this file would otherwise
                 // show as an empty result.
                 .onAppear { normalisePane() }
-                .onChange(of: renderKey) { _, _ in normalisePane() }
+                .onChange(of: renderKey) { normalisePane() }
             }
 
         case .cancelled:
@@ -1426,22 +1426,22 @@ enum PagePreviews {
         if item.pages.indices.contains(page), let rectified = item.pages[page].rectified {
             return rectified
         }
-        let key = "\(item.url.path)#\(page)" as NSString
+        let key = "\(item.url.path(percentEncoded: false))#\(page)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         let url = item.url, isPDF = item.isPDF
-        let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+        let image = await BlockingWork.run { () -> NSImage? in
             let decoded = isPDF ? PDFSource(url: url)?.render(page: page)?.image
                                 : PageImages.image(at: url, frame: page)
             return decoded.map(ImageItem.page(from:))
-        }.value
+        }
         if let image { cache.setObject(image, forKey: key) }
         return image
     }
 
     static func pageCount(of item: ImageItem) async -> Int {
         let url = item.url, isPDF = item.isPDF
-        return await Task.detached(priority: .utility) {
+        return await BlockingWork.run {
             isPDF ? (PDFSource(url: url)?.pageCount ?? 1) : max(1, PageImages.frameCount(of: url))
-        }.value
+        }
     }
 }

@@ -21,12 +21,10 @@ enum PPModelStore {
         #if DEBUG
         // Lets the benchmark run against models kept somewhere else.
         if let override = ProcessInfo.processInfo.environment["OCRFLOW_MODELS_DIR"] {
-            return URL(fileURLWithPath: override, isDirectory: true)
+            return URL(filePath: override, directoryHint: .isDirectory)
         }
         #endif
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("OCRFlow/Models", isDirectory: true)
+        return URL.applicationSupportDirectory.appending(path: "OCRFlow/Models", directoryHint: .isDirectory)
     }
 
     /// UVDoc's file name in the user models folder.
@@ -37,7 +35,7 @@ enum PPModelStore {
     static func resolveUnwarpingModel() throws -> URL {
         guard let url = existingUserFile(unwarpingModelFileName) else {
             throw PPOCRError.modelsMissing(tier: .small, missing: [unwarpingModelFileName],
-                                           searchPath: userModelsDirectory.path)
+                                           searchPath: userModelsDirectory.path(percentEncoded: false))
         }
         return url
     }
@@ -47,7 +45,7 @@ enum PPModelStore {
     static func resolveDocOrientationModel() throws -> URL {
         let name = "PP-LCNet_x1_0_doc_ori.onnx"
         guard let url = locate(name, bundledFallback: true) else {
-            throw PPOCRError.modelsMissing(tier: .small, missing: [name], searchPath: userModelsDirectory.path)
+            throw PPOCRError.modelsMissing(tier: .small, missing: [name], searchPath: userModelsDirectory.path(percentEncoded: false))
         }
         return url
     }
@@ -66,8 +64,8 @@ enum PPModelStore {
     }
 
     static func existingUserFile(_ name: String) -> URL? {
-        let url = userModelsDirectory.appendingPathComponent(name)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        let url = userModelsDirectory.appending(path: name)
+        return FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) ? url : nil
     }
 
     /// User folder first, then the app bundle. `medium` has no bundled copy.
@@ -98,7 +96,7 @@ enum PPModelStore {
 
         guard missing.isEmpty, let det, let rec, let cls, let docOri else {
             throw PPOCRError.modelsMissing(tier: tier, missing: missing,
-                                           searchPath: userModelsDirectory.path)
+                                           searchPath: userModelsDirectory.path(percentEncoded: false))
         }
 
         guard let dict = dictionary(forRecogniser: rec, tier: tier, isCustom: recognizer.customFileName != nil) else {
@@ -141,7 +139,7 @@ enum PPModelStore {
     /// Recognisers the user installed, excluding the ones the app ships.
     static func installedCustomRecognizers() -> [InstalledRecognizer] {
         let builtin = Set(PPModelTier.allCases.map(\.recFileName))
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: userModelsDirectory.path)) ?? []
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: userModelsDirectory.path(percentEncoded: false))) ?? []
         return names
             .filter { $0.hasSuffix("_rec.onnx") && !builtin.contains($0) }
             .sorted()

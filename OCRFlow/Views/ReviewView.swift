@@ -8,7 +8,7 @@ import SwiftUI
 /// somewhere in them, which still left the flag itself to be found page by
 /// page. Here each flag is its own row.
 struct ReviewQueueView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
 
     private struct FileGroup: Identifiable {
         let id: UUID
@@ -28,16 +28,8 @@ struct ReviewQueueView: View {
         }
     }
 
-    // Deferred for the same reason as the file list's selection: the list
-    // writes it back while it is being drawn.
-    private var selection: Binding<ReviewEntry.Key?> {
-        Binding(
-            get: { vm.reviewFocus },
-            set: { key in Task { @MainActor in vm.reviewFocus = key } }
-        )
-    }
-
     var body: some View {
+        @Bindable var vm = vm
         let entries = vm.reviewEntries
         if entries.isEmpty {
             // The pane beside it already says so in full; the list only has
@@ -47,7 +39,7 @@ struct ReviewQueueView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List(selection: selection) {
+            List(selection: $vm.reviewFocus) {
                 ForEach(groups(of: entries)) { group in
                     Section {
                         ForEach(group.entries) { entry in
@@ -68,7 +60,7 @@ struct ReviewQueueView: View {
 }
 
 private struct ReviewQueueRow: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     let entry: ReviewEntry
 
     private var region: PPLayoutBlock? {
@@ -103,7 +95,7 @@ private struct ReviewQueueRow: View {
 /// One flagged item at a time: the page as it is, and the result as it will
 /// read — which is also where it is corrected.
 struct ReviewDetailView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
 
     fileprivate enum Choice: Hashable { case current, alternative }
 
@@ -133,7 +125,7 @@ struct ReviewDetailView: View {
             }
         }
         .onAppear { settleFocus(entries) }
-        .onChange(of: entries.map(\.id)) { _, _ in settleFocus(vm.reviewEntries) }
+        .onChange(of: entries.map(\.id)) { settleFocus(vm.reviewEntries) }
     }
 
     private func currentIndex(in entries: [ReviewEntry]) -> Int {
@@ -150,8 +142,7 @@ struct ReviewDetailView: View {
         let index = currentIndex(in: entries)
         position = index
         if vm.reviewFocus != entries[index].id {
-            let key = entries[index].id
-            Task { @MainActor in vm.reviewFocus = key }
+            vm.reviewFocus = entries[index].id
         }
     }
 
@@ -727,30 +718,22 @@ struct EditableTable: Equatable {
     var rows: [[Cell]]
 
     init?(html: String) {
-        let options: NSRegularExpression.Options = [.caseInsensitive, .dotMatchesLineSeparators]
-        guard let rowPattern = try? NSRegularExpression(pattern: "<tr[^>]*>(.*?)</tr>", options: options),
-              let cellPattern = try? NSRegularExpression(pattern: "<(td|th)([^>]*)>(.*?)</(?:td|th)>",
-                                                         options: options) else { return nil }
-        func string(_ match: NSTextCheckingResult, _ group: Int, in text: NSString) -> String {
-            match.range(at: group).location == NSNotFound ? "" : text.substring(with: match.range(at: group))
-        }
-        func span(_ name: String, in attributes: String) -> Int {
+        let rowPattern = /<tr[^>]*>(.*?)<\/tr>/.ignoresCase().dotMatchesNewlines()
+        let cellPattern = /<(td|th)([^>]*)>(.*?)<\/(?:td|th)>/.ignoresCase().dotMatchesNewlines()
+        func span(_ name: String, in attributes: Substring) -> Int {
             guard let range = attributes.range(of: "\(name)\\s*=\\s*\"?'?(\\d+)", options: .regularExpression),
                   let digits = attributes[range].split(whereSeparator: { !$0.isNumber }).last,
                   let value = Int(digits) else { return 1 }
             return max(1, value)
         }
 
-        let source = html as NSString
-        rows = rowPattern.matches(in: html, range: NSRange(location: 0, length: source.length)).map { row in
-            let body = string(row, 1, in: source)
-            let rowSource = body as NSString
-            return cellPattern.matches(in: body, range: NSRange(location: 0, length: rowSource.length)).map { cell in
-                let attributes = string(cell, 2, in: rowSource)
-                return Cell(text: MDParser.plainText(fromHTML: string(cell, 3, in: rowSource)),
+        rows = html.matches(of: rowPattern).map { row in
+            row.output.1.matches(of: cellPattern).map { cell in
+                let (_, tag, attributes, body) = cell.output
+                return Cell(text: MDParser.plainText(fromHTML: String(body)),
                             columnSpan: span("colspan", in: attributes),
                             rowSpan: span("rowspan", in: attributes),
-                            isHeader: string(cell, 1, in: rowSource).lowercased() == "th")
+                            isHeader: tag.lowercased() == "th")
             }
         }
         guard !rows.isEmpty else { return nil }

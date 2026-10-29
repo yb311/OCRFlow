@@ -14,7 +14,7 @@ import UniformTypeIdentifiers
 struct TranslationSheet: View {
     let items: [ImageItem]
 
-    @EnvironmentObject private var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @Environment(\.dismiss) private var dismiss
     @State private var configuration: TranslationSession.Configuration?
     /// Translations by item, one per paragraph.
@@ -22,6 +22,7 @@ struct TranslationSheet: View {
     @State private var done = 0
     @State private var isTranslating = false
     @State private var failure: String?
+    @State private var exportProblem: UserPrompt?
 
     private var targetCode: String { vm.translationTarget }
 
@@ -32,15 +33,14 @@ struct TranslationSheet: View {
     private var totalParagraphs: Int { items.reduce(0) { $0 + Self.paragraphs(of: $1).count } }
 
     var body: some View {
+        @Bindable var vm = vm
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Text(items.count == 1 ? "Translate “\(items[0].fileName)”" : "Translate \(items.count) Files")
                     .font(.headline)
                 Spacer()
-                Picker("Translate to", selection: $vm.translationTarget) {
-                    ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
-                }
-                .fixedSize()
+                TranslationTargetPicker(selection: $vm.translationTarget)
+                    .fixedSize()
                 .disabled(isTranslating)
                 Button(isTranslating ? "Translating…" : "Translate") { start() }
                     .buttonStyle(.borderedProminent)
@@ -108,7 +108,13 @@ struct TranslationSheet: View {
             await translate(with: session)
         }
         .onAppear(perform: showKept)
-        .onChange(of: vm.translationTarget) { _, _ in showKept() }
+        .onChange(of: vm.translationTarget) { showKept() }
+        .alert(exportProblem?.title ?? "", isPresented: Binding(get: { exportProblem != nil },
+                                                                set: { if !$0 { exportProblem = nil } }),
+               presenting: exportProblem) { _ in
+        } message: { problem in
+            if let message = problem.message { Text(message) }
+        }
     }
 
     /// Shows what was translated into the chosen language before.
@@ -203,7 +209,8 @@ struct TranslationSheet: View {
             do {
                 try document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
             } catch {
-                NSAlert(error: error).runModal()
+                exportProblem = UserPrompt(title: String(localized: "\(url.lastPathComponent) couldn't be exported"),
+                                           message: error.localizedDescription)
             }
             return
         }
@@ -215,7 +222,7 @@ struct TranslationSheet: View {
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         var failures: [String] = []
         for item in items where translations[item.id] != nil {
-            let url = folder.appendingPathComponent("\(item.fileName)\(suffix).md")
+            let url = folder.appending(component: "\(item.fileName)\(suffix).md")
             do {
                 try document(for: item, bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
             } catch {
@@ -225,10 +232,31 @@ struct TranslationSheet: View {
         if failures.isEmpty {
             NSWorkspace.shared.open(folder)
         } else {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "\(failures.count) files couldn't be exported")
-            alert.informativeText = failures.prefix(8).joined(separator: "\n")
-            alert.runModal()
+            exportProblem = UserPrompt(title: String(localized: "\(failures.count) files couldn't be exported"),
+                                       message: failures.prefix(8).joined(separator: "\n"))
+        }
+    }
+}
+
+/// Every language macOS can translate into, named in the language the app is
+/// shown in.
+struct TranslationTargetPicker: View {
+    @Binding var selection: String
+    @State private var supported: [String] = []
+
+    /// The supported languages, and the one chosen even when macOS no longer
+    /// offers it, so the picker never shows a blank.
+    private var codes: [String] {
+        let codes = supported.contains(selection) ? supported : supported + [selection]
+        return codes.sorted { DocumentTranslation.name(of: $0).localizedStandardCompare(DocumentTranslation.name(of: $1)) == .orderedAscending }
+    }
+
+    var body: some View {
+        Picker("Translate to", selection: $selection) {
+            ForEach(codes, id: \.self) { Text(DocumentTranslation.name(of: $0)).tag($0) }
+        }
+        .task {
+            supported = await DocumentTranslation.supportedTargets()
         }
     }
 }
@@ -236,7 +264,7 @@ struct TranslationSheet: View {
 /// Gives the background translator its sessions. Invisible; it sits in the
 /// main window because a translation session can only be had from a view.
 struct AutoTranslationHost: View {
-    @ObservedObject var translator: AutoTranslator
+    let translator: AutoTranslator
 
     var body: some View {
         Color.clear

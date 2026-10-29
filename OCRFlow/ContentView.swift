@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var offersCrashReport = false
     @State private var showsWelcome = false
@@ -9,6 +9,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        @Bindable var vm = vm
         NavigationSplitView(columnVisibility: $columnVisibility) {
             Group {
                 switch vm.mode {
@@ -30,9 +31,29 @@ struct ContentView: View {
         // (280 each) already need 800, so a smaller window could only be had by
         // squeezing panes below the widths they ask for.
         .frame(minWidth: 820, minHeight: 520)
-        // Global drag-and-drop on the whole window
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            DropHelper.handle(providers: providers, vm: vm)
+        // Files and folders dropped anywhere on the window. Folders are
+        // handed over as they are: the view model walks them, subfolders
+        // included.
+        .dropDestination(for: URL.self) { urls, _ in
+            vm.addImages(urls: urls)
+            return true
+        }
+        .fileImporter(isPresented: $vm.isImportingFiles, allowedContentTypes: OCRViewModel.importableTypes,
+                      allowsMultipleSelection: true) { result in
+            if case let .success(urls) = result { vm.addImages(urls: urls) }
+        }
+        .fileDialogMessage("Choose images, PDFs or folders (including their subfolders)")
+        .fileDialogConfirmationLabel("Add")
+        .alert(vm.prompt?.title ?? "", isPresented: Binding(get: { vm.prompt != nil },
+                                                           set: { if !$0 { vm.prompt = nil } }),
+               presenting: vm.prompt) { prompt in
+            if let confirmation = prompt.confirmation {
+                Button(confirmation.label, role: confirmation.isDestructive ? .destructive : nil,
+                       action: confirmation.action)
+                Button("Cancel", role: .cancel) {}
+            }
+        } message: { prompt in
+            if let message = prompt.message { Text(message) }
         }
         .alert("OCRFlow quit unexpectedly last time", isPresented: $offersCrashReport) {
             Button("Report…") { openWindow(id: ReportProblemView.windowID) }
@@ -75,6 +96,7 @@ struct ContentView: View {
         // working through what needs checking are different jobs, with
         // different lists down the side.
         ToolbarItem(placement: .principal) {
+            @Bindable var vm = vm
             let pending = vm.reviewEntries.count
             Picker("Mode", selection: $vm.mode) {
                 ForEach(WorkspaceMode.allCases) { mode in
@@ -137,7 +159,7 @@ struct ContentView: View {
 /// The run, small enough to sit beside the button that starts it: a ring, the
 /// count, and the clock. Which files are being read is one hover away.
 private struct RunProgressView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
 
     var body: some View {
         if vm.isProcessing {

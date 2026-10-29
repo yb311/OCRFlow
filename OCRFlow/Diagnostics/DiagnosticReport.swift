@@ -53,7 +53,7 @@ struct DiagnosticReport {
         lines.append("## Downloaded models")
         if installedModels.isEmpty { lines.append("(none)") }
         for model in installedModels {
-            lines.append("- \(model.name) — \(ByteCountFormatter.string(fromByteCount: model.bytes, countStyle: .file))")
+            lines.append("- \(model.name) — \(model.bytes.formatted(.byteCount(style: .file)))")
         }
         lines.append("")
 
@@ -65,7 +65,7 @@ struct DiagnosticReport {
         let troubled = files.enumerated().filter { $0.element.status == .failed || !$0.element.pageFailures.isEmpty }
         for (index, file) in troubled {
             let name = includingFileNames ? file.name : "file \(index + 1)"
-            let size = file.bytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "?"
+            let size = file.bytes.map { $0.formatted(.byteCount(style: .file)) } ?? "?"
             var line = "- \(name) (.\(file.fileExtension.lowercased()), \(size)"
             if file.pages > 1 { line += ", \(file.pages) pages" }
             line += ") — \(file.status.rawValue)"
@@ -102,7 +102,7 @@ extension DiagnosticReport {
         #endif
         let gigabytes = Int((Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824).rounded())
         return ("\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
-                "\(String(cString: model)) \(arch)", gigabytes)
+                "\(String(decoding: model.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)) \(arch)", gigabytes)
     }
 
     static func installedModels(in folder: URL) -> [(name: String, bytes: Int64)] {

@@ -53,15 +53,9 @@ enum TableWorkbook {
     }
 
     private static func cells(fromHTML html: String) -> [Cell]? {
-        guard let rowPattern = try? NSRegularExpression(pattern: "<tr[^>]*>(.*?)</tr>",
-                                                        options: [.caseInsensitive, .dotMatchesLineSeparators]),
-              let cellPattern = try? NSRegularExpression(pattern: "<t[dh]([^>]*)>(.*?)</t[dh]>",
-                                                         options: [.caseInsensitive, .dotMatchesLineSeparators])
-        else { return nil }
-        func group(_ match: NSTextCheckingResult, _ index: Int, in text: String) -> String {
-            Range(match.range(at: index), in: text).map { String(text[$0]) } ?? ""
-        }
-        func span(_ name: String, in attributes: String) -> Int {
+        let rowPattern = /<tr[^>]*>(.*?)<\/tr>/.ignoresCase().dotMatchesNewlines()
+        let cellPattern = /<t[dh]([^>]*)>(.*?)<\/t[dh]>/.ignoresCase().dotMatchesNewlines()
+        func span(_ name: String, in attributes: Substring) -> Int {
             guard let range = attributes.range(of: "\(name)\\s*=\\s*[\"']?(\\d+)", options: .regularExpression)
             else { return 1 }
             return max(1, Int(attributes[range].filter(\.isNumber)) ?? 1)
@@ -69,18 +63,16 @@ enum TableWorkbook {
 
         var occupied = Set<[Int]>()
         var cells: [Cell] = []
-        let rows = rowPattern.matches(in: html, range: NSRange(html.startIndex..., in: html))
-        for (rowIndex, rowMatch) in rows.enumerated() {
-            let rowHTML = group(rowMatch, 1, in: html)
+        for (rowIndex, row) in html.matches(of: rowPattern).enumerated() {
             var column = 0
-            for cellMatch in cellPattern.matches(in: rowHTML, range: NSRange(rowHTML.startIndex..., in: rowHTML)) {
+            for cellMatch in row.output.1.matches(of: cellPattern) {
                 // Skip the columns a cell above still reaches down into.
                 while occupied.contains([rowIndex, column]) { column += 1 }
-                let attributes = group(cellMatch, 1, in: rowHTML)
+                let (_, attributes, body) = cellMatch.output
                 let cell = Cell(row: rowIndex, column: column,
                                 rowSpan: span("rowspan", in: attributes),
                                 columnSpan: span("colspan", in: attributes),
-                                text: plainText(group(cellMatch, 2, in: rowHTML)))
+                                text: plainText(String(body)))
                 for r in 0..<cell.rowSpan {
                     for c in 0..<cell.columnSpan { occupied.insert([rowIndex + r, column + c]) }
                 }

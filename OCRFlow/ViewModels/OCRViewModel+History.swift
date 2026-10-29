@@ -10,8 +10,9 @@ extension OCRViewModel {
     func recordMissingHistory() {
         let finished = items.filter(\.isExportable)
         let store = self.store
-        Task.detached(priority: .utility) {
-            let recorded = store.history.recorded(among: finished.map(\.id))
+        Task {
+            let ids = finished.map(\.id)
+            let recorded = await BlockingWork.run { store.history.recorded(among: ids) }
             for item in finished where !recorded.contains(item.id) {
                 store.recordInHistory(item)
             }
@@ -23,7 +24,7 @@ extension OCRViewModel {
     /// both adds the file to be read again.
     func openFromHistory(_ entry: HistoryIndex.Entry) {
         mode = .workspace
-        let url = URL(fileURLWithPath: entry.path)
+        let url = URL(filePath: entry.path)
         if let listed = items.first(where: { $0.id == entry.id }) ?? items.first(where: { $0.url == url }) {
             selectedIDs = [listed.id]
             return

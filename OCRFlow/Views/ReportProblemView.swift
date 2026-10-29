@@ -7,9 +7,11 @@ import UniformTypeIdentifiers
 struct ReportProblemView: View {
     static let windowID = "report-problem"
 
-    @EnvironmentObject private var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @State private var includeFileNames = false
     @State private var includeCrashLog = true
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     private var report: String {
         vm.diagnosticReport(includingCrashLog: includeCrashLog && vm.crashLogFromLastSession != nil)
@@ -39,7 +41,7 @@ struct ReportProblemView: View {
             .accessibilityLabel("Report")
 
             HStack {
-                Button("Save…", action: save)
+                Button("Save…") { isSaving = true }
                 Spacer()
                 Button("Copy", action: copy)
                 Button("Copy and Open GitHub Issue") {
@@ -52,6 +54,15 @@ struct ReportProblemView: View {
         }
         .padding(20)
         .frame(minWidth: 520, minHeight: 440)
+        .fileExporter(isPresented: $isSaving, item: report, contentTypes: [.utf8PlainText],
+                      defaultFilename: "OCRFlow Report.txt") { result in
+            if case let .failure(error) = result { saveError = error.localizedDescription }
+        }
+        .alert("The report couldn't be saved", isPresented: Binding(get: { saveError != nil },
+                                                                  set: { if !$0 { saveError = nil } })) {
+        } message: {
+            Text(saveError ?? "")
+        }
         // Offered once: whatever the user does here, the next launch does not
         // ask about the same crash again.
         .onDisappear { vm.crashLogFromLastSession = nil }
@@ -60,17 +71,5 @@ struct ReportProblemView: View {
     private func copy() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
-    }
-
-    private func save() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "OCRFlow Report.txt"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try report.write(to: url, atomically: true, encoding: .utf8)
-        } catch {
-            NSAlert(error: error).runModal()
-        }
     }
 }

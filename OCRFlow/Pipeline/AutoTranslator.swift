@@ -8,16 +8,46 @@ import Translation
 /// or a changed setting rebuilds the text, and only the paragraphs that
 /// actually changed then lose their translation — the rest still line up.
 struct DocumentTranslation: Codable, Equatable {
-    /// The language translated into, as the user picked it (`zh-Hans`).
+    /// The language translated into, as the user picked it (`zh`, `zh-TW`).
     var target: String
     /// Translations by the original paragraph.
     var paragraphs: [String: String] = [:]
 
-    /// The languages offered, by the name they go by in themselves.
-    static let targets: [(code: String, name: String)] = [
-        ("zh-Hans", "简体中文"), ("zh-Hant", "繁體中文"), ("en", "English"), ("ja", "日本語"),
-        ("ko", "한국어"), ("fr", "Français"), ("de", "Deutsch"), ("es", "Español"), ("ru", "Русский"),
-    ]
+    /// The language results are translated into until the user picks one:
+    /// their own, without the region. `zh-Hans-US` would otherwise become
+    /// `zh-US`, which macOS does not offer next to plain `zh`.
+    static var defaultTarget: String {
+        let preferred = Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
+        return Locale.Language(languageCode: preferred.languageCode, script: preferred.script).minimalIdentifier
+    }
+
+    /// Every language macOS translates between.
+    static func supportedTargets() async -> [String] {
+        await LanguageAvailability().supportedLanguages.map(\.minimalIdentifier)
+    }
+
+    /// `code` as macOS offers it: itself when it is in `supported`, otherwise
+    /// the offered form of the same language and script — `zh-Hans` is `zh`,
+    /// `ar` is `ar-AE` — preferring the same region, then no region at all.
+    /// Nil when macOS does not translate into the language.
+    static func target(_ code: String, among supported: [String]) -> String? {
+        if supported.contains(code) { return code }
+        let full = { (code: String) in
+            Locale.Language(identifier: Locale.Language(identifier: code).maximalIdentifier)
+        }
+        let wanted = full(code)
+        let matches = supported.filter {
+            let candidate = full($0)
+            return candidate.languageCode == wanted.languageCode && candidate.script == wanted.script
+        }
+        return matches.first { full($0).region == wanted.region }
+            ?? matches.min { $0.count < $1.count }
+    }
+
+    /// A language's name in the language the app is shown in.
+    static func name(of code: String) -> String {
+        Locale.current.localizedString(forIdentifier: code) ?? code
+    }
 
     /// A document as the paragraphs it is translated in.
     ///
@@ -73,11 +103,12 @@ struct DocumentTranslation: Codable, Equatable {
 /// waiting in that language. Documents in another language get a session of
 /// their own once it is done.
 @MainActor
-final class AutoTranslator: ObservableObject {
-    @Published private(set) var configuration: TranslationSession.Configuration?
+@Observable
+final class AutoTranslator {
+    private(set) var configuration: TranslationSession.Configuration?
 
     /// Where documents are read from and their translations go.
-    weak var owner: OCRViewModel?
+    @ObservationIgnored weak var owner: OCRViewModel?
 
     private struct Job {
         let id: UUID
@@ -85,11 +116,11 @@ final class AutoTranslator: ObservableObject {
         let target: String
     }
 
-    private var waiting: [Job] = []
+    @ObservationIgnored private var waiting: [Job] = []
     /// The target of the session asked for, kept as the user picked it:
     /// `Locale.Language` reduces `zh-Hans` to plain `zh`.
-    private var sessionTarget: String?
-    private var isRunning = false
+    @ObservationIgnored private var sessionTarget: String?
+    @ObservationIgnored private var isRunning = false
 
     /// Queues a finished document for translation into `target`, if it has
     /// anything left to translate and is not in that language already.

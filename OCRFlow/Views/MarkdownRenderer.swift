@@ -485,27 +485,21 @@ enum MDParser {
     // MARK: Regex helpers
 
     private static func matches(of pattern: String, in text: String) -> [String] {
-        guard let regex = try? NSRegularExpression(
-            pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return regex.matches(in: text, range: range).compactMap { match in
-            guard match.numberOfRanges > 1,
-                  let group = Range(match.range(at: 1), in: text) else { return nil }
-            return String(text[group])
+        guard let regex = try? Regex(pattern).dotMatchesNewlines().ignoresCase() else { return [] }
+        return text.matches(of: regex).compactMap { match in
+            match.output.count > 1 ? match.output[1].substring.map(String.init) : nil
         }
     }
 
     private static func matchesWithTags(of pattern: String, in text: String)
         -> [(tag: String, attributes: String, body: String)] {
-        guard let regex = try? NSRegularExpression(
-            pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return regex.matches(in: text, range: range).compactMap { match in
-            guard match.numberOfRanges > 3,
-                  let tag = Range(match.range(at: 1), in: text),
-                  let attributes = Range(match.range(at: 2), in: text),
-                  let body = Range(match.range(at: 3), in: text) else { return nil }
-            return (String(text[tag]).lowercased(), String(text[attributes]), String(text[body]))
+        guard let regex = try? Regex(pattern).dotMatchesNewlines().ignoresCase() else { return [] }
+        return text.matches(of: regex).compactMap { match in
+            guard match.output.count > 3,
+                  let tag = match.output[1].substring,
+                  let attributes = match.output[2].substring,
+                  let body = match.output[3].substring else { return nil }
+            return (tag.lowercased(), String(attributes), String(body))
         }
     }
 }

@@ -98,7 +98,7 @@ final class VLEngine: @unchecked Sendable {
         // Negative means "put every layer on the GPU"; on Apple Silicon that is
         // Metal, which is several times faster than the CPU path.
         modelParams.n_gpu_layers = config.useGPU ? -1 : 0
-        guard let model = llama_model_load_from_file(paths.model.path, modelParams) else {
+        guard let model = llama_model_load_from_file(paths.model.path(percentEncoded: false), modelParams) else {
             throw VLError.backendFailed(String(localized: "Couldn't load \(paths.model.lastPathComponent)"))
         }
 
@@ -131,7 +131,7 @@ final class VLEngine: @unchecked Sendable {
         mtmdParams.use_gpu = config.useGPU
         mtmdParams.print_timings = false
         if config.threadCount > 0 { mtmdParams.n_threads = Int32(config.threadCount) }
-        guard let multimodal = mtmd_init_from_file(paths.mmproj.path, model, mtmdParams) else {
+        guard let multimodal = mtmd_init_from_file(paths.mmproj.path(percentEncoded: false), model, mtmdParams) else {
             llama_free(context)
             llama_model_free(model)
             throw VLError.multimodalFailed(String(localized: "Couldn't load \(paths.mmproj.lastPathComponent)"))

@@ -26,17 +26,17 @@ final class ResultStore: @unchecked Sendable {
     let directory: URL
     /// Every document read, kept after it leaves the list.
     let history: HistoryIndex
-    private var resultsDirectory: URL { directory.appendingPathComponent("Results", isDirectory: true) }
+    private var resultsDirectory: URL { directory.appending(path: "Results", directoryHint: .isDirectory) }
     /// The results of documents no longer in the list, kept for the history.
     /// A result lives in `Results` while its file is listed and moves here
     /// when it is removed, corrections and all.
-    private var historyDirectory: URL { directory.appendingPathComponent("History", isDirectory: true) }
-    private var cacheDirectory: URL { directory.appendingPathComponent("Cache", isDirectory: true) }
-    private var partialDirectory: URL { directory.appendingPathComponent("Partial", isDirectory: true) }
+    private var historyDirectory: URL { directory.appending(path: "History", directoryHint: .isDirectory) }
+    private var cacheDirectory: URL { directory.appending(path: "Cache", directoryHint: .isDirectory) }
+    private var partialDirectory: URL { directory.appending(path: "Partial", directoryHint: .isDirectory) }
     /// Translations of listed files' results. Not carried into the history:
     /// a translation is quick to make again, and goes stale with any edit.
-    private var translationsDirectory: URL { directory.appendingPathComponent("Translations", isDirectory: true) }
-    private var queueFile: URL { directory.appendingPathComponent("queue.json") }
+    private var translationsDirectory: URL { directory.appending(path: "Translations", directoryHint: .isDirectory) }
+    private var queueFile: URL { directory.appending(path: "queue.json") }
     private let io = DispatchQueue(label: "OCRFlow.store", qos: .utility)
 
     /// How many cached recognitions are kept before the oldest go.
@@ -45,7 +45,7 @@ final class ResultStore: @unchecked Sendable {
     init(directory: URL = ResultStore.defaultDirectory) {
         self.directory = directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        history = HistoryIndex(file: directory.appendingPathComponent("history.sqlite"))
+        history = HistoryIndex(file: directory.appending(path: "history.sqlite"))
         for folder in [resultsDirectory, historyDirectory, cacheDirectory, partialDirectory, translationsDirectory] {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
@@ -54,12 +54,10 @@ final class ResultStore: @unchecked Sendable {
     static var defaultDirectory: URL {
         #if DEBUG
         if let override = ProcessInfo.processInfo.environment["OCRFLOW_LIBRARY_DIR"] {
-            return URL(fileURLWithPath: override, isDirectory: true)
+            return URL(filePath: override, directoryHint: .isDirectory)
         }
         #endif
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("OCRFlow/Library", isDirectory: true)
+        return URL.applicationSupportDirectory.appending(path: "OCRFlow/Library", directoryHint: .isDirectory)
     }
 
     // MARK: - Queue
@@ -82,7 +80,7 @@ final class ResultStore: @unchecked Sendable {
     /// Writes the list itself: which files, in which order, in which state.
     func saveQueue(_ items: [ImageItem]) {
         let entries = items.map { item in
-            Entry(id: item.id, path: item.url.path, root: item.root?.path,
+            Entry(id: item.id, path: item.url.path(percentEncoded: false), root: item.root?.path(percentEncoded: false),
                   // A file being read when the app went away was not read.
                   status: item.status == .processing ? .pending : item.status,
                   engine: item.engine, elapsed: item.elapsed, errorMessage: item.errorMessage,
@@ -111,7 +109,7 @@ final class ResultStore: @unchecked Sendable {
     }
 
     func recordInHistory(_ item: ImageItem, isNewReading: Bool = false) {
-        history.record(id: item.id, path: item.url.path, name: item.fileName, engine: item.engine,
+        history.record(id: item.id, path: item.url.path(percentEncoded: false), name: item.fileName, engine: item.engine,
                        pages: item.pages.count, isNewReading: isNewReading, text: item.ocrText)
     }
 
@@ -128,7 +126,7 @@ final class ResultStore: @unchecked Sendable {
 
     /// Moves a listed file's result to the history folder.
     private func retire(_ file: URL) {
-        let destination = historyDirectory.appendingPathComponent(file.lastPathComponent)
+        let destination = historyDirectory.appending(path: file.lastPathComponent)
         try? FileManager.default.removeItem(at: destination)
         try? FileManager.default.moveItem(at: file, to: destination)
     }
@@ -141,8 +139,8 @@ final class ResultStore: @unchecked Sendable {
               let entries = try? JSONDecoder().decode([Entry].self, from: data) else { return [] }
         let decoder = JSONDecoder()
         return entries.map { entry in
-            var item = ImageItem(url: URL(fileURLWithPath: entry.path),
-                                 root: entry.root.map { URL(fileURLWithPath: $0, isDirectory: true) },
+            var item = ImageItem(url: URL(filePath: entry.path),
+                                 root: entry.root.map { URL(filePath: $0, directoryHint: .isDirectory) },
                                  id: entry.id)
             item.status = entry.status
             item.engine = entry.engine
@@ -193,7 +191,7 @@ final class ResultStore: @unchecked Sendable {
     /// The pages kept for a document no longer in the list.
     func historyPages(for id: UUID) -> [PageResult]? {
         io.sync {}
-        guard let data = try? Data(contentsOf: historyDirectory.appendingPathComponent("\(id.uuidString).json")) else {
+        guard let data = try? Data(contentsOf: historyDirectory.appending(path: "\(id.uuidString).json")) else {
             return nil
         }
         return try? JSONDecoder().decode([PageResult].self, from: data)
@@ -205,7 +203,7 @@ final class ResultStore: @unchecked Sendable {
             let file = resultFile(for: id)
             try? FileManager.default.removeItem(at: file)
             try? FileManager.default.moveItem(
-                at: historyDirectory.appendingPathComponent(file.lastPathComponent), to: file)
+                at: historyDirectory.appending(path: file.lastPathComponent), to: file)
         }
     }
 
@@ -215,7 +213,7 @@ final class ResultStore: @unchecked Sendable {
         history.remove(ids)
         io.async { [historyDirectory] in
             for id in ids {
-                try? FileManager.default.removeItem(at: historyDirectory.appendingPathComponent("\(id.uuidString).json"))
+                try? FileManager.default.removeItem(at: historyDirectory.appending(path: "\(id.uuidString).json"))
             }
         }
     }
@@ -232,7 +230,7 @@ final class ResultStore: @unchecked Sendable {
     }
 
     private func resultFile(for id: UUID) -> URL {
-        resultsDirectory.appendingPathComponent("\(id.uuidString).json")
+        resultsDirectory.appending(path: "\(id.uuidString).json")
     }
 
     // MARK: - Translations
@@ -246,7 +244,7 @@ final class ResultStore: @unchecked Sendable {
     }
 
     private func translationFile(for id: UUID) -> URL {
-        translationsDirectory.appendingPathComponent("\(id.uuidString).json")
+        translationsDirectory.appending(path: "\(id.uuidString).json")
     }
 
     // MARK: - Pages of a document still being read
@@ -255,11 +253,11 @@ final class ResultStore: @unchecked Sendable {
     /// file per page: rewriting everything read so far after every page would
     /// make the five-hundredth page cost as much as the first five hundred.
     func savePartialPage(_ page: PageResult, index: Int, for key: String) {
-        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        let folder = partialDirectory.appending(path: key, directoryHint: .isDirectory)
         io.async {
             guard let data = try? JSONEncoder().encode(page) else { return }
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try? data.write(to: folder.appendingPathComponent("\(index).json"), options: .atomic)
+            try? data.write(to: folder.appending(path: "\(index).json"), options: .atomic)
         }
     }
 
@@ -267,7 +265,7 @@ final class ResultStore: @unchecked Sendable {
     /// by index.
     func partialPages(for key: String) -> [Int: PageResult] {
         io.sync {}   // pages still on their way to disk count too
-        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        let folder = partialDirectory.appending(path: key, directoryHint: .isDirectory)
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         let decoder = JSONDecoder()
         var pages: [Int: PageResult] = [:]
@@ -282,13 +280,13 @@ final class ResultStore: @unchecked Sendable {
 
     func partialPageCount(for key: String) -> Int {
         io.sync {}
-        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        let folder = partialDirectory.appending(path: key, directoryHint: .isDirectory)
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))) ?? []
         return files.filter { $0.hasSuffix(".json") }.count
     }
 
     func removePartial(for key: String) {
-        let folder = partialDirectory.appendingPathComponent(key, isDirectory: true)
+        let folder = partialDirectory.appending(path: key, directoryHint: .isDirectory)
         io.async { try? FileManager.default.removeItem(at: folder) }
     }
 
@@ -322,16 +320,16 @@ final class ResultStore: @unchecked Sendable {
     }
 
     func cachedPages(for key: String) -> [PageResult]? {
-        let file = cacheDirectory.appendingPathComponent("\(key).json")
+        let file = cacheDirectory.appending(path: "\(key).json")
         guard let data = try? Data(contentsOf: file),
               let pages = try? JSONDecoder().decode([PageResult].self, from: data) else { return nil }
         // Touched, so the pruning below keeps what is still being used.
-        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path(percentEncoded: false))
         return pages
     }
 
     func cache(_ pages: [PageResult], for key: String) {
-        let file = cacheDirectory.appendingPathComponent("\(key).json")
+        let file = cacheDirectory.appending(path: "\(key).json")
         io.async { [cacheDirectory, cacheLimit] in
             guard let data = try? JSONEncoder().encode(pages) else { return }
             try? data.write(to: file, options: .atomic)

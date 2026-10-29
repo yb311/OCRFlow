@@ -66,7 +66,7 @@ final class PPSession: @unchecked Sendable {
                 coreML.enableOnSubgraphs = true
                 try options.appendCoreMLExecutionProvider(with: coreML)
             }
-            session = try ORTSession(env: env, modelPath: modelPath.path, sessionOptions: options)
+            session = try ORTSession(env: env, modelPath: modelPath.path(percentEncoded: false), sessionOptions: options)
             inputNames = try session.inputNames()
             outputNames = try session.outputNames()
             guard let input = inputNames.first, let output = outputNames.first else {

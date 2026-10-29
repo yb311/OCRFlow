@@ -8,7 +8,7 @@ import SwiftUI
 struct ModelManagerView: View {
     static let windowID = "model-manager"
 
-    @ObservedObject var downloader: PPModelDownloader
+    @Bindable var downloader: PPModelDownloader
 
     var body: some View {
         ScrollView {

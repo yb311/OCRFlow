@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DropZoneView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @State private var isTargeted = false
 
     var body: some View {
@@ -58,8 +58,9 @@ struct DropZoneView: View {
             .padding(40)
         }
         .padding(24)
-        .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
-            DropHelper.handle(providers: providers, vm: vm)
-        }
+        .dropDestination(for: URL.self) { urls, _ in
+            vm.addImages(urls: urls)
+            return true
+        } isTargeted: { isTargeted = $0 }
     }
 }

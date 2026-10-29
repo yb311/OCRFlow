@@ -12,9 +12,9 @@ struct LaunchSentinel {
     let crashLogFolder: URL
 
     init(directory: URL,
-         crashLogFolder: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)) {
-        self.marker = directory.appendingPathComponent("running")
+         crashLogFolder: URL = URL.homeDirectory
+            .appending(path: "Library/Logs/DiagnosticReports", directoryHint: .isDirectory)) {
+        self.marker = directory.appending(path: "running")
         self.crashLogFolder = crashLogFolder
     }
 
@@ -52,7 +52,10 @@ struct LaunchSentinel {
     /// The exception and the crashed thread come first in the file.
     static func excerpt(of log: URL, limit: Int = 24_000) -> String? {
         guard let text = try? String(contentsOf: log, encoding: .utf8) else { return nil }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        // Without the trailing slash a directory's path carries, so the home
+        // folder is found however a line names it.
+        var home = URL.homeDirectory.path(percentEncoded: false)
+        if home.hasSuffix("/") { home.removeLast() }
         let anonymised = text.replacingOccurrences(of: home, with: "~")
         return anonymised.count > limit ? String(anonymised.prefix(limit)) + "\n…" : anonymised
     }

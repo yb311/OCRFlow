@@ -85,10 +85,8 @@ extension OCRViewModel {
             for failure in failures { Self.log.error("Watched-folder export failed: \(failure, privacy: .private)") }
             return
         }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "\(failures.count) files couldn't be exported")
-        alert.informativeText = failures.prefix(8).joined(separator: "\n")
-        alert.runModal()
+        prompt = UserPrompt(title: String(localized: "\(failures.count) files couldn't be exported"),
+                            message: failures.prefix(8).joined(separator: "\n"))
     }
 
     private static let log = Logger(subsystem: "com.ocrflow.app", category: "export")
@@ -155,11 +153,11 @@ extension OCRViewModel {
             let directory = exportDirectory(for: item, in: folder)
             var name = exportStem(for: item)
             var suffix = 2
-            while !used.insert(directory.appendingPathComponent(name).path).inserted {
+            while !used.insert(directory.appending(component: name).path(percentEncoded: false)).inserted {
                 name = "\(exportStem(for: item))-\(suffix)"
                 suffix += 1
             }
-            return directory.appendingPathComponent("\(name).\(format.fileExtension)")
+            return directory.appending(component: "\(name).\(format.fileExtension)")
         }
     }
 
@@ -187,10 +185,8 @@ extension OCRViewModel {
         }
         guard let reveal else { return }
         if written == 0 {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "No Tables to Export")
-            alert.informativeText = String(localized: "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information.")
-            alert.runModal()
+            prompt = UserPrompt(title: String(localized: "No Tables to Export"),
+                                message: String(localized: "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information."))
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([reveal])
         }
@@ -201,32 +197,30 @@ extension OCRViewModel {
     nonisolated static func exportDirectory(for item: ImageItem, in folder: URL) -> URL {
         guard let root = item.root else { return folder }
         let relative = (item.relativePath as NSString).deletingLastPathComponent
-        let base = folder.appendingPathComponent(root.lastPathComponent, isDirectory: true)
-        return relative.isEmpty ? base : base.appendingPathComponent(relative, isDirectory: true)
+        let base = folder.appending(path: root.lastPathComponent, directoryHint: .isDirectory)
+        return relative.isEmpty ? base : base.appending(path: relative, directoryHint: .isDirectory)
     }
 
     /// Writes PDFs off the main thread — redrawing a few hundred pages takes a
     /// while — and says so if any could not be written.
     private func writeSearchablePDFs(_ jobs: [([ImageItem], URL)], reveal: URL?) {
-        Task.detached(priority: .userInitiated) {
-            let failures = jobs.compactMap { items, url -> String? in
-                do {
-                    try SearchablePDFWriter.write(items, to: url)
-                    return nil
-                } catch {
-                    return String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")
+        Task {
+            let failures = await BlockingWork.run {
+                jobs.compactMap { items, url -> String? in
+                    do {
+                        try SearchablePDFWriter.write(items, to: url)
+                        return nil
+                    } catch {
+                        return String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")
+                    }
                 }
             }
-            await MainActor.run {
-                guard let reveal else { return }
-                if failures.isEmpty {
-                    NSWorkspace.shared.activateFileViewerSelecting([reveal])
-                } else {
-                    let alert = NSAlert()
-                    alert.messageText = String(localized: "\(failures.count) PDFs couldn't be written")
-                    alert.informativeText = failures.prefix(8).joined(separator: "\n")
-                    alert.runModal()
-                }
+            guard let reveal else { return }
+            if failures.isEmpty {
+                NSWorkspace.shared.activateFileViewerSelecting([reveal])
+            } else {
+                prompt = UserPrompt(title: String(localized: "\(failures.count) PDFs couldn't be written"),
+                                    message: failures.prefix(8).joined(separator: "\n"))
             }
         }
     }
@@ -322,7 +316,7 @@ extension OCRViewModel {
                 },
                 notes: page.notes.map(\.message))
         }
-        return ExportedFile(file: item.fileName, path: item.url.path, engine: item.engine?.rawValue,
+        return ExportedFile(file: item.fileName, path: item.url.path(percentEncoded: false), engine: item.engine?.rawValue,
                             text: item.ocrText, markdown: item.hasMarkdown ? item.markdown : nil,
                             pages: pages)
     }
@@ -364,7 +358,7 @@ extension OCRViewModel {
 
         let stem = file.deletingPathExtension().lastPathComponent
         let folderName = "\(stem).assets"
-        let folder = file.deletingLastPathComponent().appendingPathComponent(folderName)
+        let folder = file.deletingLastPathComponent().appending(component: folderName)
         guard (try? FileManager.default.createDirectory(at: folder,
                                                         withIntermediateDirectories: true)) != nil
         else { return markdown }
@@ -378,7 +372,7 @@ extension OCRViewModel {
             }
             let name = "\(prefix)-\(index + 1).png"
             do {
-                try data.write(to: folder.appendingPathComponent(name))
+                try data.write(to: folder.appending(component: name))
                 let path = "\(folderName)/\(name)"
                 links.append(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)
             } catch {
@@ -401,7 +395,7 @@ extension OCRViewModel {
         guard let output = watchOutputFolder, let translation = item.translation else { return }
         let result = Self.separateExportURLs(for: [item], format: .markdown, in: output)[0]
         let file = result.deletingLastPathComponent()
-            .appendingPathComponent("\(result.deletingPathExtension().lastPathComponent)_\(translation.target).md")
+            .appending(component: "\(result.deletingPathExtension().lastPathComponent)_\(translation.target).md")
         let text = translation.document(of: item.ocrText, bilingual: false)
         if let failure = write(Data(text.utf8), to: file) { reportExportFailures([failure], interactive: false) }
     }

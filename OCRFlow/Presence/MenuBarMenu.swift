@@ -3,11 +3,12 @@ import SwiftUI
 /// What the icon at the top of the screen offers: the app's main actions,
 /// reachable from any app, and the way back in when the Dock icon is hidden.
 struct MenuBarMenu: View {
-    @EnvironmentObject private var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
+        @Bindable var vm = vm
         Button("Capture Screenshot") { vm.captureScreenshot() }
             // Shown only while the global shortcut is actually in place.
             .keyboardShortcut(vm.globalCaptureShortcut && !vm.captureShortcutTaken

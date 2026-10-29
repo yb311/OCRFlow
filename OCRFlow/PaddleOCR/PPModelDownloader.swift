@@ -6,17 +6,18 @@ import Foundation
 /// the whole download has arrived, so an interrupted transfer can never leave
 /// a half-written model that the engine would then try to load.
 @MainActor
-final class PPModelDownloader: ObservableObject {
+@Observable
+final class PPModelDownloader {
 
     /// Hugging Face is often unreachable from mainland China, where the
     /// mirror is the one that works.
-    @Published var source: PPModelCatalog.Source = Locale.current.region == .chinaMainland ? .mirror : .huggingFace
+    var source: PPModelCatalog.Source = Locale.current.region == .chinaMainland ? .mirror : .huggingFace
     /// 0…1 per entry id, present only while that entry is downloading.
-    @Published private(set) var progress: [String: Double] = [:]
-    @Published private(set) var errors: [String: String] = [:]
+    private(set) var progress: [String: Double] = [:]
+    private(set) var errors: [String: String] = [:]
     /// What a reachability check made of each source, so the mirror can be
     /// shown to work — or not — before a gigabyte of download depends on it.
-    @Published private(set) var reachability: [PPModelCatalog.Source: Reachability] = [:]
+    private(set) var reachability: [PPModelCatalog.Source: Reachability] = [:]
 
     enum Reachability: Equatable {
         case checking
@@ -28,7 +29,9 @@ final class PPModelDownloader: ObservableObject {
     }
     /// Bumped whenever the models folder changes, so views recompute the
     /// installed state of every entry.
-    @Published private(set) var inventoryVersion = 0
+    private(set) var inventoryVersion = 0
+    /// Told whenever the models folder changes.
+    @ObservationIgnored var onInventoryChange: () -> Void = {}
 
     private var tasks: [String: Task<Void, Never>] = [:]
 
@@ -52,7 +55,7 @@ final class PPModelDownloader: ObservableObject {
 
         let fallback = PPModelCatalog.Source.allCases.first { $0 != source }
 
-        tasks[id] = Task.detached(priority: .utility) { [weak self] in
+        tasks[id] = Task { [weak self] in
             var failure: String?
             do {
                 try await Self.install(entry, from: source, into: destination, progress: report)
@@ -77,7 +80,7 @@ final class PPModelDownloader: ObservableObject {
                     failure = error.localizedDescription
                 }
             }
-            await self?.finish(id, error: failure)
+            self?.finish(id, error: failure)
         }
     }
 
@@ -95,7 +98,7 @@ final class PPModelDownloader: ObservableObject {
             reachability[source] = .checking
             Task { [weak self] in
                 let result = await Self.probe(source)
-                await MainActor.run { self?.reachability[source] = result }
+                self?.reachability[source] = result
             }
         }
     }
@@ -125,18 +128,23 @@ final class PPModelDownloader: ObservableObject {
     /// Deletes every file the entry installed.
     func remove(_ entry: PPModelCatalog.Entry) {
         for asset in entry.assets {
-            let url = PPModelStore.userModelsDirectory.appendingPathComponent(asset.localName)
+            let url = PPModelStore.userModelsDirectory.appending(path: asset.localName)
             try? FileManager.default.removeItem(at: url)
         }
         errors[entry.id] = nil
-        inventoryVersion += 1
+        inventoryChanged()
     }
 
     private func finish(_ id: String, error: String?) {
         tasks[id] = nil
         progress[id] = nil
         errors[id] = error
+        inventoryChanged()
+    }
+
+    private func inventoryChanged() {
         inventoryVersion += 1
+        onInventoryChange()
     }
 
     // MARK: - Transfer
@@ -148,8 +156,8 @@ final class PPModelDownloader: ObservableObject {
         // Assemble everything in a scratch folder first: a model without its
         // dictionary is worse than no model at all, because the engine loads it
         // and then decodes gibberish.
-        let staging = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OCRFlowDownload-\(UUID().uuidString)", isDirectory: true)
+        let staging = URL.temporaryDirectory
+            .appending(path: "OCRFlowDownload-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: staging) }
 
@@ -158,7 +166,7 @@ final class PPModelDownloader: ObservableObject {
             guard let url = asset.url(from: source) else {
                 throw PPDownloadError.badURL(asset.remoteFile)
             }
-            let staged = staging.appendingPathComponent(asset.localName)
+            let staged = staging.appending(path: asset.localName)
             try await downloadFile(from: url, to: staged) { fraction in
                 progress((Double(index) + fraction) / total)
             }
@@ -173,9 +181,9 @@ final class PPModelDownloader: ObservableObject {
         }
 
         for asset in entry.assets {
-            let from = staging.appendingPathComponent(asset.localName)
-            let to = destination.appendingPathComponent(asset.localName)
-            if FileManager.default.fileExists(atPath: to.path) {
+            let from = staging.appending(path: asset.localName)
+            let to = destination.appending(path: asset.localName)
+            if FileManager.default.fileExists(atPath: to.path(percentEncoded: false)) {
                 _ = try FileManager.default.replaceItemAt(to, withItemAt: from)
             } else {
                 try FileManager.default.moveItem(at: from, to: to)
@@ -200,7 +208,7 @@ final class PPModelDownloader: ObservableObject {
         // A transfer cut short but still reported as 200 would otherwise be
         // installed as a valid model.
         let expected = response.expectedContentLength
-        let written = (try? FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? Int64) ?? nil
+        let written = (try? FileManager.default.attributesOfItem(atPath: temporary.path(percentEncoded: false))[.size] as? Int64) ?? nil
         if expected > 0, let written, written != expected {
             try? FileManager.default.removeItem(at: temporary)
             throw PPDownloadError.truncated(received: written, expected: expected)

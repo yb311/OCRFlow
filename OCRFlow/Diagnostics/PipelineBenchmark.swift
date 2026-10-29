@@ -27,16 +27,20 @@ enum PipelineBenchmark {
     static func runIfRequested() {
         let args = CommandLine.arguments
         guard let flag = args.firstIndex(of: "--benchmark"), args.count > flag + 3 else { return }
-        let output = URL(fileURLWithPath: args[flag + 1], isDirectory: true)
+        let output = URL(filePath: args[flag + 1], directoryHint: .isDirectory)
         let modes = args[flag + 2].split(separator: ",").map(String.init)
-        let files = args[(flag + 3)...].map { URL(fileURLWithPath: $0) }
-        do {
-            try run(modes: modes, files: files, output: output)
-            exit(0)
-        } catch {
-            FileHandle.standardError.write(Data("benchmark failed: \(error)\n".utf8))
-            exit(1)
+        let files = args[(flag + 3)...].map { URL(filePath: $0) }
+        Task {
+            do {
+                try await run(modes: modes, files: files, output: output)
+                exit(0)
+            } catch {
+                FileHandle.standardError.write(Data("benchmark failed: \(error)\n".utf8))
+                exit(1)
+            }
         }
+        // The app never starts: the main queue serves the run until it exits.
+        dispatchMain()
     }
 
     private struct Row: Encodable {
@@ -51,7 +55,7 @@ enum PipelineBenchmark {
         var reviewNotes: Int
     }
 
-    private static func run(modes: [String], files: [URL], output: URL) throws {
+    private static func run(modes: [String], files: [URL], output: URL) async throws {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         var rows: [Row] = []
         var markdownByMode: [String: [String: String]] = [:]
@@ -59,29 +63,29 @@ enum PipelineBenchmark {
         for mode in modes {
             let settings = try settings(for: mode)
             let engines = try loadEngines(for: settings)
-            let folder = output.appendingPathComponent(mode, isDirectory: true)
+            let folder = output.appending(path: mode, directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
             for file in files {
                 let start = Date()
-                let pages = try DocumentRecognizer.recognize(url: file, settings: settings, engines: engines,
-                                                             isCancelled: { false }, progress: { _ in })
+                let pages = try await DocumentRecognizer.recognize(url: file, settings: settings, engines: engines,
+                                                                   isCancelled: { false }, progress: { _ in })
                 let seconds = Date().timeIntervalSince(start)
                 let document = OCRViewModel.assemble(pages, dropping: [], inferHeadingLevels: true)
 
                 let stem = file.deletingPathExtension().lastPathComponent
-                try document.markdown.write(to: folder.appendingPathComponent("\(stem).md"),
+                try document.markdown.write(to: folder.appending(path: "\(stem).md"),
                                             atomically: true, encoding: .utf8)
-                try document.text.write(to: folder.appendingPathComponent("\(stem).txt"),
+                try document.text.write(to: folder.appending(path: "\(stem).txt"),
                                         atomically: true, encoding: .utf8)
                 let encoded = try JSONEncoder().encode(pages)
-                try encoded.write(to: folder.appendingPathComponent("\(stem).json"))
+                try encoded.write(to: folder.appending(path: "\(stem).json"))
                 // What the queue saves must come back exactly as it went in.
                 if try JSONDecoder().decode([PageResult].self, from: encoded) != pages {
                     print("  ✗ \(file.lastPathComponent): results do not survive saving")
                 }
                 try checkSearchablePDF(file: file, pages: pages, text: document.text,
-                                       to: folder.appendingPathComponent("\(stem).searchable.pdf"))
+                                       to: folder.appending(path: "\(stem).searchable.pdf"))
                 markdownByMode[mode, default: [:]][file.lastPathComponent] = document.text
 
                 var regions: [String: Int] = [:]
@@ -94,7 +98,7 @@ enum PipelineBenchmark {
                               regions: regions,
                               reviewNotes: pages.flatMap(\.allNotes).filter { $0.severity == .warning }.count)
                 rows.append(row)
-                print(String(format: "%-9@ %-28@ %3d页 %7.2fs  %6d字  一致度 %@  %@  待复核 %d",
+                print(String(format: "%-9@ %-28@ %3d pages %7.2fs  %6d chars  agreement %@  %@  to review %d",
                              mode as NSString, String(file.lastPathComponent.prefix(28)) as NSString,
                              row.pages, row.seconds, row.characters,
                              row.agreement.map { String(format: "%.3f", $0) } ?? "—",
@@ -113,7 +117,7 @@ enum PipelineBenchmark {
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(rows).write(to: output.appendingPathComponent("summary.json"))
+        try encoder.encode(rows).write(to: output.appending(path: "summary.json"))
     }
 
     /// Writes the searchable PDF and checks a reader can find the text in
@@ -131,11 +135,11 @@ enum PipelineBenchmark {
             .filter { $0.count >= 6 && $0.allSatisfy { $0.isLetter } }
         let sample = stride(from: 0, to: words.count, by: max(1, words.count / 20)).map { words[$0] }
         let found = sample.filter { !written.findString($0, withOptions: .caseInsensitive).isEmpty }
-        print("  searchable PDF: \(written.pageCount) 页, \(found.count)/\(sample.count) 个抽样词可搜索到")
+        print("  searchable PDF: \(written.pageCount) pages, \(found.count)/\(sample.count) sampled words searchable")
         let sheets = TableWorkbook.sheets(from: [item])
         if !sheets.isEmpty {
             try TableWorkbook.write(sheets, to: url.deletingPathExtension().appendingPathExtension("xlsx"))
-            print("  Excel: \(sheets.count) 个表格")
+            print("  Excel: \(sheets.count) tables")
         }
     }
 

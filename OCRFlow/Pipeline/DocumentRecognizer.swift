@@ -42,7 +42,6 @@ enum DocumentRecognizer {
             vl.threadCount = 0
             // Document settings, applied when the pages are assembled.
             vl.inferHeadingLevels = true
-            vl.dropPageFurniture = true
             let usesPaddle = engine == .paddleOCR || engine == .auto
             let usesVL = engine == .paddleVL || (engine == .auto && vlAvailable)
             let key = Key(engine: engine,
@@ -100,24 +99,24 @@ enum DocumentRecognizer {
                           done: [Int: PageResult] = [:],
                           isCancelled: @escaping @Sendable () -> Bool,
                           progress: @escaping Progress,
-                          onPage: PageHandler? = nil) throws -> [PageResult] {
+                          onPage: PageHandler? = nil) async throws -> [PageResult] {
         if url.pathExtension.lowercased() == "pdf" {
             guard let source = PDFSource(url: url) else { throw OCRError.pdfOpenFailed }
             let count = source.pageCount
             guard count > 0 else { throw OCRError.pdfOpenFailed }
-            return try readPages(count: count, done: done, isCancelled: isCancelled,
-                                 progress: progress, onPage: onPage) { index, report in
-                try recognizePDFPage(index, of: source, settings: settings, engines: engines,
-                                     isCancelled: isCancelled, progress: report)
+            return try await readPages(count: count, done: done, isCancelled: isCancelled,
+                                       progress: progress, onPage: onPage) { index, report in
+                try await recognizePDFPage(index, of: source, settings: settings, engines: engines,
+                                           isCancelled: isCancelled, progress: report)
             }
         }
         let count = PageImages.frameCount(of: url)
         guard count > 0 else { throw OCRError.imageLoadFailed }
         progress(ProgressUpdate(fraction: 0.05, pagesDone: done.count, pageCount: count))
-        return try readPages(count: count, done: done, isCancelled: isCancelled,
-                             progress: progress, onPage: onPage) { index, report in
-            try recognizeImagePage(index, at: url, settings: settings, engines: engines,
-                                   isCancelled: isCancelled, progress: report)
+        return try await readPages(count: count, done: done, isCancelled: isCancelled,
+                                   progress: progress, onPage: onPage) { index, report in
+            try await recognizeImagePage(index, at: url, settings: settings, engines: engines,
+                                         isCancelled: isCancelled, progress: report)
         }
     }
 
@@ -125,14 +124,14 @@ enum DocumentRecognizer {
     /// stays as it is.
     static func recognize(page index: Int, of url: URL, settings: Settings, engines: Engines,
                           isCancelled: @escaping @Sendable () -> Bool,
-                          progress: ((Double) -> Void)?) throws -> PageResult {
+                          progress: (@Sendable (Double) -> Void)?) async throws -> PageResult {
         if url.pathExtension.lowercased() == "pdf" {
             guard let source = PDFSource(url: url), index < source.pageCount else { throw OCRError.pdfOpenFailed }
-            return try recognizePDFPage(index, of: source, settings: settings, engines: engines,
-                                        isCancelled: isCancelled, progress: progress)
+            return try await recognizePDFPage(index, of: source, settings: settings, engines: engines,
+                                              isCancelled: isCancelled, progress: progress)
         }
-        return try recognizeImagePage(index, at: url, settings: settings, engines: engines,
-                                      isCancelled: isCancelled, progress: progress)
+        return try await recognizeImagePage(index, at: url, settings: settings, engines: engines,
+                                            isCancelled: isCancelled, progress: progress)
     }
 
     /// How many pages a file has, without reading any of them.
@@ -145,19 +144,25 @@ enum DocumentRecognizer {
 
     private static func recognizeImagePage(_ index: Int, at url: URL, settings: Settings, engines: Engines,
                                            isCancelled: @escaping @Sendable () -> Bool,
-                                           progress: ((Double) -> Void)?) throws -> PageResult {
-        guard let image = PageImages.image(at: url, frame: index) else { throw OCRError.imageLoadFailed }
-        return try recognize(page: image, pdf: nil, settings: settings, engines: engines,
-                             isCancelled: isCancelled, progress: progress)
+                                           progress: (@Sendable (Double) -> Void)?) async throws -> PageResult {
+        let image = try await BlockingWork.run {
+            guard let image = PageImages.image(at: url, frame: index) else { throw OCRError.imageLoadFailed }
+            return image
+        }
+        return try await recognize(page: image, pdf: nil, settings: settings, engines: engines,
+                                   isCancelled: isCancelled, progress: progress)
     }
 
     private static func recognizePDFPage(_ index: Int, of source: PDFSource, settings: Settings, engines: Engines,
                                          isCancelled: @escaping @Sendable () -> Bool,
-                                         progress: ((Double) -> Void)?) throws -> PageResult {
-        guard let rendered = source.render(page: index) else { throw OCRError.imageLoadFailed }
-        return try recognize(page: rendered.image, pdf: (source, index, rendered),
-                             settings: settings, engines: engines,
-                             isCancelled: isCancelled, progress: progress)
+                                         progress: (@Sendable (Double) -> Void)?) async throws -> PageResult {
+        let rendered = try await BlockingWork.run {
+            guard let rendered = source.render(page: index) else { throw OCRError.imageLoadFailed }
+            return rendered
+        }
+        return try await recognize(page: rendered.image, pdf: PDFPage(source: source, index: index, rendered: rendered),
+                                   settings: settings, engines: engines,
+                                   isCancelled: isCancelled, progress: progress)
     }
 
     /// Reads `count` pages, a couple at a time, and returns them in order.
@@ -173,8 +178,8 @@ enum DocumentRecognizer {
                                   isCancelled: @escaping @Sendable () -> Bool,
                                   progress: @escaping Progress,
                                   onPage: PageHandler?,
-                                  read: @escaping @Sendable (Int, @escaping (Double) -> Void) throws -> PageResult)
-        throws -> [PageResult] {
+                                  read: @escaping @Sendable (Int, @escaping @Sendable (Double) -> Void) async throws -> PageResult)
+        async throws -> [PageResult] {
         struct State {
             var pages: [PageResult?]
             var errors: [Error?]
@@ -189,7 +194,7 @@ enum DocumentRecognizer {
             initial.fractions[index] = 1
             initial.finished += 1
         }
-        let toRead = (0..<count).filter { initial.pages[$0] == nil }
+        var toRead = (0..<count).filter { initial.pages[$0] == nil }.makeIterator()
         // Pages hold images, which are not Sendable; every access to them
         // goes through the lock.
         let state = OSAllocatedUnfairLock(uncheckedState: initial)
@@ -206,34 +211,26 @@ enum DocumentRecognizer {
         progress(ProgressUpdate(fraction: Double(initial.finished) / Double(count),
                                 pagesDone: initial.finished, pageCount: count))
 
-        let queue = DispatchQueue(label: "OCRFlow.pages", qos: .userInitiated, attributes: .concurrent)
-        let slots = DispatchSemaphore(value: count == 1 ? 1 : pagesInFlight)
-        let group = DispatchGroup()
-        for index in toRead {
-            slots.wait()
-            if isCancelled() {
-                slots.signal()
-                break
-            }
-            group.enter()
-            queue.async {
-                defer {
-                    slots.signal()
-                    group.leave()
+        await withTaskGroup(of: Void.self) { group in
+            func readNext() {
+                guard !isCancelled(), let index = toRead.next() else { return }
+                group.addTask {
+                    do {
+                        let page = try await read(index) { report(index, $0) }
+                        // The engines answer a stop by returning what they have
+                        // so far, so a page that comes back after one is a
+                        // fragment.
+                        if !isCancelled() { onPage?(index, page) }
+                        state.withLockUnchecked { $0.pages[index] = page }
+                    } catch {
+                        state.withLockUnchecked { $0.errors[index] = error }
+                    }
+                    report(index, 1, finishing: true)
                 }
-                do {
-                    let page = try read(index) { report(index, $0) }
-                    state.withLockUnchecked { $0.pages[index] = page }
-                    // The engines answer a stop by returning what they have so
-                    // far, so a page that comes back after one is a fragment.
-                    if !isCancelled() { onPage?(index, page) }
-                } catch {
-                    state.withLockUnchecked { $0.errors[index] = error }
-                }
-                report(index, 1, finishing: true)
             }
+            for _ in 0..<(count == 1 ? 1 : pagesInFlight) { readNext() }
+            while await group.next() != nil { readNext() }
         }
-        group.wait()
 
         let (pages, errors) = state.withLockUnchecked { ($0.pages, $0.errors) }
         if isCancelled() { return pages.compactMap { $0 } }
@@ -247,26 +244,66 @@ enum DocumentRecognizer {
 
     // MARK: - One page
 
+    /// A page of a PDF, as it was rendered for reading.
+    struct PDFPage: Sendable {
+        let source: PDFSource
+        let index: Int
+        let rendered: RenderedPDFPage
+    }
+
     /// Sends one page to whichever engine is selected.
-    static func recognize(page source: CGImage,
-                          pdf: (source: PDFSource, index: Int, rendered: RenderedPDFPage)?,
+    static func recognize(page source: CGImage, pdf: PDFPage?,
                           settings: Settings, engines: Engines,
-                          isCancelled: @escaping () -> Bool,
-                          progress: ((Double) -> Void)?) throws -> PageResult {
+                          isCancelled: @escaping @Sendable () -> Bool,
+                          progress: (@Sendable (Double) -> Void)?) async throws -> PageResult {
         // 智能分层's first layer: a PDF page whose own text can be trusted is
         // not read from its pixels at all — so it is not flattened either.
         if settings.engine == .auto, let pdf, let layered = engines.layered,
            settings.layered.pdfText.trusts(pdf.source.verdict(page: pdf.index)) {
-            if var page = try layered.read(rendered: pdf.rendered, source: pdf.source, page: pdf.index,
-                                           progress: progress, isCancelled: isCancelled) {
+            let read = try await BlockingWork.run {
+                try layered.read(rendered: pdf.rendered, source: pdf.source, page: pdf.index,
+                                 progress: progress, isCancelled: isCancelled)
+            }
+            if var page = read {
                 page.notes += unavailableNotes(engines, page: page)
                 return page
             }
         }
 
-        // Flattening comes first, exactly as it does upstream: everything after
-        // it — layout, detection, recognition — assumes text runs in straight
-        // lines. A failure here is not fatal; the page is read as photographed.
+        let drawnByPDF = pdf.map { $0.source.verdict(page: $0.index) == .digital } ?? false
+        let (image, rectified) = await BlockingWork.run {
+            prepared(source, drawnByPDF: drawnByPDF, engines: engines)
+        }
+
+        var page: PageResult
+        if settings.engine.usesVisionLanguages {
+            page = try await performVisionOCR(on: image, settings: settings)
+            progress?(1)
+        } else {
+            page = try await BlockingWork.run {
+                try readWithModels(image, drawnByPDF: drawnByPDF, settings: settings, engines: engines,
+                                   isCancelled: isCancelled, progress: progress)
+            }
+        }
+        page.rectified = rectified.map(ImageItem.page(from:))
+        return page
+    }
+
+    /// The page as the readers should see it, and the picture of it when that
+    /// differs from the source.
+    ///
+    /// Flattening comes first, exactly as it does upstream: everything after
+    /// it — layout, detection, recognition — assumes text runs in straight
+    /// lines. A failure here is not fatal; the page is read as photographed.
+    ///
+    /// PaddleOCR-VL reads regions cut out of the page, so a page lying on its
+    /// side is turned upright next; its boxes then belong to the turned page,
+    /// kept the same way a flattened one is. Not a page a PDF drew itself: its
+    /// rotation is the PDF's own, already applied when it was rendered, and
+    /// the classifier only gets such a page wrong — a figure full of sideways
+    /// labels reads to it as a page on its side.
+    private static func prepared(_ source: CGImage, drawnByPDF: Bool,
+                                 engines: Engines) -> (image: CGImage, rectified: CGImage?) {
         var image = source
         var rectified: CGImage?
         if let unwarper = engines.unwarper, let buffer = PPImageBuffer(cgImage: source),
@@ -274,30 +311,26 @@ enum DocumentRecognizer {
             image = flat
             rectified = flat
         }
-        // PaddleOCR-VL reads regions cut out of the page, so a page lying on
-        // its side is turned upright first; its boxes then belong to the
-        // turned page, kept the same way a flattened one is.
-        //
-        // Not a page a PDF drew itself: its rotation is the PDF's own, already
-        // applied when it was rendered, and the classifier only gets such a
-        // page wrong — a figure full of sideways labels reads to it as a page
-        // on its side.
-        let drawnByPDF = pdf.map { $0.source.verdict(page: $0.index) == .digital } ?? false
         if !drawnByPDF, let orienter = engines.orienter, let upright = try? orienter.straightened(image) {
             image = upright
             rectified = upright
         }
+        return (image, rectified)
+    }
 
-        var page: PageResult
+    /// Reads a page with the PaddleOCR engines. They block the calling thread
+    /// until they are done.
+    private static func readWithModels(_ image: CGImage, drawnByPDF: Bool, settings: Settings, engines: Engines,
+                                       isCancelled: @escaping @Sendable () -> Bool,
+                                       progress: (@Sendable (Double) -> Void)?) throws -> PageResult {
         switch settings.engine {
         case .visionFast, .visionAccurate:
-            page = try performVisionOCR(on: image, settings: settings)
-            progress?(1)
+            preconditionFailure("Apple Vision is not one of the PaddleOCR engines")
         case .paddleVL:
             guard let vlPipeline = engines.vlPipeline else {
                 throw VLError.backendFailed(String(localized: "The PaddleOCR-VL model isn't loaded"))
             }
-            page = try vlPipeline.parse(image: image, config: settings.vlConfig,
+            return try vlPipeline.parse(image: image, config: settings.vlConfig,
                                         progress: progress, isCancelled: isCancelled)
         case .paddleOCR:
             guard let paddle = engines.paddle else {
@@ -307,18 +340,17 @@ enum DocumentRecognizer {
             if drawnByPDF { config.useDocOrientation = false }
             let result = try paddle.recognize(image: image, config: config,
                                               progress: progress, isCancelled: isCancelled)
-            page = PageResult(size: CGSize(width: image.width, height: image.height),
+            return PageResult(size: CGSize(width: image.width, height: image.height),
                               lines: result.lines, blocks: result.blocks,
                               blockSource: .plainOCR, rawText: result.lines.plainText)
         case .auto:
             guard let layered = engines.layered else {
                 throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
             }
-            page = try layered.read(image: image, progress: progress, isCancelled: isCancelled)
+            var page = try layered.read(image: image, progress: progress, isCancelled: isCancelled)
             page.notes += unavailableNotes(engines, page: page)
+            return page
         }
-        page.rectified = rectified.map(ImageItem.page(from:))
-        return page
     }
 
     /// Says so on a page with structure, when 智能分层 had no VLM to read it.
@@ -330,36 +362,20 @@ enum DocumentRecognizer {
 
     // MARK: - Apple Vision
 
-    /// `VNImageRequestHandler.perform(_:)` is synchronous — it blocks the
-    /// calling thread until every request's completion handler has already
-    /// run — so plain local variables are enough here.
-    ///
-    /// Each line keeps the box Vision found it in, which the app used to throw
-    /// away: it is what the preview's overlay and a searchable PDF's text
-    /// layer are built from.
-    private static func performVisionOCR(on cgImage: CGImage, settings: Settings) throws -> PageResult {
-        var observations: [VNRecognizedTextObservation] = []
-        var requestError: Error?
-        let request = VNRecognizeTextRequest { req, err in
-            if let err {
-                requestError = err
-                return
-            }
-            observations = req.results as? [VNRecognizedTextObservation] ?? []
-        }
+    /// Each line keeps the box Vision found it in: it is what the preview's
+    /// overlay and a searchable PDF's text layer are built from.
+    private static func performVisionOCR(on cgImage: CGImage, settings: Settings) async throws -> PageResult {
+        var request = RecognizeTextRequest()
         request.recognitionLevel = settings.engine == .visionFast ? .fast : .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = settings.visionLanguages
+        request.recognitionLanguages = settings.visionLanguages.map(Locale.Language.init(identifier:))
+        let observations = try await request.perform(on: cgImage)
 
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        try handler.perform([request])
-        if let requestError { throw requestError }
-
-        let width = CGFloat(cgImage.width), height = CGFloat(cgImage.height)
         // Vision's coordinates are normalised with the origin at the bottom
         // left; the app's are pixels from the top left.
-        func pixel(_ point: CGPoint) -> CGPoint {
-            CGPoint(x: point.x * width, y: (1 - point.y) * height)
+        let size = CGSize(width: cgImage.width, height: cgImage.height)
+        func pixel(_ point: NormalizedPoint) -> CGPoint {
+            point.toImageCoordinates(size, origin: .upperLeft)
         }
         let lines = observations.compactMap { observation -> PPTextLine? in
             guard let candidate = observation.topCandidates(1).first else { return nil }
@@ -369,8 +385,34 @@ enum DocumentRecognizer {
                               confidence: Double(candidate.confidence),
                               wasRotated: false)
         }
-        return PageResult(size: CGSize(width: width, height: height), lines: lines,
-                          rawText: lines.map(\.text).joined(separator: "\n"))
+        return PageResult(size: size, lines: lines, rawText: lines.map(\.text).joined(separator: "\n"))
+    }
+}
+
+/// Runs synchronous work that blocks — the inference engines wait on their
+/// own thread pools and on the GPU, files are decoded and rendered — on a
+/// dispatch queue rather than on Swift's cooperative thread pool, whose few
+/// threads must never be held up waiting.
+enum BlockingWork {
+    private static let queue = DispatchQueue(label: "OCRFlow.blocking", qos: .userInitiated,
+                                             attributes: .concurrent)
+
+    static func run<T>(_ work: @escaping @Sendable () throws -> sending T) async throws -> sending T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    continuation.resume(returning: try work())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    static func run<T>(_ work: @escaping @Sendable () -> sending T) async -> sending T {
+        await withCheckedContinuation { continuation in
+            queue.async { continuation.resume(returning: work()) }
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @State private var isEmptyStateTargeted = false
     @State private var showClearAllConfirm = false
     @State private var filter: StatusFilter = .all
@@ -44,21 +44,14 @@ struct SidebarView: View {
         }
     }
 
-    // Defer writes back to @Published to avoid "publishing during view update"
-    private var selectionBinding: Binding<Set<UUID>> {
-        Binding(
-            get: { vm.selectedIDs },
-            set: { newVal in Task { @MainActor in vm.selectedIDs = newVal } }
-        )
-    }
-
     var body: some View {
+        @Bindable var vm = vm
         VStack(spacing: 0) {
             // List or empty state
             if vm.items.isEmpty {
                 emptyState
             } else {
-                List(visibleItems, selection: selectionBinding) { item in
+                List(visibleItems, selection: $vm.selectedIDs) { item in
                     SidebarRowView(item: item, query: query)
                         .tag(item.id)
                         .contextMenu {
@@ -114,7 +107,7 @@ struct SidebarView: View {
                             Divider()
                             if count == 1 {
                                 Button("Show in Finder") {
-                                    NSWorkspace.shared.selectFile(item.url.path, inFileViewerRootedAtPath: "")
+                                    NSWorkspace.shared.selectFile(item.url.path(percentEncoded: false), inFileViewerRootedAtPath: "")
                                 }
                                 Divider()
                             }
@@ -137,14 +130,14 @@ struct SidebarView: View {
             bottomToolbar
         }
         .searchable(text: $vm.searchQuery, placement: .sidebar, prompt: "Search names and text")
-        .onChange(of: filter) { _, _ in
+        .onChange(of: filter) {
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
             let survivors = vm.selectedIDs.intersection(visible)
             let replacement = survivors.isEmpty
                 ? Set(visibleItems.first.map { [$0.id] } ?? [])
                 : survivors
-            Task { @MainActor in vm.selectedIDs = replacement }
+            vm.selectedIDs = replacement
         }
     }
 
@@ -205,9 +198,10 @@ struct SidebarView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onDrop(of: [.fileURL], isTargeted: $isEmptyStateTargeted) { providers in
-            DropHelper.handle(providers: providers, vm: vm)
-        }
+        .dropDestination(for: URL.self) { urls, _ in
+            vm.addImages(urls: urls)
+            return true
+        } isTargeted: { isEmptyStateTargeted = $0 }
     }
 
     // MARK: - Bottom toolbar
@@ -317,7 +311,7 @@ struct SidebarView: View {
 // MARK: - Sidebar Row
 
 struct SidebarRowView: View {
-    @EnvironmentObject var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     let item: ImageItem
     var query = ""
     @State private var isHovering = false

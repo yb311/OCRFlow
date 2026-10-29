@@ -1,7 +1,6 @@
 import Foundation
 import AppKit
 import Vision
-import Combine
 import UniformTypeIdentifiers
 import OnnxRuntimeBindings
 import os
@@ -99,7 +98,7 @@ struct OCRSettings: Codable, Equatable {
     var watchFolderPath: String?
     var watchOutputPath: String?
     var autoTranslate = false
-    var translationTarget = "zh-Hans"
+    var translationTarget = DocumentTranslation.defaultTarget
     var globalCaptureShortcut = true
     var showInMenuBar = true
     var showInDock = true
@@ -108,9 +107,9 @@ struct OCRSettings: Codable, Equatable {
 
 extension OCRSettings {
     /// Decodes field by field, falling back to the default for anything missing
-    /// or no longer readable. A settings file written by an older build then
-    /// loses only the fields that actually changed shape, instead of throwing
-    /// and resetting everything the user had tuned.
+    /// or no longer readable. A setting added or changed in a later version
+    /// then takes its default, instead of throwing and resetting everything
+    /// the user had tuned.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let fallback = OCRSettings()
@@ -137,13 +136,7 @@ extension OCRSettings {
         renderFigures = value(.renderFigures, fallback.renderFigures)
         renderTables = value(.renderTables, fallback.renderTables)
         exportFigures = value(.exportFigures, fallback.exportFigures)
-        // The preference used to live inside the PaddleOCR-VL settings, back
-        // when only that engine produced layout blocks. A file written by such
-        // a build carries the user's choice there.
-        dropPageFurniture = (try? container.decode(Bool.self, forKey: .dropPageFurniture))
-            ?? vl.dropPageFurniture
-        // Before the switches were split apart there was one of them, and it
-        // covered the three that repeat on every page.
+        dropPageFurniture = value(.dropPageFurniture, fallback.dropPageFurniture)
         useDocUnwarping = value(.useDocUnwarping, fallback.useDocUnwarping)
         watchEnabled = value(.watchEnabled, fallback.watchEnabled)
         watchFolderPath = try? container.decodeIfPresent(String.self, forKey: .watchFolderPath)
@@ -154,49 +147,47 @@ extension OCRSettings {
         showInMenuBar = value(.showInMenuBar, fallback.showInMenuBar)
         showInDock = value(.showInDock, fallback.showInDock)
         showFloatingButton = value(.showFloatingButton, fallback.showFloatingButton)
-        keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
-            ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
-                    .filter { !$0.isPageFurniture }.map(\.rawName)
-                : PPLayoutLabel.auxiliary.map(\.rawName))
+        keptAuxiliary = value(.keptAuxiliary, fallback.keptAuxiliary)
     }
 }
 
 @MainActor
-final class OCRViewModel: ObservableObject {
+@Observable
+final class OCRViewModel {
 
-    // MARK: - Published state
+    // MARK: - State
 
-    @Published var items: [ImageItem] = []
-    @Published var selectedIDs: Set<UUID> = []
+    var items: [ImageItem] = []
+    var selectedIDs: Set<UUID> = []
     /// Whether the window is browsing documents or working through what was
     /// flagged for review.
-    @Published var mode: WorkspaceMode = .workspace
+    var mode: WorkspaceMode = .workspace
     /// The flagged item the review pane is on.
-    @Published var reviewFocus: ReviewEntry.Key?
+    var reviewFocus: ReviewEntry.Key?
     /// A page and region the document pane should turn to, set when leaving
     /// review for "在文档中查看". The pane clears it once it has moved.
-    @Published var documentFocus: DocumentFocus?
+    var documentFocus: DocumentFocus?
     /// What the sidebar is searching for. The document pane reads it too, to
     /// open a file found by its contents at the place it says that.
-    @Published var searchQuery = ""
-    @Published var isProcessing = false
+    var searchQuery = ""
+    var isProcessing = false
     /// Set between pressing 停止 and the last in-flight image actually letting
     /// go. A run cannot be restarted in that window: the worker still holds the
     /// cancellation token, and re-arming it would let a half-finished page be
     /// written out as a finished one.
-    @Published private(set) var isStopping = false
-    @Published var totalProgress: Double = 0        // 0.0 – 1.0
-    @Published var recognitionLanguages: [String] = OCRSettings().recognitionLanguages {
+    private(set) var isStopping = false
+    var totalProgress: Double = 0        // 0.0 – 1.0
+    var recognitionLanguages: [String] = OCRSettings().recognitionLanguages {
         didSet { persistSettings() }
     }
-    @Published var ocrEngine: OCREngine = OCRSettings().engine {
+    var ocrEngine: OCREngine = OCRSettings().engine {
         didSet { persistSettings() }
     }
     /// How many images `startProcessing` runs at once. Decoding and Vision
     /// recognition genuinely parallelise across cores; PaddleOCR's own engine
     /// still finishes one recognition before starting the next regardless of
     /// this value (see `processConcurrently`).
-    @Published var maxConcurrentTasks: Int = OCRViewModel.defaultConcurrency {
+    var maxConcurrentTasks: Int = OCRViewModel.defaultConcurrency {
         didSet { persistSettings() }
     }
 
@@ -207,7 +198,7 @@ final class OCRViewModel: ObservableObject {
     }
 
     // MARK: - PaddleOCR settings
-    @Published var paddleConfig: PPOCRConfig = .default {
+    var paddleConfig: PPOCRConfig = .default {
         didSet {
             // Swapping the model files or the backend invalidates the loaded
             // sessions; the tuning knobs are read per image and do not.
@@ -218,12 +209,12 @@ final class OCRViewModel: ObservableObject {
         }
     }
     /// Draw PaddleOCR's detected text boxes over the preview.
-    @Published var showTextBoxes = true {
+    var showTextBoxes = true {
         didSet { persistSettings() }
     }
 
     // MARK: - PaddleOCR-VL settings
-    @Published var vlConfig: VLConfig = .default {
+    var vlConfig: VLConfig = .default {
         didSet {
             if let engine = vlEngine, !engine.matchesModelConfiguration(vlConfig) {
                 vlEngine = nil
@@ -233,49 +224,51 @@ final class OCRViewModel: ObservableObject {
     }
 
     // MARK: - 智能分层 settings
-    @Published var layeredConfig: LayeredConfig = .default {
+    var layeredConfig: LayeredConfig = .default {
         didSet { persistSettings() }
     }
 
     /// Loaded VLM weights, kept alive across images. Held separately from the
     /// PP-OCR engine because the two can be swapped independently.
-    private var vlEngine: VLEngine?
+    @ObservationIgnored private var vlEngine: VLEngine?
     /// The layout stage, loaded alongside the VLM.
-    private var vlLayoutSession: PPSession?
-    private var vlLayoutEnv: ORTEnv?
+    @ObservationIgnored private var vlLayoutSession: PPSession?
+    @ObservationIgnored private var vlLayoutEnv: ORTEnv?
 
     /// Loaded ONNX sessions, kept alive across images.
-    private var paddleEngine: PPOCREngine?
+    @ObservationIgnored private var paddleEngine: PPOCREngine?
     /// UVDoc, loaded the first time a page has to be flattened.
-    private var docUnwarper: PPDocUnwarper?
-    private var docUnwarperEnv: ORTEnv?
-    private var docOrienter: PPDocOrientationClassifier?
-    private var docOrienterEnv: ORTEnv?
+    @ObservationIgnored private var docUnwarper: PPDocUnwarper?
+    @ObservationIgnored private var docUnwarperEnv: ORTEnv?
+    @ObservationIgnored private var docOrienter: PPDocOrientationClassifier?
+    @ObservationIgnored private var docOrienterEnv: ORTEnv?
     /// Read from the OCR worker thread to honour the Stop button mid-image.
     private let cancellation = PPCancellationToken()
 
-    /// Installs the models that are not bundled. Its changes are republished
-    /// below so the settings sheet re-reads what is on disk after a download.
+    /// Installs the models that are not bundled.
     let modelDownloader = PPModelDownloader()
-    private var downloaderObserver: AnyCancellable?
-
-    private var terminationObserver: AnyCancellable?
 
     /// The queue and its results on disk, and the recognition cache.
-    let store = ResultStore()
+    let store: ResultStore
     /// False until the queue saved by the last session has been read back;
     /// the list shows nothing actionable before then.
-    @Published private(set) var isRestoringQueue = true
+    private(set) var isRestoringQueue = true
 
     /// The crash log the last session left, when it ended in a crash. The
     /// window offers to report it once, then it is cleared.
-    @Published var crashLogFromLastSession: URL?
-    private lazy var sentinel = LaunchSentinel(directory: store.directory)
+    var crashLogFromLastSession: URL?
+
+    /// A question or a message for the user, which the main window shows.
+    var prompt: UserPrompt?
+    private let sentinel: LaunchSentinel
 
     init() {
+        store = ResultStore()
+        sentinel = LaunchSentinel(directory: store.directory)
         crashLogFromLastSession = sentinel.begin()
         restoreSettings()
         validateModelSelections()
+        validateTranslationTarget()
         // Write the settings back in their normalised form. Without this a file
         // that was partial, or written by an older build, stays that way on disk
         // until the user happens to change something.
@@ -284,28 +277,19 @@ final class OCRViewModel: ObservableObject {
         updateCaptureShortcut()
         updatePresence()
 
-        downloaderObserver = modelDownloader.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-            // A model the user just deleted may be the one currently selected.
-            // The publisher fires before the store's own state settles, so the
-            // check runs on the next turn of the main actor.
-            Task { @MainActor in self?.validateModelSelections() }
-        }
-        // llama.cpp tears its Metal device down in a static destructor and
-        // asserts if a model is still loaded at that point, which crashes the
-        // app on quit. Releasing the engine while the run loop is still alive
-        // keeps the teardown in the right order.
-        terminationObserver = NotificationCenter.default
-            .publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.store.saveQueue(self.items)
-                    self.releaseVLEngine()
-                    self.sentinel.end()
-                }
-            }
+        // A model the user just deleted may be the one currently selected.
+        modelDownloader.onInventoryChange = { [weak self] in self?.validateModelSelections() }
         restoreQueue()
+    }
+
+    /// Called as the app quits. llama.cpp tears its Metal device down in a
+    /// static destructor and asserts if a model is still loaded at that
+    /// point, which crashes the app on quit. Releasing the engine while the
+    /// run loop is still alive keeps the teardown in the right order.
+    func prepareForTermination() {
+        store.saveQueue(items)
+        releaseVLEngine()
+        sentinel.end()
     }
 
     /// Reads back the list the last session left: every file, its status and
@@ -313,26 +297,24 @@ final class OCRViewModel: ObservableObject {
     /// back as 待处理, and 开始识别 carries on from there.
     private func restoreQueue() {
         let store = self.store
-        Task.detached(priority: .userInitiated) {
-            let restored = store.load()
-            await MainActor.run {
-                // Anything added while the queue was loading goes after it.
-                let added = self.items
-                let restoredURLs = Set(restored.map(\.url))
-                var all = restored
-                all.append(contentsOf: added.filter { !restoredURLs.contains($0.url) })
-                self.items = all
-                self.settleEquivalentReadings()
-                self.rebuildDocuments()
-                if self.selectedIDs.isEmpty, let first = all.first { self.selectedIDs = [first.id] }
-                self.isRestoringQueue = false
-                self.recalcProgress()
-                self.updateWatcher()
-                store.pruneResults(keeping: Set(all.map(\.id)))
-                self.recordMissingHistory()
-                store.prunePartials(keeping: Set(all.compactMap(\.resume?.key)))
-                self.loadThumbnails(for: restored.map(\.id))
-            }
+        Task {
+            let restored = await BlockingWork.run { store.load() }
+            // Anything added while the queue was loading goes after it.
+            let added = items
+            let restoredURLs = Set(restored.map(\.url))
+            var all = restored
+            all.append(contentsOf: added.filter { !restoredURLs.contains($0.url) })
+            items = all
+            settleEquivalentReadings()
+            rebuildDocuments()
+            if selectedIDs.isEmpty, let first = all.first { selectedIDs = [first.id] }
+            isRestoringQueue = false
+            recalcProgress()
+            updateWatcher()
+            store.pruneResults(keeping: Set(all.map(\.id)))
+            recordMissingHistory()
+            store.prunePartials(keeping: Set(all.compactMap(\.resume?.key)))
+            loadThumbnails(for: restored.map(\.id))
         }
     }
 
@@ -342,7 +324,7 @@ final class OCRViewModel: ObservableObject {
 
     /// Set while the stored values are being written back into the published
     /// properties, so each one's `didSet` does not save what was just loaded.
-    private var isRestoringSettings = false
+    @ObservationIgnored private var isRestoringSettings = false
 
     var settingsSnapshot: OCRSettings {
         OCRSettings(engine: ocrEngine,
@@ -369,8 +351,8 @@ final class OCRViewModel: ObservableObject {
                     keptAuxiliary: keptAuxiliary.map(\.rawName),
                     useDocUnwarping: useDocUnwarping,
                     watchEnabled: watchEnabled,
-                    watchFolderPath: watchFolder?.path,
-                    watchOutputPath: watchOutputFolder?.path,
+                    watchFolderPath: watchFolder?.path(percentEncoded: false),
+                    watchOutputPath: watchOutputFolder?.path(percentEncoded: false),
                     autoTranslate: autoTranslate,
                     translationTarget: translationTarget,
                     globalCaptureShortcut: globalCaptureShortcut,
@@ -427,8 +409,8 @@ final class OCRViewModel: ObservableObject {
         dropPageFurniture = settings.dropPageFurniture
         keptAuxiliary = Set(settings.keptAuxiliary.compactMap(PPLayoutLabel.init(rawName:)))
         useDocUnwarping = settings.useDocUnwarping
-        watchFolder = settings.watchFolderPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
-        watchOutputFolder = settings.watchOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        watchFolder = settings.watchFolderPath.map { URL(filePath: $0, directoryHint: .isDirectory) }
+        watchOutputFolder = settings.watchOutputPath.map { URL(filePath: $0, directoryHint: .isDirectory) }
         watchEnabled = settings.watchEnabled
         autoTranslate = settings.autoTranslate
         translationTarget = settings.translationTarget
@@ -442,6 +424,7 @@ final class OCRViewModel: ObservableObject {
     func resetAllSettings() {
         apply(OCRSettings())
         validateModelSelections()
+        validateTranslationTarget()
         persistSettings()
         updateWatcher()
         updateCaptureShortcut()
@@ -511,19 +494,19 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Text post-processing settings
     /// 合并换行为空格（"不换行"模式）
-    @Published var mergeLineBreaks = false { didSet { persistSettings() } }
+    var mergeLineBreaks = false { didSet { persistSettings() } }
     /// 去除连续空行，只保留单个空行
-    @Published var removeEmptyLines = false { didSet { persistSettings() } }
+    var removeEmptyLines = false { didSet { persistSettings() } }
     /// 去除每行首尾多余空格
-    @Published var trimWhitespace = true { didSet { persistSettings() } }
+    var trimWhitespace = true { didSet { persistSettings() } }
     /// 自动去除行内连字符换行（如 "exam-\nple" → "example"）
-    @Published var removeHyphenBreaks = false { didSet { persistSettings() } }
+    var removeHyphenBreaks = false { didSet { persistSettings() } }
 
     // MARK: - Behavior settings
     /// 添加文件后自动开始识别
-    @Published var autoStartOnAdd = false { didSet { persistSettings() } }
+    var autoStartOnAdd = false { didSet { persistSettings() } }
     /// 重新处理时跳过已完成的文件
-    @Published var skipCompleted = true { didSet { persistSettings() } }
+    var skipCompleted = true { didSet { persistSettings() } }
 
     // MARK: - Export settings
     enum ExportSeparator: String, CaseIterable, Identifiable, Codable {
@@ -547,9 +530,9 @@ final class OCRViewModel: ObservableObject {
             }
         }
     }
-    @Published var exportSeparator: ExportSeparator = .emptyLine { didSet { persistSettings() } }
+    var exportSeparator: ExportSeparator = .emptyLine { didSet { persistSettings() } }
     /// 导出时包含文件名标题
-    @Published var exportIncludeFilename = true { didSet { persistSettings() } }
+    var exportIncludeFilename = true { didSet { persistSettings() } }
 
     /// What an export writes.
     enum ExportFormat: String, CaseIterable, Identifiable, Codable {
@@ -603,25 +586,25 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
-    @Published var exportFormat: ExportFormat = .markdown { didSet { persistSettings() } }
-    @Published var exportLayout: ExportLayout = .combined { didSet { persistSettings() } }
+    var exportFormat: ExportFormat = .markdown { didSet { persistSettings() } }
+    var exportLayout: ExportLayout = .combined { didSet { persistSettings() } }
 
     // MARK: - Result rendering settings
     /// Draw the figure and chart regions of the page in the Markdown pane,
     /// cropped from the source image, instead of a bare placeholder.
-    @Published var renderFigures = true { didSet { persistSettings() } }
+    var renderFigures = true { didSet { persistSettings() } }
     /// Draw recognised tables as a grid rather than as the HTML the model wrote.
-    @Published var renderTables = true { didSet { persistSettings() } }
+    var renderTables = true { didSet { persistSettings() } }
     /// Write the figures out next to an exported Markdown file and point the
     /// document at them.
-    @Published var exportFigures = true { didSet { persistSettings() } }
+    var exportFigures = true { didSet { persistSettings() } }
     /// Leave running headers, footers and page numbers out of the document.
     ///
     /// This is a decision about the *document*, not about the recognition:
     /// those regions are always read and always drawn in the preview, so
     /// flipping this rebuilds what is already on screen instead of asking for
     /// another pass over the file.
-    @Published var dropPageFurniture = true {
+    var dropPageFurniture = true {
         didSet {
             guard oldValue != dropPageFurniture else { return }
             persistSettings()
@@ -632,7 +615,7 @@ final class OCRViewModel: ObservableObject {
     /// Flatten a photographed page before reading it — PaddleOCR's
     /// 图片扭曲矫正. Off by default, as upstream: a scan has nothing to flatten,
     /// and the model would only resample it.
-    @Published var useDocUnwarping = false {
+    var useDocUnwarping = false {
         didSet {
             guard oldValue != useDocUnwarping else { return }
             if !useDocUnwarping { docUnwarper = nil; docUnwarperEnv = nil }
@@ -643,7 +626,7 @@ final class OCRViewModel: ObservableObject {
     /// Which auxiliary regions stay in the document. Everything not in here is
     /// filtered out, which is how PaddleOCR's own 辅助内容解析 switches read:
     /// off means "the model found it and left it out".
-    @Published var keptAuxiliary: Set<PPLayoutLabel> = [] {
+    var keptAuxiliary: Set<PPLayoutLabel> = [] {
         didSet {
             guard oldValue != keptAuxiliary else { return }
             persistSettings()
@@ -726,16 +709,22 @@ final class OCRViewModel: ObservableObject {
         guard let index = items.firstIndex(where: { $0.id == itemID }),
               items[index].pages.indices.contains(page),
               items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+        guard items[index].pages[page].blocks[blockIndex].isCorrected else {
+            return rereadBlockNow(itemID: itemID, page: page, blockIndex: blockIndex)
+        }
+        prompt = UserPrompt(title: String(localized: "This region has manual edits"),
+                            message: String(localized: "Rereading with PaddleOCR-VL will replace the edited text."),
+                            confirmation: .init(label: String(localized: "Reread")) { [weak self] in
+                                self?.rereadBlockNow(itemID: itemID, page: page, blockIndex: blockIndex)
+                            })
+    }
+
+    private func rereadBlockNow(itemID: UUID, page: Int, blockIndex: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              items[index].pages.indices.contains(page),
+              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
         let item = items[index]
         let block = item.pages[page].blocks[blockIndex]
-        if block.isCorrected {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "This region has manual edits")
-            alert.informativeText = String(localized: "Rereading with PaddleOCR-VL will replace the edited text.")
-            alert.addButton(withTitle: String(localized: "Reread"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
         let task = block.label.vlTask ?? .ocr
         let config = vlConfig
         let pageSize = item.pages[page].size
@@ -757,10 +746,10 @@ final class OCRViewModel: ObservableObject {
                 // Asked for by a person, so given the larger budget the
                 // pipeline only reaches for on a second attempt.
                 let limit = config.maxOutputTokens * RegionReader.retryBudgetFactor
-                let output = try await Task.detached(priority: .userInitiated) {
+                let output = try await BlockingWork.run {
                     try engine.recognize([VLRequest(image: image, crop: crop, task: task,
                                                     maxTokens: limit)])[0].get()
-                }.value
+                }
                 let previous = AlternativeReading(source: block.source ?? item.pages[page].blockSource,
                                                   text: block.text, note: .beforeReread)
                 updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
@@ -815,7 +804,7 @@ final class OCRViewModel: ObservableObject {
     }
 
     /// Pages being read again on their own right now.
-    @Published private(set) var rereadingPages: Set<PageRef> = []
+    private(set) var rereadingPages: Set<PageRef> = []
 
     /// Whether one page of this result can be read again by itself. Not
     /// while a run is going: the page would compete with it for the engines,
@@ -838,18 +827,22 @@ final class OCRViewModel: ObservableObject {
     func rereadPage(itemID: UUID, page: Int) {
         guard let index = items.firstIndex(where: { $0.id == itemID }),
               canRereadPage(items[index]), items[index].pages.indices.contains(page) else { return }
+        guard items[index].pages[page].blocks.contains(where: \.isCorrected) else {
+            return rereadPageNow(itemID: itemID, page: page)
+        }
+        prompt = UserPrompt(title: String(localized: "Page \(page + 1) has manual edits"),
+                            message: String(localized: "Recognizing this page again replaces these edits with the new result. Other pages are not affected."),
+                            confirmation: .init(label: String(localized: "Recognize Again"), isDestructive: true) { [weak self] in
+                                self?.rereadPageNow(itemID: itemID, page: page)
+                            })
+    }
+
+    private func rereadPageNow(itemID: UUID, page: Int) {
+        guard let index = items.firstIndex(where: { $0.id == itemID }),
+              canRereadPage(items[index]), items[index].pages.indices.contains(page) else { return }
         let item = items[index]
         let ref = PageRef(itemID: itemID, page: page)
         guard !rereadingPages.contains(ref) else { return }
-        if item.pages[page].blocks.contains(where: \.isCorrected) {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "Page \(page + 1) has manual edits")
-            alert.informativeText = String(localized: "Recognizing this page again replaces these edits with the new result. Other pages are not affected.")
-            alert.addButton(withTitle: String(localized: "Recognize Again"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-            alert.buttons.first?.hasDestructiveAction = true
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
         var settings = currentRecognitionSettings()
         if let engine = item.engine { settings.engine = engine }
         let url = item.url
@@ -859,10 +852,9 @@ final class OCRViewModel: ObservableObject {
             defer { rereadingPages.remove(ref) }
             do {
                 let engines = try await loadEngines(for: settings)
-                let result = try await Task.detached(priority: .userInitiated) {
-                    try DocumentRecognizer.recognize(page: page, of: url, settings: settings, engines: engines,
-                                                     isCancelled: { false }, progress: nil)
-                }.value
+                let result = try await DocumentRecognizer.recognize(page: page, of: url, settings: settings,
+                                                                    engines: engines, isCancelled: { false },
+                                                                    progress: nil)
                 // The file may have been removed, or read again as a whole,
                 // while this page was being read.
                 guard let i = items.firstIndex(where: { $0.id == itemID }), items[i].status == .completed,
@@ -871,10 +863,8 @@ final class OCRViewModel: ObservableObject {
                 rebuildDocument(at: i)
                 store.save(items[i])
             } catch {
-                let alert = NSAlert()
-                alert.messageText = String(localized: "Recognizing page \(page + 1) again failed")
-                alert.informativeText = error.localizedDescription
-                alert.runModal()
+                prompt = UserPrompt(title: String(localized: "Recognizing page \(page + 1) again failed"),
+                                    message: error.localizedDescription)
             }
         }
     }
@@ -882,46 +872,31 @@ final class OCRViewModel: ObservableObject {
     // MARK: - Folder watching
 
     /// Watch a folder and read whatever lands in it.
-    @Published var watchEnabled = false {
+    var watchEnabled = false {
         didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
     }
-    @Published var watchFolder: URL? {
+    var watchFolder: URL? {
         didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
     }
     /// Where a watched file's result is written, in the export format
     /// currently chosen. Nil keeps the results in the list only.
-    @Published var watchOutputFolder: URL? {
+    var watchOutputFolder: URL? {
         didSet { persistSettings(); if !isRestoringSettings { updateWatcher() } }
     }
 
     private var watcher: FolderWatcher?
     /// Files the watcher added, exported as each one finishes.
-    private var watchedIDs = Set<UUID>()
+    @ObservationIgnored private var watchedIDs = Set<UUID>()
     /// Watched files arrived while a run was going; they get one of their own
     /// when it ends.
-    private var watchBacklog = false
+    @ObservationIgnored private var watchBacklog = false
 
     var isWatching: Bool { watcher != nil }
-
-    /// Picks a folder for the watcher, or for its results.
-    func chooseWatchFolder(output: Bool) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.message = output ? String(localized: "Choose an output folder for results") : String(localized: "Choose a folder to watch (including its subfolders)")
-        panel.prompt = String(localized: "Choose")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        if output { watchOutputFolder = url } else { watchFolder = url }
-    }
 
     private func updateWatcher() {
         watcher?.stop()
         watcher = nil
-        guard watchEnabled, !isRestoringQueue, let folder = watchFolder else {
-            objectWillChange.send()
-            return
-        }
+        guard watchEnabled, !isRestoringQueue, let folder = watchFolder else { return }
         let output = watchOutputFolder
         let format = exportFormat
         watcher = FolderWatcher(
@@ -935,12 +910,11 @@ final class OCRViewModel: ObservableObject {
                 let formats = format == .markdown ? [format, .plainText] : [format]
                 return !formats.contains { format in
                     let result = Self.separateExportURLs(for: [probe], format: format, in: output)[0]
-                    return FileManager.default.fileExists(atPath: result.path)
+                    return FileManager.default.fileExists(atPath: result.path(percentEncoded: false))
                 }
             },
             onFiles: { [weak self] urls in self?.addWatched(urls, root: folder) })
         watcher?.start()
-        objectWillChange.send()
     }
 
     private func addWatched(_ urls: [URL], root: URL) {
@@ -967,34 +941,34 @@ final class OCRViewModel: ObservableObject {
     // MARK: - Translation
 
     /// Translate each result as soon as it is recognized.
-    @Published var autoTranslate = false { didSet { persistSettings() } }
+    var autoTranslate = false { didSet { persistSettings() } }
     /// The language results are translated into, automatically or not.
-    @Published var translationTarget = "zh-Hans" { didSet { persistSettings() } }
+    var translationTarget = DocumentTranslation.defaultTarget { didSet { persistSettings() } }
     /// Results waiting to be translated, or being translated now.
-    @Published var translatingIDs: Set<UUID> = []
+    var translatingIDs: Set<UUID> = []
     /// Why the last automatic translation did not finish.
-    @Published var translationFailure: String?
+    var translationFailure: String?
 
     let translator = AutoTranslator()
 
     /// Watched files whose translation is still to be written out.
-    var watchedAwaitingTranslation = Set<UUID>()
+    @ObservationIgnored var watchedAwaitingTranslation = Set<UUID>()
 
     // MARK: - Capture shortcut
 
     /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one, and
     /// the same place again with ⌥⇧⌘3.
-    @Published var globalCaptureShortcut = true {
+    var globalCaptureShortcut = true {
         didSet { persistSettings(); if !isRestoringSettings { updateCaptureShortcut() } }
     }
     /// True when another app already holds ⌥⇧⌘2.
-    @Published private(set) var captureShortcutTaken = false
+    private(set) var captureShortcutTaken = false
     /// True when another app already holds ⌥⇧⌘3.
-    @Published private(set) var captureAgainShortcutTaken = false
-    private var captureHotKeys: [GlobalHotKey] = []
+    private(set) var captureAgainShortcutTaken = false
+    @ObservationIgnored private var captureHotKeys: [GlobalHotKey] = []
     /// Brings the main window to the front, opening one if it was closed —
     /// for a capture made from another app, or the menu bar. Set by the app.
-    var showMainWindow: (() -> Void)?
+    @ObservationIgnored var showMainWindow: (() -> Void)?
 
     private func updateCaptureShortcut() {
         captureHotKeys.forEach { $0.unregister() }
@@ -1011,7 +985,7 @@ final class OCRViewModel: ObservableObject {
     // MARK: - Presence
 
     /// An icon at the top of the screen with the app's main actions.
-    @Published var showInMenuBar = true {
+    var showInMenuBar = true {
         didSet {
             persistSettings()
             // Taking it out of the menu bar must not leave the app with no
@@ -1021,7 +995,7 @@ final class OCRViewModel: ObservableObject {
     }
     /// When off, the Dock icon only shows while one of the app's windows is
     /// open.
-    @Published var showInDock = true {
+    var showInDock = true {
         didSet {
             persistSettings()
             if !showInDock, !showInMenuBar { showInMenuBar = true }
@@ -1029,10 +1003,10 @@ final class OCRViewModel: ObservableObject {
         }
     }
     /// A small round button above every other window that captures on click.
-    @Published var showFloatingButton = false {
+    var showFloatingButton = false {
         didSet { persistSettings(); if !isRestoringSettings { updatePresence() } }
     }
-    private var floatingButton: FloatingCaptureButton?
+    @ObservationIgnored private var floatingButton: FloatingCaptureButton?
 
     private func updatePresence() {
         DockIcon.shared.hidden = !showInDock
@@ -1072,13 +1046,19 @@ final class OCRViewModel: ObservableObject {
     nonisolated static let supportedExtensions: Set<String> = ["png", "jpg", "jpeg", "tiff", "tif", "bmp", "gif",
                                                    "heic", "webp", "pdf"]
 
+    /// What the file picker offers: every readable file, and folders.
+    nonisolated static let importableTypes: [UTType] =
+        supportedExtensions.compactMap { UTType(filenameExtension: $0) } + [.folder]
+
+    /// The main window's file picker is showing.
+    var isImportingFiles = false
+
     /// Adds files, and everything readable inside folders — subfolders
     /// included. Each file found in a folder remembers that folder, so an
     /// export can lay the results out the way the sources were.
     func addImages(urls: [URL]) {
-        Task.detached(priority: .userInitiated) {
-            let found = Self.expand(urls)
-            await MainActor.run { self.add(found) }
+        Task {
+            add(await BlockingWork.run { Self.expand(urls) })
         }
     }
 
@@ -1088,7 +1068,7 @@ final class OCRViewModel: ObservableObject {
         var found: [(url: URL, root: URL?)] = []
         for url in urls {
             var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDirectory) else { continue }
             guard isDirectory.boolValue else {
                 found.append((url, nil))
                 continue
@@ -1102,7 +1082,7 @@ final class OCRViewModel: ObservableObject {
                 inFolder.append(file)
             }
             // Finder order, so the list reads like the folder does.
-            inFolder.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            inFolder.sort { $0.path(percentEncoded: false).localizedStandardCompare($1.path(percentEncoded: false)) == .orderedAscending }
             found += inFolder.map { ($0, url) }
         }
         return found
@@ -1137,17 +1117,18 @@ final class OCRViewModel: ObservableObject {
     /// photos and held each one in memory for as long as it stayed listed.
     func loadThumbnails(for ids: [UUID]) {
         let targets = items.filter { ids.contains($0.id) }.map { ($0.id, $0.url) }
-        Task.detached(priority: .utility) { [weak self] in
-            for chunk in stride(from: 0, to: targets.count, by: 16).map({ Array(targets[$0..<min($0 + 16, targets.count)]) }) {
-                let made = chunk.compactMap { id, url in
-                    PageImages.thumbnail(of: url).map { (id, ImageItem.page(from: $0)) }
+        Task { [weak self] in
+            for start in stride(from: 0, to: targets.count, by: 16) {
+                let chunk = Array(targets[start..<min(start + 16, targets.count)])
+                let made = await BlockingWork.run {
+                    chunk.compactMap { id, url in
+                        PageImages.thumbnail(of: url).map { (id, ImageItem.page(from: $0)) }
+                    }
                 }
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    for (id, image) in made {
-                        if let index = self.items.firstIndex(where: { $0.id == id }) {
-                            self.items[index].thumbnail = image
-                        }
+                guard let self else { return }
+                for (id, image) in made {
+                    if let index = items.firstIndex(where: { $0.id == id }) {
+                        items[index].thumbnail = image
                     }
                 }
             }
@@ -1158,12 +1139,12 @@ final class OCRViewModel: ObservableObject {
 
     /// From the moment capture is asked for until the picture is taken or
     /// the user gives up, so a second press does not start a second one.
-    @Published private(set) var isCapturing = false
+    private(set) var isCapturing = false
     /// Where the last screenshot was taken, so the same place can be taken
     /// again — the next page of a document shown on screen, say.
-    @Published private(set) var lastCaptureTarget: CaptureTarget?
+    private(set) var lastCaptureTarget: CaptureTarget?
     /// Screenshots taken while a run was busy, read once it ends.
-    private var capturesWaiting = Set<UUID>()
+    @ObservationIgnored private var capturesWaiting = Set<UUID>()
 
     /// Lets the user drag out a part of the screen or click a window, then
     /// reads it like any other file.
@@ -1231,23 +1212,26 @@ final class OCRViewModel: ObservableObject {
         addCapture(url)
     }
 
+    /// The time in a file name: sortable, and with no colons, which Finder
+    /// shows as slashes.
     private static func captureDate() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        return formatter.string(from: Date())
+        let hour = Date.FormatStyle.Symbol.VerbatimHour.twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)
+        let format: Date.FormatString =
+            "\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits) \(hour: hour).\(minute: .twoDigits).\(second: .twoDigits)"
+        return Date.now.formatted(.verbatim(format, timeZone: .current, calendar: Calendar(identifier: .gregorian)))
     }
 
     /// In the library folder, so the entry in the list keeps working after a
     /// relaunch. Numbered when there are several in one second, as there are
     /// when taking page after page.
     private func newCaptureURL(named name: String, extension pathExtension: String) -> URL {
-        let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
+        let folder = store.directory.appending(path: "Screenshots", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var url = folder.appendingPathComponent(name).appendingPathExtension(pathExtension)
+        var url = folder.appending(component: name).appendingPathExtension(pathExtension)
         var count = 1
-        while FileManager.default.fileExists(atPath: url.path) {
+        while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
             count += 1
-            url = folder.appendingPathComponent("\(name) \(count)").appendingPathExtension(pathExtension)
+            url = folder.appending(component: "\(name) \(count)").appendingPathExtension(pathExtension)
         }
         return url
     }
@@ -1265,18 +1249,9 @@ final class OCRViewModel: ObservableObject {
         }
     }
 
+    /// Asks the main window to show the file picker.
     func openFilePicker() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.png, .jpeg, .tiff, .bmp, .gif, .heif, .webP, .pdf,
-                                     UTType(filenameExtension: "heic") ?? .heif]
-        panel.message = String(localized: "Choose images, PDFs or folders (including their subfolders)")
-        panel.prompt = String(localized: "Add")
-        if panel.runModal() == .OK {
-            addImages(urls: panel.urls)
-        }
+        isImportingFiles = true
     }
 
     func removeItem(id: UUID) {
@@ -1339,15 +1314,16 @@ final class OCRViewModel: ObservableObject {
     var actionableCount: Int { items.filter(isActionable).count }
 
     /// When the run in progress started, for the elapsed time beside the bar.
-    @Published private(set) var runStartedAt: Date?
+    private(set) var runStartedAt: Date?
 
     func startProcessing() {
         let ids = items.filter(isActionable).map(\.id)
         // A completed file is only actionable when 「跳过已完成」 is off, and
         // running it again would throw away any corrections made to it.
         let corrected = items.filter { ids.contains($0.id) && $0.isCorrected }
-        guard confirmDiscardingCorrections(in: corrected) else { return }
-        run(ids: ids, useCache: true)
+        confirmDiscardingCorrections(in: corrected) { [weak self] in
+            self?.run(ids: ids, useCache: true)
+        }
     }
 
     /// Re-arms the given items and runs them immediately. A 「重试」 that only
@@ -1358,24 +1334,24 @@ final class OCRViewModel: ObservableObject {
     /// cache is bypassed.
     func retryItems(ids: Set<UUID>) {
         let corrected = items.filter { ids.contains($0.id) && $0.isCorrected }
-        guard confirmDiscardingCorrections(in: corrected) else { return }
-        for id in ids { retryItem(id: id) }
-        run(ids: items.filter { ids.contains($0.id) }.map(\.id), useCache: false)
+        confirmDiscardingCorrections(in: corrected) { [weak self] in
+            guard let self else { return }
+            for id in ids { retryItem(id: id) }
+            run(ids: items.filter { ids.contains($0.id) }.map(\.id), useCache: false)
+        }
     }
 
     /// Hand corrections are the one thing a re-run cannot reproduce, so they
-    /// are never thrown away without asking.
-    private func confirmDiscardingCorrections(in corrected: [ImageItem]) -> Bool {
-        guard !corrected.isEmpty else { return true }
-        let alert = NSAlert()
-        alert.messageText = corrected.count == 1
-            ? String(localized: "“\(corrected[0].fileName)” has manual edits")
-            : String(localized: "\(corrected.count) files have manual edits")
-        alert.informativeText = String(localized: "Recognizing again will replace these edits with new results. Export first to keep them.")
-        alert.addButton(withTitle: String(localized: "Recognize Again"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        alert.buttons.first?.hasDestructiveAction = true
-        return alert.runModal() == .alertFirstButtonReturn
+    /// are never thrown away without asking. Runs `action` straight away when
+    /// there are none, and once the user agrees when there are.
+    private func confirmDiscardingCorrections(in corrected: [ImageItem], then action: @escaping () -> Void) {
+        guard !corrected.isEmpty else { return action() }
+        prompt = UserPrompt(title: corrected.count == 1
+                                ? String(localized: "“\(corrected[0].fileName)” has manual edits")
+                                : String(localized: "\(corrected.count) files have manual edits"),
+                            message: String(localized: "Recognizing again will replace these edits with new results. Export first to keep them."),
+                            confirmation: .init(label: String(localized: "Recognize Again"), isDestructive: true,
+                                                action: action))
     }
 
     func run(ids: [UUID], useCache: Bool) {
@@ -1463,7 +1439,7 @@ final class OCRViewModel: ObservableObject {
     /// selected in the settings — 「用 PaddleOCR-VL 重新识别」 on one file
     /// leaves every other file, and the setting itself, as they were. Kept
     /// across a stop, so carrying the file on reads the rest the same way.
-    private var engineOverrides: [UUID: OCREngine] = [:]
+    @ObservationIgnored private var engineOverrides: [UUID: OCREngine] = [:]
 
     /// Whether 「用 PaddleOCR-VL 重新识别」 applies to this file.
     func canReadWithVL(_ item: ImageItem) -> Bool {
@@ -1475,10 +1451,12 @@ final class OCRViewModel: ObservableObject {
     /// selected.
     func readWithVL(id: UUID) {
         guard !isProcessing, let item = items.first(where: { $0.id == id }) else { return }
-        guard confirmDiscardingCorrections(in: item.isCorrected ? [item] : []) else { return }
-        engineOverrides[id] = .paddleVL
-        retryItem(id: id)
-        run(ids: [id], useCache: false)
+        confirmDiscardingCorrections(in: item.isCorrected ? [item] : []) { [weak self] in
+            guard let self else { return }
+            engineOverrides[id] = .paddleVL
+            retryItem(id: id)
+            run(ids: [id], useCache: false)
+        }
     }
 
     // MARK: - Private
@@ -1521,7 +1499,7 @@ final class OCRViewModel: ObservableObject {
 
             // Hashing a large file and reading back the pages an earlier run
             // kept both take a moment; neither belongs on the main actor.
-            let prepared = await Task.detached(priority: .userInitiated) {
+            let prepared = await BlockingWork.run {
                 () -> (key: String?, cached: [PageResult]?, count: Int, done: [Int: PageResult]) in
                 let key = ResultStore.cacheKey(for: url, fingerprint: fingerprint)
                 if useCache, let key, let pages = store.cachedPages(for: key) {
@@ -1537,7 +1515,7 @@ final class OCRViewModel: ObservableObject {
                     return (key, nil, count, [:])
                 }
                 return (key, nil, count, store.partialPages(for: key))
-            }.value
+            }
 
             let outcome: (pages: [PageResult], cached: Bool)
             if let cached = prepared.cached {
@@ -1559,21 +1537,19 @@ final class OCRViewModel: ObservableObject {
                 // several files make real progress at once when
                 // `startProcessing` fans a batch out across a task group,
                 // instead of each one blocking the actor in turn.
-                outcome = try await Task.detached(priority: .userInitiated) { () -> (pages: [PageResult], cached: Bool) in
-                    let pages = try DocumentRecognizer.recognize(
-                        url: url, settings: settings, engines: engines, done: done,
-                        isCancelled: { cancelToken.isCancelled },
-                        progress: reportProgress,
-                        onPage: keepKey.map { key in
-                            { @Sendable index, page in store.savePartialPage(page, index: index, for: key) }
-                        })
-                    // Only a complete, clean reading is worth serving again.
-                    let failedPage = pages.contains { $0.size == .zero }
-                    if let key = prepared.key, !cancelToken.isCancelled, !failedPage {
-                        store.cache(pages, for: key)
-                    }
-                    return (pages, false)
-                }.value
+                let pages = try await DocumentRecognizer.recognize(
+                    url: url, settings: settings, engines: engines, done: done,
+                    isCancelled: { cancelToken.isCancelled },
+                    progress: reportProgress,
+                    onPage: keepKey.map { key in
+                        { @Sendable index, page in store.savePartialPage(page, index: index, for: key) }
+                    })
+                // Only a complete, clean reading is worth serving again.
+                let failedPage = pages.contains { $0.size == .zero }
+                if let key = prepared.key, !cancelToken.isCancelled, !failedPage {
+                    store.cache(pages, for: key)
+                }
+                outcome = (pages, false)
             }
 
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
@@ -1604,7 +1580,7 @@ final class OCRViewModel: ObservableObject {
             updated.reusedCachedResult = outcome.cached
             updated.processingProgress = 1.0
             updated.resume = nil
-            items[i] = updated          // single assignment → one objectWillChange
+            items[i] = updated          // one assignment, one change
             engineOverrides[id] = nil
             if let resumeKey { store.removePartial(for: resumeKey) }
             store.save(updated, isNewReading: true)
@@ -1648,7 +1624,7 @@ final class OCRViewModel: ObservableObject {
     // MARK: - Engines
 
     /// The engine load in progress, which the next one waits for.
-    private var engineLoading: Task<DocumentRecognizer.Engines, Error>?
+    @ObservationIgnored private var engineLoading: Task<DocumentRecognizer.Engines, Error>?
 
     /// Loads what the selected engine needs, reusing whatever is already
     /// loaded and still matches the settings.
@@ -1710,9 +1686,9 @@ final class OCRViewModel: ObservableObject {
         // Drop the old weights before loading new ones, rather than holding
         // both for the length of the load.
         vlEngine = nil
-        let engine = try await Task.detached(priority: .userInitiated) {
+        let engine = try await BlockingWork.run {
             try VLEngine(config: config)
-        }.value
+        }
         vlEngine = engine
         return engine
     }
@@ -1728,9 +1704,9 @@ final class OCRViewModel: ObservableObject {
                 let modelURL = try VLModelStore.resolveLayoutModel()
                 let env = try ORTEnv(loggingLevel: .error)
                 vlLayoutEnv = env
-                vlLayoutSession = try await Task.detached(priority: .userInitiated) {
+                vlLayoutSession = try await BlockingWork.run {
                     try PPSession(modelPath: modelURL, env: env, config: .default)
-                }.value
+                }
             }
             detector = vlLayoutSession.map(PPLayoutDetector.init)
         }
@@ -1746,9 +1722,9 @@ final class OCRViewModel: ObservableObject {
         if let docOrienter { return docOrienter }
         guard let url = try? PPModelStore.resolveDocOrientationModel(),
               let env = try? ORTEnv(loggingLevel: .error) else { return nil }
-        let session = try? await Task.detached(priority: .userInitiated) {
+        let session = try? await BlockingWork.run {
             try PPSession(modelPath: url, env: env, config: .default)
-        }.value
+        }
         guard let session else { return nil }
         docOrienterEnv = env
         docOrienter = PPDocOrientationClassifier(session: session)
@@ -1762,9 +1738,9 @@ final class OCRViewModel: ObservableObject {
         if let docUnwarper { return docUnwarper }
         guard let url = try? PPModelStore.resolveUnwarpingModel(),
               let env = try? ORTEnv(loggingLevel: .error) else { return nil }
-        let session = try? await Task.detached(priority: .userInitiated) {
+        let session = try? await BlockingWork.run {
             try PPSession(modelPath: url, env: env, config: .default)
-        }.value
+        }
         guard let session else { return nil }
         docUnwarperEnv = env
         docUnwarper = PPDocUnwarper(session: session)
@@ -1776,9 +1752,9 @@ final class OCRViewModel: ObservableObject {
         if let engine = paddleEngine, engine.matchesModelConfiguration(config) { return engine }
         // Building an engine reads ~29 MB of model files; keep it off the main
         // thread so the window stays responsive on the first run.
-        let engine = try await Task.detached(priority: .userInitiated) {
+        let engine = try await BlockingWork.run {
             try PPOCREngine(config: config)
-        }.value
+        }
         paddleEngine = engine
         return engine
     }
@@ -1802,10 +1778,7 @@ final class OCRViewModel: ObservableObject {
 
         // 3. 合并连续空行为单个空行
         if removeEmptyLines {
-            let multipleNewlines = try? NSRegularExpression(pattern: "\n{3,}", options: [])
-            text = multipleNewlines?.stringByReplacingMatches(
-                in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "\n\n"
-            ) ?? text
+            text.replace(/\n{3,}/, with: "\n\n")
         }
 
         // 4. 合并所有换行为空格（不换行模式）—— 放最后执行
@@ -1836,6 +1809,21 @@ final class OCRViewModel: ObservableObject {
             .reduce(0.0) { $0 + min(max($1.processingProgress, 0), 1) }
         totalProgress = min(1, (Double(settled) + inFlight) / Double(items.count))
     }
+}
+
+/// What the main window asks or tells the user on the view model's behalf.
+struct UserPrompt: Identifiable {
+    struct Confirmation {
+        var label: String
+        var isDestructive = false
+        var action: () -> Void
+    }
+
+    let id = UUID()
+    var title: String
+    var message: String?
+    /// The action being asked about. Nil for something only to be read.
+    var confirmation: Confirmation?
 }
 
 enum OCRError: LocalizedError {

@@ -34,7 +34,7 @@ final class HistoryIndex: @unchecked Sendable {
 
     init(file: URL) {
         queue.sync {
-            guard sqlite3_open_v2(file.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
+            guard sqlite3_open_v2(file.path(percentEncoded: false), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
                                   nil) == SQLITE_OK else {
                 sqlite3_close(db)
                 db = nil

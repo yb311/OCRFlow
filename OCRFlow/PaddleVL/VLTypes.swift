@@ -122,11 +122,6 @@ struct VLConfig: Equatable, Codable {
     /// How much wider than the detected region each crop is taken. PaddleOCR
     /// exposes the same knob on its layout stage as `unclip_ratio`.
     var cropUnclipRatio: Double = 1.05
-    /// Where the preference used to live. It is a document setting rather than
-    /// an engine one — both engines produce layout blocks now — so it moved to
-    /// the view model; this field is only read once, to carry the user's old
-    /// choice forward.
-    var dropPageFurniture: Bool = true
 
     static let `default` = VLConfig()
 
@@ -165,8 +160,8 @@ struct VLConfig: Equatable, Codable {
 }
 
 extension VLConfig {
-    /// Field by field, so a settings file from an older build keeps everything
-    /// it still knows about instead of resetting the lot.
+    /// Field by field, so a setting added or changed later takes its default
+    /// instead of resetting the lot.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let fallback = VLConfig()
@@ -189,7 +184,6 @@ extension VLConfig {
         useImageTextRecognition = value(.useImageTextRecognition, fallback.useImageTextRecognition)
         inferHeadingLevels = value(.inferHeadingLevels, fallback.inferHeadingLevels)
         cropUnclipRatio = value(.cropUnclipRatio, fallback.cropUnclipRatio)
-        dropPageFurniture = value(.dropPageFurniture, fallback.dropPageFurniture)
     }
 }
 

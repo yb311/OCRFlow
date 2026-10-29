@@ -11,7 +11,7 @@ import SwiftUI
 struct WelcomeView: View {
     static let seenKey = "OCRFlow.hasSeenWelcome"
 
-    @ObservedObject var downloader: PPModelDownloader
+    @Bindable var downloader: PPModelDownloader
     @Environment(\.dismiss) private var dismiss
 
     private let entries = [PPModelCatalog.layoutModel, PPModelCatalog.vlQuantized]
@@ -95,7 +95,7 @@ struct WelcomeView: View {
             }
         } else {
             HStack {
-                Button("Download (\(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)))") {
+                Button("Download (\(totalBytes.formatted(.byteCount(style: .file))))") {
                     for entry in entries where !entry.isInstalled { downloader.download(entry) }
                 }
                 Picker("From", selection: $downloader.source) {

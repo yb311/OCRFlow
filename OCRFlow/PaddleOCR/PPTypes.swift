@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import Synchronization
 
 // MARK: - Results
 
@@ -294,20 +295,12 @@ enum PPOCRError: LocalizedError {
 ///
 /// The Stop button flips this so a long page is abandoned between batches
 /// rather than after it finishes.
-final class PPCancellationToken: @unchecked Sendable {
-    private let lock = NSLock()
-    private var cancelled = false
+final class PPCancellationToken: Sendable {
+    private let cancelled = Atomic(false)
 
-    var isCancelled: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return cancelled
-    }
+    var isCancelled: Bool { cancelled.load(ordering: .acquiring) }
 
-    func cancel() {
-        lock.lock(); cancelled = true; lock.unlock()
-    }
+    func cancel() { cancelled.store(true, ordering: .releasing) }
 
-    func reset() {
-        lock.lock(); cancelled = false; lock.unlock()
-    }
+    func reset() { cancelled.store(false, ordering: .releasing) }
 }

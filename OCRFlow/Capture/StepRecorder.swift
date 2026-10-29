@@ -114,6 +114,8 @@ enum InputControl {
         // the app explains.
         if !UserDefaults.standard.bool(forKey: requestedKey) {
             UserDefaults.standard.set(true, forKey: requestedKey)
+            // The key spelled out: `kAXTrustedCheckOptionPrompt` is imported as a
+            // mutable global, which strict concurrency does not allow reading.
             AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
             return false
         }
@@ -124,7 +126,7 @@ enum InputControl {
         alert.addButton(withTitle: String(localized: "Open System Settings"))
         alert.addButton(withTitle: String(localized: "Cancel"))
         if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+           let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
         return false

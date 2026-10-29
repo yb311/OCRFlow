@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 import AppKit
 @testable import OCRFlow
 
 /// Runs the bundled PP-OCRv6 models on a real rendered page: no mocks.
-final class OrientationTests: XCTestCase {
+struct OrientationTests {
 
     /// A two-column page: the left column says 甲, the right one 乙, so the
     /// reading order can be read off the text.
@@ -43,35 +44,35 @@ final class OrientationTests: XCTestCase {
     }
 
     /// Every 甲 line before every 乙 line.
-    private func assertColumnsInOrder(_ text: String, file: StaticString = #filePath, line: UInt = #line) {
+    private func expectColumnsInOrder(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) {
         let lines = text.split(separator: "\n")
         let left = lines.indices.filter { lines[$0].hasPrefix("甲") }
         let right = lines.indices.filter { lines[$0].hasPrefix("乙") }
-        XCTAssertEqual(left.count, 6, text, file: file, line: line)
-        XCTAssertEqual(right.count, 6, text, file: file, line: line)
-        XCTAssertLessThan(left.max() ?? .max, right.min() ?? .min, text, file: file, line: line)
+        #expect(left.count == 6, "\(text)", sourceLocation: sourceLocation)
+        #expect(right.count == 6, "\(text)", sourceLocation: sourceLocation)
+        #expect((left.max() ?? .max) < (right.min() ?? .min), "\(text)", sourceLocation: sourceLocation)
     }
 
-    func testUprightTwoColumnPageReadsLeftColumnFirst() throws {
-        assertColumnsInOrder(try read(twoColumnPage(), orientation: true))
+    @Test func uprightTwoColumnPageReadsLeftColumnFirst() throws {
+        expectColumnsInOrder(try read(twoColumnPage(), orientation: true))
     }
 
-    func testSidewaysPageIsStraightenedAndReadInColumnOrder() throws {
+    @Test func sidewaysPageIsStraightenedAndReadInColumnOrder() throws {
         let sideways = rotated90(twoColumnPage())
-        assertColumnsInOrder(try read(sideways, orientation: true))
+        expectColumnsInOrder(try read(sideways, orientation: true))
     }
 
-    func testBoxesComeBackInTheSidewaysImagesCoordinates() throws {
+    @Test func boxesComeBackInTheSidewaysImagesCoordinates() throws {
         let sideways = rotated90(twoColumnPage())
         var config = PPOCRConfig.default
         config.useDocOrientation = true
         let lines = try PPOCREngine(config: config).recognize(image: sideways).lines
         let bounds = CGRect(x: 0, y: 0, width: sideways.width, height: sideways.height).insetBy(dx: -2, dy: -2)
-        XCTAssertFalse(lines.isEmpty)
+        #expect(!lines.isEmpty)
         for line in lines {
-            XCTAssertTrue(bounds.contains(line.boundingBox), "\(line.boundingBox) outside \(bounds)")
+            #expect(bounds.contains(line.boundingBox), "\(line.boundingBox) outside \(bounds)")
             // A line of text on a page turned sideways runs down the image.
-            XCTAssertGreaterThan(line.boundingBox.height, line.boundingBox.width, line.text)
+            #expect(line.boundingBox.height > line.boundingBox.width, "\(line.text)")
         }
     }
 }

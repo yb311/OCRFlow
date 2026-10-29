@@ -1,4 +1,3 @@
-import Combine
 import Sparkle
 import SwiftUI
 
@@ -6,19 +5,20 @@ import SwiftUI
 ///
 /// `SPUStandardUpdaterController` schedules its first background check as soon
 /// as it is constructed, so it is built once at launch rather than when a menu
-/// opens. The two published properties exist only so SwiftUI can observe state
-/// that Sparkle exposes through KVO: `canCheckForUpdates` goes false while a
-/// check is already running, which is what greys out the menu item.
+/// opens. Sparkle exposes its state through KVO; `canCheckForUpdates` is
+/// mirrored here so SwiftUI can observe it — it goes false while a check is
+/// already running, which is what greys out the menu item.
 @MainActor
-final class UpdaterController: ObservableObject {
-    @Published private(set) var canCheckForUpdates = false
+@Observable
+final class UpdaterController {
+    private(set) var canCheckForUpdates = false
 
-    @Published var automaticallyChecksForUpdates: Bool {
+    var automaticallyChecksForUpdates: Bool {
         didSet { updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates }
     }
 
-    private let controller: SPUStandardUpdaterController
-    private var cancellables: Set<AnyCancellable> = []
+    @ObservationIgnored private let controller: SPUStandardUpdaterController
+    @ObservationIgnored private var observation: NSKeyValueObservation?
 
     private var updater: SPUUpdater { controller.updater }
 
@@ -28,10 +28,10 @@ final class UpdaterController: ObservableObject {
                                                   userDriverDelegate: nil)
         automaticallyChecksForUpdates = controller.updater.automaticallyChecksForUpdates
 
-        controller.updater.publisher(for: \.canCheckForUpdates)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] in self?.canCheckForUpdates = $0 }
-            .store(in: &cancellables)
+        observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in
+            // Sparkle changes it on the main thread.
+            MainActor.assumeIsolated { self?.canCheckForUpdates = updater.canCheckForUpdates }
+        }
     }
 
     func checkForUpdates() {

@@ -65,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var waiting: [URL] = []
     /// Brings the main window back. Set by the app.
     var showMainWindow: (() -> Void)?
+    /// Settles what has to be settled before the process goes. Set by the app.
+    var willTerminate: (() -> Void)?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         if let open { open(urls) } else { waiting += urls }
@@ -84,14 +86,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         DockIcon.shared.hidden = !(OCRViewModel.savedSettings?.showInDock ?? true)
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        willTerminate?()
+    }
 }
 
 struct OCRFlowApp: App {
     /// SwiftUI names each of the group's windows after this.
     static let mainWindowID = "main"
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
-    @StateObject private var viewModel = OCRViewModel()
-    @StateObject private var updater = UpdaterController()
+    @State private var viewModel = OCRViewModel()
+    @State private var updater = UpdaterController()
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
 
@@ -104,7 +110,7 @@ struct OCRFlowApp: App {
     var body: some Scene {
         WindowGroup(id: Self.mainWindowID) {
             ContentView()
-                .environmentObject(viewModel)
+                .environment(viewModel)
                 .onAppear(perform: connect)
         }
         .windowStyle(.titleBar)
@@ -189,9 +195,8 @@ struct OCRFlowApp: App {
         // free, and it stays open beside the main window, so detection
         // thresholds can be tuned while the result is visible.
         Settings {
-            SettingsView()
-                .environmentObject(viewModel)
-                .environmentObject(updater)
+            SettingsView(vm: viewModel, updater: updater)
+                .environment(viewModel)
         }
 
         // Written only on a real change: the menu bar extra writes its
@@ -200,7 +205,7 @@ struct OCRFlowApp: App {
         MenuBarExtra(isInserted: Binding(get: { viewModel.showInMenuBar },
                                          set: { if viewModel.showInMenuBar != $0 { viewModel.showInMenuBar = $0 } })) {
             MenuBarMenu()
-                .environmentObject(viewModel)
+                .environment(viewModel)
         } label: {
             Image(systemName: "text.viewfinder")
                 // In the menu bar the app starts without a window, and this is
@@ -210,14 +215,14 @@ struct OCRFlowApp: App {
 
         Window("History", id: HistoryView.windowID) {
             HistoryView()
-                .environmentObject(viewModel)
+                .environment(viewModel)
         }
         .defaultSize(width: 900, height: 600)
         .keyboardShortcut("y", modifiers: .command)
 
         Window("Report a Problem", id: ReportProblemView.windowID) {
             ReportProblemView()
-                .environmentObject(viewModel)
+                .environment(viewModel)
         }
         .defaultSize(width: 620, height: 560)
 
@@ -238,6 +243,7 @@ extension OCRFlowApp {
         let show = { [openWindow] in Self.showMainWindow(openWindow) }
         viewModel.showMainWindow = show
         appDelegate.showMainWindow = show
+        appDelegate.willTerminate = { [weak viewModel] in viewModel?.prepareForTermination() }
     }
 
     /// Brings the main window to the front, or opens one when it was closed.

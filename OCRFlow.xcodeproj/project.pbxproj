@@ -44,8 +44,8 @@
 		A1000001000000000000AA06 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA06 /* DetailView.swift */; };
 		A1000001000000000000AA07 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA07 /* DropZoneView.swift */; };
 		D101000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D102000000000000000000A1 /* Localizable.xcstrings */; };
+		D101000000000000000000A2 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D102000000000000000000A2 /* InfoPlist.xcstrings */; };
 		A1000001000000000000AA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA08 /* Assets.xcassets */; };
-		A1000001000000000000AA0A /* DropHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0A /* DropHelper.swift */; };
 		A1000001000000000000AA0B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA0B /* AppIcon.icon */; };
 		B10000010000000000000000 /* PPOCREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000000 /* PPOCREngine.swift */; };
 		B10000010000000000000001 /* PPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000001 /* PPTypes.swift */; };
@@ -140,8 +140,8 @@
 		A1000002000000000000AA07 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
 		A1000002000000000000AA08 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D102000000000000000000A1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		D102000000000000000000A2 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		A1000002000000000000AA09 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1000002000000000000AA0A /* DropHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropHelper.swift; sourceTree = "<group>"; };
 		A1000002000000000000AA0B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		B10000020000000000000000 /* PPOCREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPOCREngine.swift; sourceTree = "<group>"; };
 		B10000020000000000000001 /* PPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPTypes.swift; sourceTree = "<group>"; };
@@ -282,6 +282,7 @@
 				A1000002000000000000AA08 /* Assets.xcassets */,
 				A1000002000000000000AA0B /* AppIcon.icon */,
 				D102000000000000000000A1 /* Localizable.xcstrings */,
+				D102000000000000000000A2 /* InfoPlist.xcstrings */,
 				A1000002000000000000AA09 /* Info.plist */,
 			);
 			path = OCRFlow;
@@ -328,7 +329,6 @@
 				A1000002000000000000AA05 /* SidebarView.swift */,
 				A1000002000000000000AA06 /* DetailView.swift */,
 				A1000002000000000000AA07 /* DropZoneView.swift */,
-				A1000002000000000000AA0A /* DropHelper.swift */,
 				B1000002000000000000000D /* ModelManagerView.swift */,
 				B1000002000000000000000E /* SettingsView.swift */,
 				B1000002000000000000001A /* MarkdownRenderer.swift */,
@@ -564,6 +564,7 @@
 				B10000010000000000000A03 /* PaddleOCR in Resources */,
 				C1010000000000000000000B /* MarkdownViewer in Resources */,
 				D101000000000000000000A1 /* Localizable.xcstrings in Resources */,
+				D101000000000000000000A2 /* InfoPlist.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -620,7 +621,6 @@
 				A1000001000000000000AA05 /* SidebarView.swift in Sources */,
 				A1000001000000000000AA06 /* DetailView.swift in Sources */,
 				A1000001000000000000AA07 /* DropZoneView.swift in Sources */,
-				A1000001000000000000AA0A /* DropHelper.swift in Sources */,
 				B10000010000000000000000 /* PPOCREngine.swift in Sources */,
 				B10000010000000000000001 /* PPTypes.swift in Sources */,
 				B10000010000000000000002 /* PPModelStore.swift in Sources */,
@@ -729,7 +729,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -788,7 +787,6 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -806,7 +804,6 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OCRFlow/Info.plist;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -819,7 +816,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/Vendor",
 				);
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -838,7 +835,6 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OCRFlow/Info.plist;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -851,7 +847,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/Vendor",
 				);
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -869,7 +865,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ocrflow.appTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OCRFlow.app/Contents/MacOS/OCRFlow";
 			};
 			name = Debug;
@@ -887,7 +883,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ocrflow.appTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OCRFlow.app/Contents/MacOS/OCRFlow";
 			};
 			name = Release;

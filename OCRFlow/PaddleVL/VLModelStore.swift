@@ -23,7 +23,7 @@ enum VLModelStore {
 
         guard let model, let mmproj else {
             throw VLError.modelsMissing(variant: variant, missing: missing,
-                                        searchPath: PPModelStore.userModelsDirectory.path)
+                                        searchPath: PPModelStore.userModelsDirectory.path(percentEncoded: false))
         }
         return Paths(model: model, mmproj: mmproj)
     }
@@ -33,7 +33,7 @@ enum VLModelStore {
     /// explicitly turned layout analysis off.
     static func resolveLayoutModel() throws -> URL {
         guard let url = PPModelStore.existingUserFile(layoutModelFileName) else {
-            throw VLError.layoutModelMissing(searchPath: PPModelStore.userModelsDirectory.path)
+            throw VLError.layoutModelMissing(searchPath: PPModelStore.userModelsDirectory.path(percentEncoded: false))
         }
         return url
     }

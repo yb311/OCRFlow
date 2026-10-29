@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import os
 
 /// Settings for 智能分层, the engine that reads each region of a page with
 /// whichever reader suits it.
@@ -319,15 +320,14 @@ enum RegionReader {
                       task: region.task)
         }
 
-        let lock = NSLock()
-        var done = 0
+        let done = OSAllocatedUnfairLock(initialState: 0)
         var results = vl.recognize(requests, isCancelled: isCancelled) { _, _ in
-            lock.lock()
-            done += 1
+            let count = done.withLock { done in
+                done += 1
+                return done
+            }
             // The first pass is most of the work; the retries below are the rest.
-            let fraction = 0.9 * Double(done) / Double(requests.count)
-            lock.unlock()
-            progress?(fraction)
+            progress?(0.9 * Double(count) / Double(requests.count))
         }
 
         // An answer that ran out of budget is read again with more of it before

@@ -9,8 +9,8 @@ import SwiftUI
 /// controls the current engine ignores, which is what the previous layout's
 /// "以下设置暂不生效" banners were apologising for.
 struct SettingsView: View {
-    @EnvironmentObject var vm: OCRViewModel
-    @EnvironmentObject var updater: UpdaterController
+    @Bindable var vm: OCRViewModel
+    @Bindable var updater: UpdaterController
     @Environment(\.openWindow) private var openWindow
 
     /// Remembered across openings: someone who tunes thresholds keeps coming
@@ -24,6 +24,13 @@ struct SettingsView: View {
     @State private var opensAtLogin = false
     @State private var loginItemNeedsApproval = false
     @State private var loginItemError: String?
+    @State private var isChoosingFolder = false
+    /// Which of the folder watch's folders is being chosen.
+    @State private var folderRole = WatchFolderRole.watched
+
+    private enum WatchFolderRole {
+        case watched, output
+    }
 
     var body: some View {
         TabView {
@@ -38,6 +45,16 @@ struct SettingsView: View {
         // makes it pick something shorter than the panes actually need. Fixed,
         // and tall enough that the longest pane scrolls as little as possible.
         .frame(width: 560, height: 640)
+        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
+            guard case let .success(url) = result else { return }
+            switch folderRole {
+            case .watched: vm.watchFolder = url
+            case .output:  vm.watchOutputFolder = url
+            }
+        }
+        .fileDialogMessage(folderRole == .output ? "Choose an output folder for results"
+                                                 : "Choose a folder to watch (including its subfolders)")
+        .fileDialogConfirmationLabel("Choose")
     }
 
     // MARK: - Tab: Recognition
@@ -863,8 +880,8 @@ struct SettingsView: View {
                     toggleRow(isOn: $vm.watchEnabled,
                               title: "Automatically recognize new files added to a folder",
                               subtitle: "Includes subfolders. Files are read once they finish writing; originals are never moved or deleted")
-                    folderRow("Watch", url: vm.watchFolder) { vm.chooseWatchFolder(output: false) }
-                    folderRow("Output", url: vm.watchOutputFolder) { vm.chooseWatchFolder(output: true) }
+                    folderRow("Watch", url: vm.watchFolder) { chooseFolder(.watched) }
+                    folderRow("Output", url: vm.watchOutputFolder) { chooseFolder(.output) }
                     if vm.watchEnabled, vm.watchFolder == nil {
                         Label("Choose a folder to watch first", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.orange)
@@ -963,6 +980,11 @@ struct SettingsView: View {
         }
     }
 
+    private func chooseFolder(_ role: WatchFolderRole) {
+        folderRole = role
+        isChoosingFolder = true
+    }
+
     // MARK: - Building blocks
 
     private func folderRow(_ title: LocalizedStringKey, url: URL?, choose: @escaping () -> Void) -> some View {
@@ -995,10 +1017,8 @@ struct SettingsView: View {
         toggleRow(isOn: $vm.autoTranslate,
                   title: "Translate results after recognition",
                   subtitle: "Uses macOS's built-in translation on this Mac; nothing is uploaded. Watched-folder results get a translated copy beside them")
-        Picker("Translate to", selection: $vm.translationTarget) {
-            ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
-        }
-        .fixedSize()
+        TranslationTargetPicker(selection: $vm.translationTarget)
+            .fixedSize()
         .disabled(!vm.autoTranslate)
         .padding(.leading, 20)
         if vm.autoTranslate, let failure = vm.translationFailure {

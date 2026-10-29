@@ -13,8 +13,7 @@ import CoreServices
 ///
 /// Nothing in the watched folder is moved, renamed or deleted.
 ///
-/// Lives on the main thread: the event stream is scheduled on the main queue
-/// and the settle timer on the main run loop.
+/// Lives on the main actor: the event stream is delivered on the main queue.
 @MainActor
 final class FolderWatcher {
     let folder: URL
@@ -29,7 +28,7 @@ final class FolderWatcher {
     // Touched by `deinit` as well, which cannot be isolated to the main actor;
     // the watcher is only ever released on the main thread.
     nonisolated(unsafe) private var stream: FSEventStreamRef?
-    nonisolated(unsafe) private var timer: Timer?
+    nonisolated(unsafe) private var settleTask: Task<Void, Never>?
     /// Files seen but not yet still: path → what they looked like last time.
     private var pending: [String: (size: Int64, modified: Date)] = [:]
     /// Files already handed over or skipped.
@@ -60,7 +59,7 @@ final class FolderWatcher {
             }
         }
         stream = FSEventStreamCreate(kCFAllocatorDefault, callback, &context,
-                                     [folder.path] as CFArray,
+                                     [folder.path(percentEncoded: false)] as CFArray,
                                      FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
                                      1.0, FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents))
         if let stream {
@@ -76,8 +75,8 @@ final class FolderWatcher {
     }
 
     nonisolated private func tearDown() {
-        timer?.invalidate()
-        timer = nil
+        settleTask?.cancel()
+        settleTask = nil
         if let stream {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
@@ -95,13 +94,14 @@ final class FolderWatcher {
 
         var ready: [URL] = []
         var stillMoving = false
-        let excludedPath = excluded.map { $0.path + "/" }
+        let excludedComponents = excluded?.pathComponents
         for case let url as URL in walker {
-            let path = url.standardizedFileURL.path
-            if let excludedPath, path.hasPrefix(excludedPath) || path + "/" == excludedPath {
+            let standardized = url.standardizedFileURL
+            if let excludedComponents, standardized.pathComponents.starts(with: excludedComponents) {
                 walker.skipDescendants()
                 continue
             }
+            let path = standardized.path(percentEncoded: false)
             guard OCRViewModel.supportedExtensions.contains(url.pathExtension.lowercased()),
                   !settled.contains(path),
                   let values = try? url.resourceValues(forKeys: Set(keys)),
@@ -118,15 +118,17 @@ final class FolderWatcher {
             }
         }
         if !ready.isEmpty {
-            ready.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            ready.sort { $0.path(percentEncoded: false).localizedStandardCompare($1.path(percentEncoded: false)) == .orderedAscending }
             onFiles(ready)
         }
         // Files still arriving are looked at again until they settle; FSEvents
         // says nothing more about a file that has simply stopped changing.
-        timer?.invalidate()
-        timer = stillMoving
-            ? Timer.scheduledTimer(withTimeInterval: settleInterval, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated { self?.rescan() }
+        settleTask?.cancel()
+        settleTask = stillMoving
+            ? Task { [weak self, settleInterval] in
+                try? await Task.sleep(for: .seconds(settleInterval))
+                guard !Task.isCancelled else { return }
+                self?.rescan()
             }
             : nil
     }

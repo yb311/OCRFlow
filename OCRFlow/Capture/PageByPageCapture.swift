@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -30,12 +29,12 @@ final class PageByPageCapture {
         guard let first = await ScreenCapture.choose(returnFocus: true),
               let firstPrint = await Self.look(at: first.target) else { return [] }
         let target = first.target
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OCRFlow Pages \(UUID().uuidString)", isDirectory: true)
+        let folder = URL.temporaryDirectory
+            .appending(path: "OCRFlow Pages \(UUID().uuidString)", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var pages: [URL] = []
         func keep(_ image: CGImage) {
-            let url = folder.appendingPathComponent(String(format: "%04d.png", pages.count + 1))
+            let url = folder.appending(path: String(format: "%04d.png", pages.count + 1))
             if Self.write(image, to: url) { pages.append(url) }
         }
         keep(first.image)
@@ -243,22 +242,23 @@ final class PageByPageCapture {
 // MARK: - What the panel shows
 
 @MainActor
-private final class PageRunState: ObservableObject {
+@Observable
+private final class PageRunState {
     enum Phase { case recording, running }
 
-    @Published var phase = Phase.recording
+    var phase = Phase.recording
     /// Clicks, keys and scrolls recorded so far.
-    @Published var actions = 0
+    var actions = 0
     /// Captured so far.
-    @Published var pages = 1
+    var pages = 1
 
-    var onDone: () -> Void = {}
-    var onCancel: () -> Void = {}
-    var onStop: () -> Void = {}
+    @ObservationIgnored var onDone: () -> Void = {}
+    @ObservationIgnored var onCancel: () -> Void = {}
+    @ObservationIgnored var onStop: () -> Void = {}
 }
 
 private struct PageRunView: View {
-    @ObservedObject var state: PageRunState
+    let state: PageRunState
 
     var body: some View {
         Group {

@@ -90,6 +90,16 @@
         }
       }
     },
+    "%@ couldn't be exported" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导出 %@"
+          }
+        }
+      }
+    },
     "%@ returned HTTP %lld. Try again later or switch the download source." : {
       "localizations" : {
         "zh-Hans" : {
@@ -7008,6 +7018,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "识别模型与字典不匹配：模型输出 %lld 类，字典对应 %lld 类。请确认模型旁的字典文件来自同一个版本。"
+          }
+        }
+      }
+    },
+    "The report couldn't be saved" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存报告"
           }
         }
       }

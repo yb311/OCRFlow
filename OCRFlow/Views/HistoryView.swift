@@ -5,7 +5,7 @@ import SwiftUI
 struct HistoryView: View {
     static let windowID = "history"
 
-    @EnvironmentObject private var vm: OCRViewModel
+    @Environment(OCRViewModel.self) private var vm
     @Environment(\.dismiss) private var dismiss
 
     @State private var query = ""
@@ -64,7 +64,7 @@ struct HistoryView: View {
         .task(id: selection) {
             guard let id = selection else { selectedText = nil; return }
             let history = vm.store.history
-            selectedText = await Task.detached { history.text(for: id) }.value
+            selectedText = await BlockingWork.run { history.text(for: id) }
         }
         .frame(minWidth: 720, minHeight: 440)
     }
@@ -72,7 +72,7 @@ struct HistoryView: View {
     private func reload() async {
         let history = vm.store.history
         let query = self.query
-        entries = await Task.detached { history.search(query) }.value
+        entries = await BlockingWork.run { history.search(query) }
         if let selection, !entries.contains(where: { $0.id == selection }) { self.selection = nil }
     }
 

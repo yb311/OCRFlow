@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import PDFKit
+import Synchronization
 
 /// A PDF page drawn to pixels, and the way back from pixels to the page.
 struct RenderedPDFPage {
@@ -15,23 +16,21 @@ struct RenderedPDFPage {
 /// Opens PDFs and renders their pages, one caller at a time.
 ///
 /// PDFKit documents are not safe to use from two threads at once, and the
-/// recognisers read pages concurrently; every access goes through the lock.
-final class PDFSource: @unchecked Sendable {
+/// recognisers read pages concurrently; every access goes through the mutex.
+final class PDFSource: Sendable {
     /// 144 dpi: enough for the detectors to see small print, small enough that
     /// a page stays a few megabytes.
     static let renderScale: CGFloat = 2
 
-    private let document: PDFDocument
-    private let lock = NSLock()
+    private let document: Mutex<PDFDocument>
 
     init?(url: URL) {
         guard let document = PDFDocument(url: url), !document.isLocked else { return nil }
-        self.document = document
+        self.document = Mutex(document)
     }
 
     var pageCount: Int {
-        lock.lock(); defer { lock.unlock() }
-        return document.pageCount
+        document.withLock { $0.pageCount }
     }
 
     /// Draws the page as a viewer shows it: the crop box, turned by the
@@ -39,16 +38,16 @@ final class PDFSource: @unchecked Sendable {
     /// version did, read rotated scans sideways and margins that are not
     /// meant to be seen.
     func render(page index: Int, scale: CGFloat = renderScale) -> RenderedPDFPage? {
-        lock.lock(); defer { lock.unlock() }
-        guard let page = document.page(at: index) else { return nil }
-        return Self.render(page, scale: scale)
+        document.withLock { document in
+            document.page(at: index).flatMap { Self.render($0, scale: scale) }
+        }
     }
 
     /// Whether the page's own text can be trusted, and why not if it cannot.
     func verdict(page index: Int) -> PDFTextLayer.Verdict {
-        lock.lock(); defer { lock.unlock() }
-        guard let page = document.page(at: index) else { return .none }
-        return PDFTextLayer.verdict(for: page)
+        document.withLock { document in
+            document.page(at: index).map(PDFTextLayer.verdict(for:)) ?? .none
+        }
     }
 
     /// What the page's own text layer says about the given pixel regions —
@@ -56,16 +55,17 @@ final class PDFSource: @unchecked Sendable {
     /// trusted. Nil regions means the whole page's text as one string.
     func nativeText(page index: Int, rendering: RenderedPDFPage, regions: [CGRect]?,
                     policy: PDFTextPolicy) -> (verdict: PDFTextLayer.Verdict, texts: [String]) {
-        lock.lock(); defer { lock.unlock() }
-        guard let page = document.page(at: index) else { return (.none, []) }
-        let verdict = PDFTextLayer.verdict(for: page)
-        guard policy.trusts(verdict) else { return (verdict, []) }
-        guard let regions else { return (verdict, [page.string ?? ""]) }
-        let toPage = rendering.pixelToPage
-        return (verdict, regions.map { rect in
-            let pageRect = rect.applying(toPage).standardized
-            return PDFTextLayer.cleaned(page.selection(for: pageRect)?.string ?? "")
-        })
+        document.withLock { document in
+            guard let page = document.page(at: index) else { return (.none, []) }
+            let verdict = PDFTextLayer.verdict(for: page)
+            guard policy.trusts(verdict) else { return (verdict, []) }
+            guard let regions else { return (verdict, [page.string ?? ""]) }
+            let toPage = rendering.pixelToPage
+            return (verdict, regions.map { rect in
+                let pageRect = rect.applying(toPage).standardized
+                return PDFTextLayer.cleaned(page.selection(for: pageRect)?.string ?? "")
+            })
+        }
     }
 
     static func render(_ page: PDFPage, scale: CGFloat) -> RenderedPDFPage? {
