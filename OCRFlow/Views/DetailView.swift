@@ -61,6 +61,7 @@ struct DetailView: View {
         .sheet(isPresented: $translating) {
             if #available(macOS 15.0, *) {
                 TranslationSheet(items: vm.selectedItems.filter(\.isExportable))
+                    .environmentObject(vm)
             }
         }
     }
@@ -211,12 +212,15 @@ struct ItemDetailView: View {
         /// The document as a document: the Markdown rendered, nothing else.
         case source
         case plain
+        /// The whole document translated, once it has been.
+        case translation
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .markdown: return String(localized: "Blocks")
-            case .source:   return "Markdown"
-            case .plain:    return String(localized: "Plain Text")
+            case .markdown:    return String(localized: "Blocks")
+            case .source:      return "Markdown"
+            case .plain:       return String(localized: "Plain Text")
+            case .translation: return String(localized: "Translation")
             }
         }
     }
@@ -234,6 +238,7 @@ struct ItemDetailView: View {
         if structured { panes.append(.markdown) }
         if structured { panes.append(.source) }
         panes.append(.plain)
+        if item.translation != nil || vm.translatingIDs.contains(item.id) { panes.append(.translation) }
         return panes
     }
 
@@ -705,7 +710,11 @@ struct ItemDetailView: View {
                 HStack(spacing: 10) {
                     if item.status == .completed {
                         Button {
-                            if item.hasMarkdown && resultPane != .plain {
+                            if resultPane == .translation, let translation = item.translation {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(translation.document(of: item.ocrText, bilingual: false),
+                                                               forType: .string)
+                            } else if item.hasMarkdown && resultPane != .plain {
                                 vm.copyMarkdown(for: item.id)
                             } else {
                                 vm.copyText(for: item.id)
@@ -733,6 +742,7 @@ struct ItemDetailView: View {
                         .help("Translate the results on this Mac with macOS's built-in translation")
                         .sheet(isPresented: $translating) {
                             TranslationSheet(items: [item])
+                                .environmentObject(vm)
                         }
                     }
 
@@ -953,6 +963,8 @@ struct ItemDetailView: View {
                                 .padding(16)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                    case .translation:
+                        TranslationPane(item: item, isTranslating: vm.translatingIDs.contains(item.id))
                     }
                 }
                 .task(id: renderKey) { await refreshDocument() }

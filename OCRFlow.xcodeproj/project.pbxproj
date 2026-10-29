@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4E3D18B9BD1448F99CB38A93 /* OCRViewModel+Translation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAEFDE37BB543F4B887E2D8 /* OCRViewModel+Translation.swift */; };
+		CCD258B5EA4C498C9E9C7E79 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD77856E99944998F9D6902 /* GlobalHotKey.swift */; };
+		B5A7CCECD26045188743952F /* AutoTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0307CA02377A4AE4B9DE0A94 /* AutoTranslator.swift */; };
 		E1323942E6A90246D52A80D5 /* OrientationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB91FCA9FAB7674A193C68FA /* OrientationTests.swift */; };
 		E979926B6DF3697B35C9EB0E /* PipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5864FCC49E7BE1B44DA93AA /* PipelineTests.swift */; };
 		EC6102CD294A1C0160709794 /* OCRViewModel+Review.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DFFBC990E132197A04FE65 /* OCRViewModel+Review.swift */; };
@@ -86,6 +89,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1CAEFDE37BB543F4B887E2D8 /* OCRViewModel+Translation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OCRViewModel+Translation.swift"; sourceTree = "<group>"; };
+		3CD77856E99944998F9D6902 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
+		0307CA02377A4AE4B9DE0A94 /* AutoTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTranslator.swift; sourceTree = "<group>"; };
 		EB91FCA9FAB7674A193C68FA /* OrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationTests.swift; sourceTree = "<group>"; };
 		E5864FCC49E7BE1B44DA93AA /* PipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineTests.swift; sourceTree = "<group>"; };
 		E2DFFBC990E132197A04FE65 /* OCRViewModel+Review.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OCRViewModel+Review.swift"; sourceTree = "<group>"; };
@@ -212,6 +218,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000002000000000000AA01 /* OCRFlowApp.swift */,
+				3CD77856E99944998F9D6902 /* GlobalHotKey.swift */,
 				A1000002000000000000AA02 /* ContentView.swift */,
 				A1000004000000000000AA03 /* Models */,
 				A1000004000000000000AA04 /* ViewModels */,
@@ -252,6 +259,7 @@
 			isa = PBXGroup;
 			children = (
 				E2DFFBC990E132197A04FE65 /* OCRViewModel+Review.swift */,
+				1CAEFDE37BB543F4B887E2D8 /* OCRViewModel+Translation.swift */,
 				EB7F06C4B80F58CF68086EA5 /* OCRViewModel+History.swift */,
 				E99BCFFD81B9748D74FDE323 /* OCRViewModel+Export.swift */,
 				A1000002000000000000AA04 /* OCRViewModel.swift */,
@@ -350,6 +358,7 @@
 			children = (
 				E2CCA4B3A9475856EAE98855 /* HistoryIndex.swift */,
 				C10200000000000000000008 /* FolderWatcher.swift */,
+				0307CA02377A4AE4B9DE0A94 /* AutoTranslator.swift */,
 				C10200000000000000000007 /* TableWorkbook.swift */,
 				C10200000000000000000005 /* SearchablePDFWriter.swift */,
 				C10200000000000000000004 /* ResultStore.swift */,
@@ -530,6 +539,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EC6102CD294A1C0160709794 /* OCRViewModel+Review.swift in Sources */,
+				4E3D18B9BD1448F99CB38A93 /* OCRViewModel+Translation.swift in Sources */,
 				E2B37CE9B887B6E215BDBA1B /* OCRViewModel+History.swift in Sources */,
 				E8EA941D7D4A1DAACECDA788 /* OCRViewModel+Export.swift in Sources */,
 				EC2D8B02C9ECD735983876BE /* WelcomeView.swift in Sources */,
@@ -542,6 +552,7 @@
 				C1010000000000000000000A /* ReviewView.swift in Sources */,
 				C1010000000000000000000C /* MarkdownWebView.swift in Sources */,
 				C10100000000000000000008 /* FolderWatcher.swift in Sources */,
+				B5A7CCECD26045188743952F /* AutoTranslator.swift in Sources */,
 				C10100000000000000000007 /* TableWorkbook.swift in Sources */,
 				C10100000000000000000006 /* PipelineBenchmark.swift in Sources */,
 				C10100000000000000000005 /* SearchablePDFWriter.swift in Sources */,
@@ -551,6 +562,7 @@
 				C10100000000000000000001 /* PDFPages.swift in Sources */,
 				C10100000000000000000000 /* PageResult.swift in Sources */,
 				A1000001000000000000AA01 /* OCRFlowApp.swift in Sources */,
+				CCD258B5EA4C498C9E9C7E79 /* GlobalHotKey.swift in Sources */,
 				A1000001000000000000AA02 /* ContentView.swift in Sources */,
 				A1000001000000000000AA03 /* ImageItem.swift in Sources */,
 				A1000001000000000000AA04 /* OCRViewModel.swift in Sources */,

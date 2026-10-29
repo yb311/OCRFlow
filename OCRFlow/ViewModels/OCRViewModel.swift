@@ -98,6 +98,9 @@ struct OCRSettings: Codable, Equatable {
     var watchEnabled = false
     var watchFolderPath: String?
     var watchOutputPath: String?
+    var autoTranslate = false
+    var translationTarget = "zh-Hans"
+    var globalCaptureShortcut = true
 }
 
 extension OCRSettings {
@@ -142,6 +145,9 @@ extension OCRSettings {
         watchEnabled = value(.watchEnabled, fallback.watchEnabled)
         watchFolderPath = try? container.decodeIfPresent(String.self, forKey: .watchFolderPath)
         watchOutputPath = try? container.decodeIfPresent(String.self, forKey: .watchOutputPath)
+        autoTranslate = value(.autoTranslate, fallback.autoTranslate)
+        translationTarget = value(.translationTarget, fallback.translationTarget)
+        globalCaptureShortcut = value(.globalCaptureShortcut, fallback.globalCaptureShortcut)
         keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
             ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
                     .filter { !$0.isPageFurniture }.map(\.rawName)
@@ -268,6 +274,8 @@ final class OCRViewModel: ObservableObject {
         // that was partial, or written by an older build, stays that way on disk
         // until the user happens to change something.
         persistSettings()
+        if #available(macOS 15.0, *) { translator.owner = self }
+        updateCaptureShortcut()
 
         downloaderObserver = modelDownloader.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -355,7 +363,10 @@ final class OCRViewModel: ObservableObject {
                     useDocUnwarping: useDocUnwarping,
                     watchEnabled: watchEnabled,
                     watchFolderPath: watchFolder?.path,
-                    watchOutputPath: watchOutputFolder?.path)
+                    watchOutputPath: watchOutputFolder?.path,
+                    autoTranslate: autoTranslate,
+                    translationTarget: translationTarget,
+                    globalCaptureShortcut: globalCaptureShortcut)
     }
 
     private func persistSettings() {
@@ -403,6 +414,9 @@ final class OCRViewModel: ObservableObject {
         watchFolder = settings.watchFolderPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
         watchOutputFolder = settings.watchOutputPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
         watchEnabled = settings.watchEnabled
+        autoTranslate = settings.autoTranslate
+        translationTarget = settings.translationTarget
+        globalCaptureShortcut = settings.globalCaptureShortcut
     }
 
     func resetAllSettings() {
@@ -410,6 +424,7 @@ final class OCRViewModel: ObservableObject {
         validateModelSelections()
         persistSettings()
         updateWatcher()
+        updateCaptureShortcut()
     }
 
     /// Drops any selection whose model files are not on disk — deleted from the
@@ -925,6 +940,54 @@ final class OCRViewModel: ObservableObject {
         guard watchedIDs.remove(item.id) != nil, let output = watchOutputFolder,
               item.isExportable else { return }
         writeSeparately([item], format: resolvedFormat(for: [item]), into: output, reveal: nil)
+        if autoTranslate { watchedAwaitingTranslation.insert(item.id) }
+    }
+
+    // MARK: - Translation
+
+    /// Translate each result as soon as it is recognized.
+    @Published var autoTranslate = false { didSet { persistSettings() } }
+    /// The language results are translated into, automatically or not.
+    @Published var translationTarget = "zh-Hans" { didSet { persistSettings() } }
+    /// Results waiting to be translated, or being translated now.
+    @Published var translatingIDs: Set<UUID> = []
+    /// Why the last automatic translation did not finish.
+    @Published var translationFailure: String?
+
+    /// An `AutoTranslator` on macOS 15 and later. Typed loosely because a
+    /// stored property cannot be limited to an OS version.
+    let translatorBox: AnyObject? = {
+        if #available(macOS 15.0, *) { return AutoTranslator() }
+        return nil
+    }()
+
+    /// Watched files whose translation is still to be written out.
+    var watchedAwaitingTranslation = Set<UUID>()
+
+    // MARK: - Capture shortcut
+
+    /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one.
+    @Published var globalCaptureShortcut = true {
+        didSet { persistSettings(); if !isRestoringSettings { updateCaptureShortcut() } }
+    }
+    /// True when another app already holds the shortcut.
+    @Published private(set) var captureShortcutTaken = false
+    private var captureHotKey: GlobalHotKey?
+    /// Brings back the main window when there is none, for a capture made
+    /// from another app after it was closed. Set by the app.
+    var showMainWindow: (() -> Void)?
+
+    private func updateCaptureShortcut() {
+        captureHotKey?.unregister()
+        captureHotKey = nil
+        captureShortcutTaken = false
+        guard globalCaptureShortcut else { return }
+        let hotKey = GlobalHotKey.capture { [weak self] in self?.captureScreenshot() }
+        if hotKey.register() {
+            captureHotKey = hotKey
+        } else {
+            captureShortcutTaken = true
+        }
     }
 
     // MARK: - Computed helpers
@@ -1058,6 +1121,12 @@ final class OCRViewModel: ObservableObject {
             guard FileManager.default.fileExists(atPath: url.path) else { return }
             Task { @MainActor in
                 guard let self else { return }
+                // Taken from another app with the global shortcut: the result
+                // is what the user is waiting to see.
+                NSApp.activate()
+                if !NSApp.windows.contains(where: { $0.isVisible && $0.identifier?.rawValue.hasPrefix(OCRFlowApp.mainWindowID) == true }) {
+                    self.showMainWindow?()
+                }
                 let before = Set(self.items.map(\.id))
                 self.add([(url, nil)])
                 if let new = self.items.first(where: { !before.contains($0.id) }) {
@@ -1107,6 +1176,7 @@ final class OCRViewModel: ObservableObject {
             if let key = item.resume?.key { store.removePartial(for: key) }
         }
         items.removeAll { ids.contains($0.id) }
+        forgetTranslations(ids)
         recalcProgress()
         store.remove(Array(ids))
         store.saveQueue(items)
@@ -1115,6 +1185,7 @@ final class OCRViewModel: ObservableObject {
     func clearAll() {
         store.remove(items.map(\.id))
         store.prunePartials(keeping: [])
+        forgetTranslations(Set(items.map(\.id)))
         items.removeAll()
         selectedIDs = []
         totalProgress = 0
@@ -1409,6 +1480,7 @@ final class OCRViewModel: ObservableObject {
             store.save(updated, isNewReading: true)
             store.saveQueue(items)
             exportIfWatched(updated)
+            if autoTranslate { translate(updated) }
         } catch {
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
             var updated = items[i]

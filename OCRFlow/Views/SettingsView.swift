@@ -793,6 +793,19 @@ struct SettingsView: View {
                     toggleRow(isOn: $vm.skipCompleted,
                               title: "Skip completed files",
                               subtitle: "When you click Start Recognition again, files already recognized are not processed again")
+                    translationRow
+                }
+            }
+
+            settingSection("Screenshot") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.globalCaptureShortcut,
+                              title: "Capture with \(GlobalHotKey.captureTitle) from any app",
+                              subtitle: "Drag out part of the screen and it is recognized right away, without switching to OCRFlow first")
+                    if vm.globalCaptureShortcut, vm.captureShortcutTaken {
+                        Label("Another app is already using \(GlobalHotKey.captureTitle)", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
                 }
             }
 
@@ -924,6 +937,32 @@ struct SettingsView: View {
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    /// Translating each result once it is recognized, and into what.
+    @ViewBuilder
+    private var translationRow: some View {
+        if #available(macOS 15.0, *) {
+            toggleRow(isOn: $vm.autoTranslate,
+                      title: "Translate results after recognition",
+                      subtitle: "Uses macOS's built-in translation on this Mac; nothing is uploaded. Watched-folder results get a translated copy beside them")
+            Picker("Translate to", selection: $vm.translationTarget) {
+                ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
+            }
+            .fixedSize()
+            .disabled(!vm.autoTranslate)
+            .padding(.leading, 20)
+            if vm.autoTranslate, let failure = vm.translationFailure {
+                Label(failure, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.orange)
+                    .padding(.leading, 20)
+            }
+        } else {
+            toggleRow(isOn: .constant(false),
+                      title: "Translate results after recognition",
+                      subtitle: "Requires macOS 15 or later")
+                .disabled(true)
         }
     }
 

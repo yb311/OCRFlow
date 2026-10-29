@@ -33,6 +33,9 @@ final class ResultStore: @unchecked Sendable {
     private var historyDirectory: URL { directory.appendingPathComponent("History", isDirectory: true) }
     private var cacheDirectory: URL { directory.appendingPathComponent("Cache", isDirectory: true) }
     private var partialDirectory: URL { directory.appendingPathComponent("Partial", isDirectory: true) }
+    /// Translations of listed files' results. Not carried into the history:
+    /// a translation is quick to make again, and goes stale with any edit.
+    private var translationsDirectory: URL { directory.appendingPathComponent("Translations", isDirectory: true) }
     private var queueFile: URL { directory.appendingPathComponent("queue.json") }
     private let io = DispatchQueue(label: "OCRFlow.store", qos: .utility)
 
@@ -43,7 +46,7 @@ final class ResultStore: @unchecked Sendable {
         self.directory = directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         history = HistoryIndex(file: directory.appendingPathComponent("history.sqlite"))
-        for folder in [resultsDirectory, historyDirectory, cacheDirectory, partialDirectory] {
+        for folder in [resultsDirectory, historyDirectory, cacheDirectory, partialDirectory, translationsDirectory] {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
     }
@@ -116,7 +119,10 @@ final class ResultStore: @unchecked Sendable {
     /// anything else had nothing worth keeping.
     func remove(_ ids: [UUID]) {
         io.async { [self] in
-            for id in ids { retire(resultFile(for: id)) }
+            for id in ids {
+                retire(resultFile(for: id))
+                try? FileManager.default.removeItem(at: translationFile(for: id))
+            }
         }
     }
 
@@ -155,12 +161,16 @@ final class ResultStore: @unchecked Sendable {
                 // The result went missing; the file is read again.
                 item.status = .pending
             }
+            if item.status == .completed, let data = try? Data(contentsOf: translationFile(for: entry.id)) {
+                item.translation = try? decoder.decode(DocumentTranslation.self, from: data)
+            }
             return item
         }
     }
 
-    /// Moves the results of files no longer in the list to the history —
-    /// what a crash between removing a file and moving its result leaves.
+    /// Moves the results of files no longer in the list to the history, and
+    /// deletes their translations — what a crash between removing a file and
+    /// moving its result leaves.
     func pruneResults(keeping ids: Set<UUID>) {
         io.async { [self] in
             let files = (try? FileManager.default.contentsOfDirectory(at: resultsDirectory,
@@ -168,6 +178,12 @@ final class ResultStore: @unchecked Sendable {
             for file in files {
                 let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent)
                 if id.map(ids.contains) != true { retire(file) }
+            }
+            let translations = (try? FileManager.default.contentsOfDirectory(at: translationsDirectory,
+                                                                            includingPropertiesForKeys: nil)) ?? []
+            for file in translations {
+                let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent)
+                if id.map(ids.contains) != true { try? FileManager.default.removeItem(at: file) }
             }
         }
     }
@@ -217,6 +233,20 @@ final class ResultStore: @unchecked Sendable {
 
     private func resultFile(for id: UUID) -> URL {
         resultsDirectory.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    // MARK: - Translations
+
+    func saveTranslation(_ translation: DocumentTranslation, for id: UUID) {
+        let file = translationFile(for: id)
+        io.async {
+            guard let data = try? JSONEncoder().encode(translation) else { return }
+            try? data.write(to: file, options: .atomic)
+        }
+    }
+
+    private func translationFile(for id: UUID) -> URL {
+        translationsDirectory.appendingPathComponent("\(id.uuidString).json")
     }
 
     // MARK: - Pages of a document still being read

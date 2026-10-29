@@ -49,6 +49,9 @@ struct ContentView: View {
             showsWelcome = !offersCrashReport && !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
         }
         .onChange(of: appearance) { _, value in value.apply() }
+        .background {
+            if #available(macOS 15.0, *) { AutoTranslationHost(translator: vm.translator) }
+        }
     }
 
     /// Names the file when there is one, and counts them when there are more:

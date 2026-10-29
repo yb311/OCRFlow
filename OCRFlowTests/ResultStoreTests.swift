@@ -84,6 +84,21 @@ final class ResultStoreTests: XCTestCase {
         XCTAssertNil(ResultStore.cacheKey(for: directory.appendingPathComponent("missing"), fingerprint: ""))
     }
 
+    func testTranslationIsKeptWithTheResultAndGoesWithIt() {
+        var done = ImageItem(url: URL(fileURLWithPath: "/a/done.png"))
+        done.status = .completed
+        done.pages = [page("hello")]
+        store.save(done)
+        store.saveTranslation(DocumentTranslation(target: "zh-Hans", paragraphs: ["hello": "你好"]), for: done.id)
+        store.saveQueue([done])
+
+        XCTAssertEqual(store.load().first?.translation?.paragraphs["hello"], "你好")
+
+        store.remove([done.id])
+        store.saveQueue([done])
+        XCTAssertNil(store.load().first?.translation)
+    }
+
     func testCacheRoundTrip() {
         XCTAssertNil(store.cachedPages(for: "k"))
         store.cache([page("cached")], for: "k")

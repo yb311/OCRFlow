@@ -62,6 +62,8 @@ struct ImageItem: Identifiable, Equatable {
     /// True when the last run found this file, read the same way, in the
     /// recognition cache instead of reading it again.
     var reusedCachedResult = false
+    /// The result translated, when it has been.
+    var translation: DocumentTranslation?
 
     var fileName: String { url.lastPathComponent }
     var fileExtension: String { url.pathExtension.uppercased() }
@@ -113,6 +115,7 @@ struct ImageItem: Identifiable, Equatable {
         pagesDone = 0
         pageCount = 0
         elapsed = nil
+        translation = nil
     }
 
     /// True when the result has structure worth rendering as Markdown.
@@ -154,7 +157,7 @@ struct ImageItem: Identifiable, Equatable {
         lhs.processingProgress == rhs.processingProgress &&
         lhs.pagesDone == rhs.pagesDone && lhs.resume == rhs.resume &&
         lhs.pages == rhs.pages && lhs.thumbnail === rhs.thumbnail &&
-        lhs.errorMessage == rhs.errorMessage
+        lhs.errorMessage == rhs.errorMessage && lhs.translation == rhs.translation
     }
 
     init(url: URL, root: URL? = nil, id: UUID = UUID()) {

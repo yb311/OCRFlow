@@ -126,6 +126,9 @@ extension OCRViewModel {
                                      inferHeadingLevels: vlConfig.inferHeadingLevels)
         items[index].ocrText = postProcess(document.text)
         items[index].markdown = document.markdown
+        // A translation is kept up with the text it translates: the
+        // paragraphs an edit changed are translated again.
+        if let target = items[index].translation?.target { translate(items[index], into: target) }
     }
 
     /// The document a file's pages make, honouring the page-furniture

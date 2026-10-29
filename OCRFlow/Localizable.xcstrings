@@ -1200,6 +1200,16 @@
         }
       }
     },
+    "Another app is already using %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已被其他 App 占用"
+          }
+        }
+      }
+    },
     "Any text layer (including OCR layers on scans)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1546,6 +1556,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "截图识别"
+          }
+        }
+      }
+    },
+    "Capture with %@ from any app" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在任何 App 中按 %@ 截图"
           }
         }
       }
@@ -2542,6 +2562,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要先在设置中下载 PaddleOCR-VL 模型"
+          }
+        }
+      }
+    },
+    "Drag out part of the screen and it is recognized right away, without switching to OCRFlow first" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖选屏幕的一部分，立即识别，无需先切换到 OCRFlow"
           }
         }
       }
@@ -5478,6 +5508,16 @@
         }
       }
     },
+    "Requires macOS 15 or later" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 macOS 15 或更高版本"
+          }
+        }
+      }
+    },
     "Reread" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5852,6 +5892,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存后文本、Markdown 与导出都会跟着变"
+          }
+        }
+      }
+    },
+    "Screenshot" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图"
           }
         }
       }
@@ -6958,6 +7008,16 @@
         }
       }
     },
+    "Translate results after recognition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别完成后自动翻译"
+          }
+        }
+      }
+    },
     "Translate the results on this Mac with macOS's built-in translation" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6994,6 +7054,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻译中…"
+          }
+        }
+      }
+    },
+    "Translation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "译文"
           }
         }
       }
@@ -7134,6 +7204,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 macOS 内置翻译，在本机完成，不上传内容。首次使用某种语言时系统会提示下载语言包。"
+          }
+        }
+      }
+    },
+    "Uses macOS's built-in translation on this Mac; nothing is uploaded. Watched-folder results get a translated copy beside them" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 macOS 内置的本机翻译，不上传任何内容。监视文件夹的结果旁会另存一份译文"
           }
         }
       }

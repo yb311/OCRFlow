@@ -47,4 +47,24 @@ final class ExportNamingTests: XCTestCase {
                              root: URL(fileURLWithPath: "/docs", isDirectory: true))
         XCTAssertEqual(item.relativePath, "x.png")
     }
+
+    // MARK: - Translation
+
+    func testOnlyParagraphsWithoutATranslationAreLeftToTranslate() {
+        var item = ImageItem(url: URL(fileURLWithPath: "/a/doc.png"))
+        item.ocrText = "First paragraph.\n\nSecond paragraph.\n\nFirst paragraph."
+        item.translation = DocumentTranslation(target: "zh-Hans", paragraphs: ["First paragraph.": "第一段。"])
+
+        XCTAssertEqual(DocumentTranslation.untranslated(in: item, target: "zh-Hans"), ["Second paragraph."])
+        // Another language starts from nothing; a repeated paragraph is asked for once.
+        XCTAssertEqual(DocumentTranslation.untranslated(in: item, target: "ja"),
+                       ["First paragraph.", "Second paragraph."])
+    }
+
+    func testTranslatedDocumentFollowsTheCurrentText() {
+        let translation = DocumentTranslation(target: "zh-Hans",
+                                              paragraphs: ["One.": "一。", "Two.": "二。"])
+        XCTAssertEqual(translation.document(of: "Two.\n\nOne.", bilingual: false), "二。\n\n一。")
+        XCTAssertEqual(translation.document(of: "One.", bilingual: true), "One.\n\n一。")
+    }
 }

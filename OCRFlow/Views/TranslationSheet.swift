@@ -1,5 +1,4 @@
 import SwiftUI
-import NaturalLanguage
 import Translation
 import UniformTypeIdentifiers
 
@@ -9,12 +8,15 @@ import UniformTypeIdentifiers
 /// Apple's Translation framework runs on the device: nothing is uploaded, the
 /// same promise the OCR makes. A language pair used for the first time asks
 /// the system to download it, through the system's own prompt.
+///
+/// What it translates is kept with the result, so a translation made here, or
+/// in the background after recognition, is there the next time it opens.
 @available(macOS 15.0, *)
 struct TranslationSheet: View {
     let items: [ImageItem]
 
+    @EnvironmentObject private var vm: OCRViewModel
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("translation.target") private var targetCode = "zh-Hans"
     @State private var configuration: TranslationSession.Configuration?
     /// Translations by item, one per paragraph.
     @State private var translations: [UUID: [String]] = [:]
@@ -22,22 +24,10 @@ struct TranslationSheet: View {
     @State private var isTranslating = false
     @State private var failure: String?
 
-    /// The languages offered, by the name they go by in Chinese.
-    private static let targets: [(code: String, name: String)] = [
-        ("zh-Hans", "简体中文"), ("zh-Hant", "繁體中文"), ("en", "English"), ("ja", "日本語"),
-        ("ko", "한국어"), ("fr", "Français"), ("de", "Deutsch"), ("es", "Español"), ("ru", "Русский"),
-    ]
+    private var targetCode: String { vm.translationTarget }
 
-    /// A document as the paragraphs it is translated in.
-    ///
-    /// Each paragraph is rejoined first: a line break where the page's line
-    /// happened to end splits a sentence in two, and the translator then
-    /// translates two halves. Tables keep their rows.
     static func paragraphs(of item: ImageItem) -> [String] {
-        item.ocrText.components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map { $0.contains("\t") ? $0 : PPDocumentAssembler.reflowed($0) }
+        DocumentTranslation.paragraphs(of: item.ocrText)
     }
 
     private var totalParagraphs: Int { items.reduce(0) { $0 + Self.paragraphs(of: $1).count } }
@@ -48,8 +38,8 @@ struct TranslationSheet: View {
                 Text(items.count == 1 ? "Translate “\(items[0].fileName)”" : "Translate \(items.count) Files")
                     .font(.headline)
                 Spacer()
-                Picker("Translate to", selection: $targetCode) {
-                    ForEach(Self.targets, id: \.code) { Text($0.name).tag($0.code) }
+                Picker("Translate to", selection: $vm.translationTarget) {
+                    ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
                 }
                 .fixedSize()
                 .disabled(isTranslating)
@@ -118,24 +108,34 @@ struct TranslationSheet: View {
         .translationTask(configuration) { session in
             await translate(with: session)
         }
+        .onAppear(perform: showKept)
+        .onChange(of: vm.translationTarget) { _, _ in showKept() }
+    }
+
+    /// Shows what was translated into the chosen language before.
+    private func showKept() {
+        guard !isTranslating else { return }
+        failure = nil
+        translations = [:]
+        for item in items {
+            guard let current = vm.items.first(where: { $0.id == item.id }),
+                  let kept = current.translation, kept.target == targetCode else { continue }
+            let paragraphs = Self.paragraphs(of: item)
+            guard paragraphs.contains(where: { kept.paragraphs[$0] != nil }) else { continue }
+            translations[item.id] = paragraphs.map { kept.paragraphs[$0] ?? "" }
+        }
     }
 
     private func start() {
         failure = nil
         translations = [:]
         done = 0
-        // The language is worked out once, from everything there is to read.
-        // Left to the framework, it is guessed paragraph by paragraph, and a
-        // paragraph of names and formulas is a guess it refuses to make.
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(items.map(\.ocrText).joined(separator: "\n"))
-        guard let dominant = recognizer.dominantLanguage else {
+        guard let source = DocumentTranslation.language(of: items.map(\.ocrText).joined(separator: "\n")) else {
             failure = String(localized: "Couldn't tell what language the text is in")
             return
         }
-        let source = Locale.Language(identifier: dominant.rawValue)
         let target = Locale.Language(identifier: targetCode)
-        guard source.minimalIdentifier != target.minimalIdentifier else {
+        guard !DocumentTranslation.isSameLanguage(source, as: targetCode) else {
             failure = String(localized: "The text is already in the selected language")
             return
         }
@@ -169,6 +169,9 @@ struct TranslationSheet: View {
                     done += 1
                     translations[item.id] = result
                 }
+                vm.addTranslation(Dictionary(zip(paragraphs, result), uniquingKeysWith: { first, _ in first })
+                                    .filter { !$0.value.isEmpty },
+                                  target: targetCode, to: item.id)
             }
         } catch {
             failure = String(localized: "Translation didn't finish: \(error.localizedDescription)")
@@ -227,6 +230,54 @@ struct TranslationSheet: View {
             alert.messageText = String(localized: "\(failures.count) files couldn't be exported")
             alert.informativeText = failures.prefix(8).joined(separator: "\n")
             alert.runModal()
+        }
+    }
+}
+
+/// Gives the background translator its sessions. Invisible; it sits in the
+/// main window because a translation session can only be had from a view.
+@available(macOS 15.0, *)
+struct AutoTranslationHost: View {
+    @ObservedObject var translator: AutoTranslator
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+            .translationTask(translator.configuration) { session in
+                await translator.run(session)
+            }
+    }
+}
+
+/// A result's translation beside the original, paragraph by paragraph.
+struct TranslationPane: View {
+    let item: ImageItem
+    let isTranslating: Bool
+
+    var body: some View {
+        let translation = item.translation
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                if isTranslating {
+                    Label("Translating…", systemImage: "character.bubble")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Array(DocumentTranslation.paragraphs(of: item.ocrText).enumerated()), id: \.offset) { _, original in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(original)
+                            .foregroundStyle(.secondary)
+                        if let translated = translation?.paragraphs[original] {
+                            Text(translated)
+                        }
+                    }
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(16)
         }
     }
 }

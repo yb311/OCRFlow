@@ -70,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 struct OCRFlowApp: App {
+    /// SwiftUI names each of the group's windows after this.
+    static let mainWindowID = "main"
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @StateObject private var viewModel = OCRViewModel()
     @StateObject private var updater = UpdaterController()
@@ -83,11 +85,12 @@ struct OCRFlowApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: Self.mainWindowID) {
             ContentView()
                 .environmentObject(viewModel)
                 .onAppear {
                     appDelegate.open = { [weak viewModel] urls in viewModel?.addImages(urls: urls) }
+                    viewModel.showMainWindow = { [openWindow] in openWindow(id: Self.mainWindowID) }
                 }
         }
         .windowStyle(.titleBar)

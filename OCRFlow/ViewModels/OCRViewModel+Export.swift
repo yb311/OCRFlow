@@ -395,6 +395,17 @@ extension OCRViewModel {
         return cleaned.isEmpty ? "figure" : cleaned
     }
 
+    /// Writes a watched file's translation beside its result, named for the
+    /// language: `scan.pdf_OCR_zh-Hans.md`.
+    func exportWatchedTranslation(_ item: ImageItem) {
+        guard let output = watchOutputFolder, let translation = item.translation else { return }
+        let result = Self.separateExportURLs(for: [item], format: .markdown, in: output)[0]
+        let file = result.deletingLastPathComponent()
+            .appendingPathComponent("\(result.deletingPathExtension().lastPathComponent)_\(translation.target).md")
+        let text = translation.document(of: item.ocrText, bilingual: false)
+        if let failure = write(Data(text.utf8), to: file) { reportExportFailures([failure], interactive: false) }
+    }
+
     func exportSelectedItems() {
         exportItems(ids: selectedIDs)
     }
