@@ -7,7 +7,11 @@ import Vision
 /// few seconds, and need Screen Recording and Accessibility permission for
 /// the test host, so they only run when asked for:
 ///
-///     TEST_RUNNER_OCRFLOW_LIVE_SLIDES=<path to the built slides helper> xcodebuild test …
+///     TEST_RUNNER_OCRFLOW_LIVE_SLIDES=<path to the built slides helper> xcodebuild test \
+///         -only-testing:OCRFlowTests/LiveCaptureTests …
+///
+/// Run them on their own: the other tests run in parallel, and their work on
+/// the main thread holds up the events and captures these wait for.
 ///
 /// The helper is `Scripts/slides.swift`, built with `swiftc -O`. Sign the
 /// test host with a real identity (`CODE_SIGN_IDENTITY="Developer ID
