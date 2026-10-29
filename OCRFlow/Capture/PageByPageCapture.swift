@@ -28,7 +28,7 @@ final class PageByPageCapture {
     func run() async -> [URL] {
         guard InputControl.isAllowed() else { return [] }
         guard let first = await ScreenCapture.choose(returnFocus: true),
-              let firstPrint = PageFingerprint(first.image) else { return [] }
+              let firstPrint = await Self.look(at: first.target) else { return [] }
         let target = first.target
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("OCRFlow Pages \(UUID().uuidString)", isDirectory: true)
@@ -66,42 +66,62 @@ final class PageByPageCapture {
             return []
         }
 
-        // Then it is done again and again. The first turn was the user's own.
+        // Then it is done again and again.
         state.phase = .running
         state.onStop = { [weak self] in self?.stopRequested = true }
         watchForEscape()
-        var last = firstPrint
-        var turned = true
-        while !stopRequested, pages.count < Self.pageLimit {
-            if !turned {
-                await StepPlayer.play(steps, offset: offset(of: target, from: recordedFrame)) { [weak self] in
-                    self?.stopRequested ?? true
-                }
-            }
-            turned = false
-            guard let image = await nextPage(of: target, after: last),
-                  let print = PageFingerprint(image),
-                  // Back at the start: a deck that goes round.
-                  pages.count < 2 || !print.isSamePage(as: firstPrint) else { break }
+        await turnPages(with: steps, of: target, recordedFrame: recordedFrame, first: firstPrint) { image in
             keep(image)
-            last = print
             state.pages = pages.count
+            return pages.count
         }
         stopWatchingForEscape()
         closePanel()
         return pages
     }
 
+    /// Turns page after page with the recorded steps, handing each new page to
+    /// `keep`, which says how many there are now. Ends at the last page, at
+    /// the limit, or when stopped. The first turn has been made already, by
+    /// the user. `first` is a look at the first page, taken with `look(at:)`.
+    func turnPages(with steps: [RecordedStep], of target: CaptureTarget, recordedFrame: CGRect?,
+                   first: PageFingerprint, keep: (CGImage) -> Int) async {
+        var last = first
+        var count = 1
+        var turned = true
+        while !stopRequested, count < Self.pageLimit {
+            if !turned {
+                await StepPlayer.play(steps, offset: offset(of: target, from: recordedFrame)) { [weak self] in
+                    self?.stopRequested ?? true
+                }
+            }
+            turned = false
+            guard let page = await nextPage(of: target, after: last),
+                  // Back at the start: a deck that goes round.
+                  count < 2 || !page.print.isSamePage(as: first) else { return }
+            count = keep(page.image)
+            last = page.print
+        }
+    }
+
     // MARK: - Watching the screen
 
+    /// A small look at the target, to compare with other looks.
+    ///
+    /// Only looks are compared with looks: a full capture made small draws
+    /// fine print differently from one taken small, enough to count as
+    /// another page.
+    static func look(at target: CaptureTarget) async -> PageFingerprint? {
+        guard let image = try? await ScreenCapture.grab(target, maxWidth: 640) else { return nil }
+        return PageFingerprint(image)
+    }
+
     /// Waits for the target to show something new, then for it to finish
-    /// drawing, and takes it. Nil when nothing changes — the last page — or
-    /// the run was stopped.
-    private func nextPage(of target: CaptureTarget, after last: PageFingerprint) async -> CGImage? {
-        func look() async -> PageFingerprint? {
-            guard let image = try? await ScreenCapture.grab(target, maxWidth: 640) else { return nil }
-            return PageFingerprint(image)
-        }
+    /// drawing, and takes it, with the look it settled on. Nil when nothing
+    /// changes — the last page — or the run was stopped.
+    private func nextPage(of target: CaptureTarget,
+                          after last: PageFingerprint) async -> (image: CGImage, print: PageFingerprint)? {
+        func look() async -> PageFingerprint? { await Self.look(at: target) }
 
         // A page that loads takes a moment to start changing.
         var current: PageFingerprint?
@@ -125,8 +145,8 @@ final class PageByPageCapture {
             if print.isSamePage(as: current) { break }
             current = print
         }
-        guard !stopRequested else { return nil }
-        return try? await ScreenCapture.grab(target)
+        guard !stopRequested, let image = try? await ScreenCapture.grab(target) else { return nil }
+        return (image, current)
     }
 
     /// How far a captured window has moved since the steps were recorded,

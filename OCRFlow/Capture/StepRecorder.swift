@@ -86,7 +86,8 @@ enum StepPlayer {
                 event.location = CGPoint(x: event.location.x + offset.dx, y: event.location.y + offset.dy)
             }
             event.setIntegerValueField(.eventSourceUserData, value: marker)
-            event.timestamp = CGEventTimestamp(ProcessInfo.processInfo.systemUptime * 1_000_000_000)
+            // Now, in the units the system uses: a fresh event carries it.
+            if let now = CGEvent(source: nil)?.timestamp { event.timestamp = now }
             event.post(tap: .cghidEventTap)
         }
     }

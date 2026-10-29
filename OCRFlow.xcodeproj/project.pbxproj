@@ -33,6 +33,7 @@
 		EF8132789B61190B4A5A7092 /* LaunchSentinel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */; };
 		EF48B53D98608EFB58262624 /* DiagnosticReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */; };
 		E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */; };
+		F1000001000000000000C002 /* LiveCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000C002 /* LiveCaptureTests.swift */; };
 		F1000001000000000000C001 /* CaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000C001 /* CaptureTests.swift */; };
 		EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */; };
 		A1000001000000000000AA01 /* OCRFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000AA01 /* OCRFlowApp.swift */; };
@@ -125,6 +126,7 @@
 		ED13BD99C3D87059559FB833 /* LaunchSentinel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSentinel.swift; sourceTree = "<group>"; };
 		EDE2D189986A0C03D264D11F /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReport.swift; sourceTree = "<group>"; };
 		E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultStoreTests.swift; sourceTree = "<group>"; };
+		F1000002000000000000C002 /* LiveCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCaptureTests.swift; sourceTree = "<group>"; };
 		F1000002000000000000C001 /* CaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureTests.swift; sourceTree = "<group>"; };
 		E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportNamingTests.swift; sourceTree = "<group>"; };
 		E0000002000000000000FF00 /* OCRFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OCRFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -243,6 +245,7 @@
 				E5ADF11E8FFFC1CE0C1D96D1 /* DiagnosticsTests.swift */,
 				E6482D633C4113596C4E0E63 /* ResultStoreTests.swift */,
 				F1000002000000000000C001 /* CaptureTests.swift */,
+				F1000002000000000000C002 /* LiveCaptureTests.swift */,
 				E8F9BCFD1DCAC69DB10F620E /* ExportNamingTests.swift */,
 			);
 			path = OCRFlowTests;
@@ -577,6 +580,7 @@
 				EB43135A63A94DB46B2A6407 /* DiagnosticsTests.swift in Sources */,
 				E1CDA3E37A99E21B7AFDCC5A /* ResultStoreTests.swift in Sources */,
 				F1000001000000000000C001 /* CaptureTests.swift in Sources */,
+				F1000001000000000000C002 /* LiveCaptureTests.swift in Sources */,
 				EAE85924B4BA10CD66192EB8 /* ExportNamingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
