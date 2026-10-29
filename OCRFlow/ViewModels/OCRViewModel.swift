@@ -101,6 +101,9 @@ struct OCRSettings: Codable, Equatable {
     var autoTranslate = false
     var translationTarget = "zh-Hans"
     var globalCaptureShortcut = true
+    var showInMenuBar = true
+    var showInDock = true
+    var showFloatingButton = false
 }
 
 extension OCRSettings {
@@ -148,6 +151,9 @@ extension OCRSettings {
         autoTranslate = value(.autoTranslate, fallback.autoTranslate)
         translationTarget = value(.translationTarget, fallback.translationTarget)
         globalCaptureShortcut = value(.globalCaptureShortcut, fallback.globalCaptureShortcut)
+        showInMenuBar = value(.showInMenuBar, fallback.showInMenuBar)
+        showInDock = value(.showInDock, fallback.showInDock)
+        showFloatingButton = value(.showFloatingButton, fallback.showFloatingButton)
         keptAuxiliary = (try? container.decode([String].self, forKey: .keptAuxiliary))
             ?? (dropPageFurniture ? PPLayoutLabel.auxiliary
                     .filter { !$0.isPageFurniture }.map(\.rawName)
@@ -274,8 +280,9 @@ final class OCRViewModel: ObservableObject {
         // that was partial, or written by an older build, stays that way on disk
         // until the user happens to change something.
         persistSettings()
-        if #available(macOS 15.0, *) { translator.owner = self }
+        translator.owner = self
         updateCaptureShortcut()
+        updatePresence()
 
         downloaderObserver = modelDownloader.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -331,7 +338,7 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Settings persistence
 
-    private static let settingsKey = "OCRFlow.settings"
+    nonisolated private static let settingsKey = "OCRFlow.settings"
 
     /// Set while the stored values are being written back into the published
     /// properties, so each one's `didSet` does not save what was just loaded.
@@ -366,7 +373,10 @@ final class OCRViewModel: ObservableObject {
                     watchOutputPath: watchOutputFolder?.path,
                     autoTranslate: autoTranslate,
                     translationTarget: translationTarget,
-                    globalCaptureShortcut: globalCaptureShortcut)
+                    globalCaptureShortcut: globalCaptureShortcut,
+                    showInMenuBar: showInMenuBar,
+                    showInDock: showInDock,
+                    showFloatingButton: showFloatingButton)
     }
 
     private func persistSettings() {
@@ -376,9 +386,15 @@ final class OCRViewModel: ObservableObject {
     }
 
     private func restoreSettings() {
-        guard let data = UserDefaults.standard.data(forKey: Self.settingsKey),
-              let stored = try? JSONDecoder().decode(OCRSettings.self, from: data) else { return }
+        guard let stored = Self.savedSettings else { return }
         apply(stored)
+    }
+
+    /// What the last session saved, if anything. Read on its own by the app
+    /// delegate, which has to settle the Dock icon before this model exists.
+    nonisolated static var savedSettings: OCRSettings? {
+        guard let data = UserDefaults.standard.data(forKey: settingsKey) else { return nil }
+        return try? JSONDecoder().decode(OCRSettings.self, from: data)
     }
 
     private func apply(_ settings: OCRSettings) {
@@ -417,6 +433,10 @@ final class OCRViewModel: ObservableObject {
         autoTranslate = settings.autoTranslate
         translationTarget = settings.translationTarget
         globalCaptureShortcut = settings.globalCaptureShortcut
+        showInMenuBar = settings.showInMenuBar
+        // Without either, nothing would be left to bring the app back with.
+        showInDock = settings.showInDock || !settings.showInMenuBar
+        showFloatingButton = settings.showFloatingButton
     }
 
     func resetAllSettings() {
@@ -425,6 +445,7 @@ final class OCRViewModel: ObservableObject {
         persistSettings()
         updateWatcher()
         updateCaptureShortcut()
+        updatePresence()
     }
 
     /// Drops any selection whose model files are not on disk — deleted from the
@@ -954,12 +975,7 @@ final class OCRViewModel: ObservableObject {
     /// Why the last automatic translation did not finish.
     @Published var translationFailure: String?
 
-    /// An `AutoTranslator` on macOS 15 and later. Typed loosely because a
-    /// stored property cannot be limited to an OS version.
-    let translatorBox: AnyObject? = {
-        if #available(macOS 15.0, *) { return AutoTranslator() }
-        return nil
-    }()
+    let translator = AutoTranslator()
 
     /// Watched files whose translation is still to be written out.
     var watchedAwaitingTranslation = Set<UUID>()
@@ -973,8 +989,8 @@ final class OCRViewModel: ObservableObject {
     /// True when another app already holds the shortcut.
     @Published private(set) var captureShortcutTaken = false
     private var captureHotKey: GlobalHotKey?
-    /// Brings back the main window when there is none, for a capture made
-    /// from another app after it was closed. Set by the app.
+    /// Brings the main window to the front, opening one if it was closed —
+    /// for a capture made from another app, or the menu bar. Set by the app.
     var showMainWindow: (() -> Void)?
 
     private func updateCaptureShortcut() {
@@ -987,6 +1003,42 @@ final class OCRViewModel: ObservableObject {
             captureHotKey = hotKey
         } else {
             captureShortcutTaken = true
+        }
+    }
+
+    // MARK: - Presence
+
+    /// An icon at the top of the screen with the app's main actions.
+    @Published var showInMenuBar = true {
+        didSet {
+            persistSettings()
+            // Taking it out of the menu bar must not leave the app with no
+            // way back in.
+            if !showInMenuBar, !showInDock { showInDock = true }
+        }
+    }
+    /// When off, the Dock icon only shows while one of the app's windows is
+    /// open.
+    @Published var showInDock = true {
+        didSet {
+            persistSettings()
+            if !showInDock, !showInMenuBar { showInMenuBar = true }
+            if !isRestoringSettings { updatePresence() }
+        }
+    }
+    /// A small round button above every other window that captures on click.
+    @Published var showFloatingButton = false {
+        didSet { persistSettings(); if !isRestoringSettings { updatePresence() } }
+    }
+    private var floatingButton: FloatingCaptureButton?
+
+    private func updatePresence() {
+        DockIcon.shared.hidden = !showInDock
+        if showFloatingButton {
+            if floatingButton == nil { floatingButton = FloatingCaptureButton(model: self) }
+        } else {
+            floatingButton?.close()
+            floatingButton = nil
         }
     }
 
@@ -1102,10 +1154,16 @@ final class OCRViewModel: ObservableObject {
 
     // MARK: - Screenshot
 
+    /// While the crosshair is up. The floating button steps aside meanwhile,
+    /// so it is not in the picture.
+    @Published private(set) var isCapturing = false
+
     /// Lets the user drag out a part of the screen, then reads it like any
     /// other file. The capture is kept in the library folder, so the entry in
     /// the list keeps working after a relaunch.
     func captureScreenshot() {
+        // A second press while the crosshair is up would start a second one.
+        guard !isCapturing else { return }
         let folder = store.directory.appendingPathComponent("Screenshots", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let formatter = DateFormatter()
@@ -1117,16 +1175,14 @@ final class OCRViewModel: ObservableObject {
         // -i: drag out a region (space bar switches to a window); -x: no sound.
         process.arguments = ["-i", "-x", url.path]
         process.terminationHandler = { [weak self] _ in
-            // Escape leaves no file behind, and nothing is added.
-            guard FileManager.default.fileExists(atPath: url.path) else { return }
             Task { @MainActor in
                 guard let self else { return }
+                self.isCapturing = false
+                // Escape leaves no file behind, and nothing is added.
+                guard FileManager.default.fileExists(atPath: url.path) else { return }
                 // Taken from another app with the global shortcut: the result
                 // is what the user is waiting to see.
-                NSApp.activate()
-                if !NSApp.windows.contains(where: { $0.isVisible && $0.identifier?.rawValue.hasPrefix(OCRFlowApp.mainWindowID) == true }) {
-                    self.showMainWindow?()
-                }
+                self.showMainWindow?()
                 let before = Set(self.items.map(\.id))
                 self.add([(url, nil)])
                 if let new = self.items.first(where: { !before.contains($0.id) }) {
@@ -1135,7 +1191,12 @@ final class OCRViewModel: ObservableObject {
                 }
             }
         }
-        try? process.run()
+        isCapturing = true
+        do {
+            try process.run()
+        } catch {
+            isCapturing = false
+        }
     }
 
     func openFilePicker() {

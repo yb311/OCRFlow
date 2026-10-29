@@ -63,9 +63,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     private var waiting: [URL] = []
+    /// Brings the main window back. Set by the app.
+    var showMainWindow: (() -> Void)?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         if let open { open(urls) } else { waiting += urls }
+    }
+
+    /// The Dock icon clicked, or the app opened again from Finder. AppKit
+    /// only opens a window when none is visible, and the floating button and
+    /// the menu bar icon count as visible ones, so it is done here.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        guard let showMainWindow else { return true }
+        showMainWindow()
+        return false
+    }
+
+    /// Settled before anything is on screen, so a hidden Dock icon does not
+    /// flash up at launch.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        DockIcon.shared.hidden = !(OCRViewModel.savedSettings?.showInDock ?? true)
     }
 }
 
@@ -88,14 +105,15 @@ struct OCRFlowApp: App {
         WindowGroup(id: Self.mainWindowID) {
             ContentView()
                 .environmentObject(viewModel)
-                .onAppear {
-                    appDelegate.open = { [weak viewModel] urls in viewModel?.addImages(urls: urls) }
-                    viewModel.showMainWindow = { [openWindow] in openWindow(id: Self.mainWindowID) }
-                }
+                .onAppear(perform: connect)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 1100, height: 700)
+        // With the Dock icon hidden the app lives in the menu bar and starts
+        // there without a window, as menu bar apps do. Windows left open at
+        // the last quit still come back.
+        .defaultLaunchBehavior(viewModel.showInDock ? .automatic : .suppressed)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
@@ -166,6 +184,20 @@ struct OCRFlowApp: App {
                 .environmentObject(updater)
         }
 
+        // Written only on a real change: the menu bar extra writes its
+        // binding back on every update, and each write would announce a
+        // change and start the next update.
+        MenuBarExtra(isInserted: Binding(get: { viewModel.showInMenuBar },
+                                         set: { if viewModel.showInMenuBar != $0 { viewModel.showInMenuBar = $0 } })) {
+            MenuBarMenu()
+                .environmentObject(viewModel)
+        } label: {
+            Image(systemName: "text.viewfinder")
+                // In the menu bar the app starts without a window, and this is
+                // the only view that appears.
+                .onAppear(perform: connect)
+        }
+
         Window("History", id: HistoryView.windowID) {
             HistoryView()
                 .environmentObject(viewModel)
@@ -185,6 +217,33 @@ struct OCRFlowApp: App {
             ModelManagerView(downloader: viewModel.modelDownloader)
         }
         .defaultSize(width: 620, height: 580)
+    }
+}
+
+extension OCRFlowApp {
+    /// Hands the parts of the app that live outside SwiftUI what they need
+    /// to reach the list and the main window.
+    private func connect() {
+        appDelegate.open = { [weak viewModel] urls in viewModel?.addImages(urls: urls) }
+        let show = { [openWindow] in Self.showMainWindow(openWindow) }
+        viewModel.showMainWindow = show
+        appDelegate.showMainWindow = show
+    }
+
+    /// Brings the main window to the front, or opens one when it was closed.
+    @MainActor
+    static func showMainWindow(_ openWindow: OpenWindowAction) {
+        NSApp.activate()
+        let existing = NSApp.windows.first { window in
+            window.identifier?.rawValue.hasPrefix(mainWindowID) == true
+                && (window.isVisible || window.isMiniaturized)
+        }
+        if let existing {
+            if existing.isMiniaturized { existing.deminiaturize(nil) }
+            existing.makeKeyAndOrderFront(nil)
+        } else {
+            openWindow(id: mainWindowID)
+        }
     }
 }
 

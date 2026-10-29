@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 /// The app's settings, grouped by what the user is trying to do rather than by
@@ -18,6 +19,11 @@ struct SettingsView: View {
     /// Applied by the main window, which watches the same key.
     @AppStorage(AppAppearance.storageKey) private var appearance: AppAppearance = .system
     @State private var showResetConfirm = false
+    /// Read back from the system, which owns the setting, when the pane
+    /// shows: asking is a round trip to another process.
+    @State private var opensAtLogin = false
+    @State private var loginItemNeedsApproval = false
+    @State private var loginItemError: String?
 
     var body: some View {
         TabView {
@@ -785,6 +791,42 @@ struct SettingsView: View {
                 .fixedSize()
             }
 
+            settingSection("Menu Bar & Dock") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.showInMenuBar,
+                              title: "Show in menu bar",
+                              subtitle: "Capture, open files and reach settings from the icon at the top of the screen")
+                    toggleRow(isOn: $vm.showInDock,
+                              title: "Show in Dock",
+                              subtitle: "When off, OCRFlow starts in the menu bar, and its Dock icon only appears while one of its windows is open")
+                        // Hiding both would leave no way back into the app.
+                        .disabled(!vm.showInMenuBar)
+                    if !vm.showInMenuBar {
+                        hint("To hide the Dock icon, show OCRFlow in the menu bar first.")
+                    }
+                    toggleRow(isOn: Binding(get: { opensAtLogin }, set: setOpensAtLogin),
+                              title: "Open at login",
+                              subtitle: "Starts with your Mac, so capturing is ready straight away")
+                    if loginItemNeedsApproval {
+                        HStack(spacing: 8) {
+                            Label("Waiting for your approval in System Settings", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption).foregroundStyle(.orange)
+                            Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+                                .buttonStyle(.link)
+                                .font(.caption)
+                        }
+                    }
+                    if let loginItemError {
+                        Label(loginItemError, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                .onAppear {
+                    opensAtLogin = LoginItem.isEnabled
+                    loginItemNeedsApproval = LoginItem.needsApproval
+                }
+            }
+
             settingSection("Automation") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.autoStartOnAdd,
@@ -806,6 +848,9 @@ struct SettingsView: View {
                         Label("Another app is already using \(GlobalHotKey.captureTitle)", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.orange)
                     }
+                    toggleRow(isOn: $vm.showFloatingButton,
+                              title: "Show floating capture button",
+                              subtitle: "A small round button above all windows. Click to capture, drag to move it, right-click for more")
                 }
             }
 
@@ -943,27 +988,31 @@ struct SettingsView: View {
     /// Translating each result once it is recognized, and into what.
     @ViewBuilder
     private var translationRow: some View {
-        if #available(macOS 15.0, *) {
-            toggleRow(isOn: $vm.autoTranslate,
-                      title: "Translate results after recognition",
-                      subtitle: "Uses macOS's built-in translation on this Mac; nothing is uploaded. Watched-folder results get a translated copy beside them")
-            Picker("Translate to", selection: $vm.translationTarget) {
-                ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
-            }
-            .fixedSize()
-            .disabled(!vm.autoTranslate)
-            .padding(.leading, 20)
-            if vm.autoTranslate, let failure = vm.translationFailure {
-                Label(failure, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.orange)
-                    .padding(.leading, 20)
-            }
-        } else {
-            toggleRow(isOn: .constant(false),
-                      title: "Translate results after recognition",
-                      subtitle: "Requires macOS 15 or later")
-                .disabled(true)
+        toggleRow(isOn: $vm.autoTranslate,
+                  title: "Translate results after recognition",
+                  subtitle: "Uses macOS's built-in translation on this Mac; nothing is uploaded. Watched-folder results get a translated copy beside them")
+        Picker("Translate to", selection: $vm.translationTarget) {
+            ForEach(DocumentTranslation.targets, id: \.code) { Text($0.name).tag($0.code) }
         }
+        .fixedSize()
+        .disabled(!vm.autoTranslate)
+        .padding(.leading, 20)
+        if vm.autoTranslate, let failure = vm.translationFailure {
+            Label(failure, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.orange)
+                .padding(.leading, 20)
+        }
+    }
+
+    private func setOpensAtLogin(_ enabled: Bool) {
+        do {
+            try LoginItem.set(enabled)
+            loginItemError = nil
+        } catch {
+            loginItemError = error.localizedDescription
+        }
+        opensAtLogin = LoginItem.isEnabled
+        loginItemNeedsApproval = LoginItem.needsApproval
     }
 
     @ViewBuilder

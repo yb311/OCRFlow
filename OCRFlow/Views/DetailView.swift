@@ -38,10 +38,8 @@ struct DetailView: View {
                         .buttonStyle(.borderedProminent)
                     Button("Copy All Text") { vm.copySelectedText() }
                         .buttonStyle(.bordered)
-                    if #available(macOS 15.0, *) {
-                        Button("Translate \(exportable) Files…") { translating = true }
-                            .buttonStyle(.bordered)
-                    }
+                    Button("Translate \(exportable) Files…") { translating = true }
+                        .buttonStyle(.bordered)
                 }
             }
             if !rerunnable.isEmpty {
@@ -59,10 +57,8 @@ struct DetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $translating) {
-            if #available(macOS 15.0, *) {
-                TranslationSheet(items: vm.selectedItems.filter(\.isExportable))
-                    .environmentObject(vm)
-            }
+            TranslationSheet(items: vm.selectedItems.filter(\.isExportable))
+                .environmentObject(vm)
         }
     }
 }
@@ -733,7 +729,7 @@ struct ItemDetailView: View {
                         .help(showCopied ? "Copied" : "Copy this file's results")
                     }
 
-                    if item.isExportable, #available(macOS 15.0, *) {
+                    if item.isExportable {
                         Button {
                             translating = true
                         } label: {

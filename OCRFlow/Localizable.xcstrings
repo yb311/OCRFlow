@@ -1020,6 +1020,16 @@
         }
       }
     },
+    "A small round button above all windows. Click to capture, drag to move it, right-click for more" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浮在所有窗口之上的小圆按钮。单击截图，拖动可移动位置，右键查看更多"
+          }
+        }
+      }
+    },
     "About %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1566,6 +1576,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在任何 App 中按 %@ 截图"
+          }
+        }
+      }
+    },
+    "Capture, open files and reach settings from the icon at the top of the screen" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在屏幕顶部的图标里截图、打开文件和进入设置"
           }
         }
       }
@@ -3108,6 +3128,16 @@
         }
       }
     },
+    "Floating Capture Button" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "悬浮截图按钮"
+          }
+        }
+      }
+    },
     "Footer" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3284,6 +3314,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "段落标题级别识别"
+          }
+        }
+      }
+    },
+    "Hide Floating Button" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏悬浮按钮"
           }
         }
       }
@@ -3684,6 +3724,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "单块最大输出：%lld token"
+          }
+        }
+      }
+    },
+    "Menu Bar & Dock" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "菜单栏与程序坞"
           }
         }
       }
@@ -4178,12 +4228,42 @@
         }
       }
     },
+    "Open Login Items…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开登录项…"
+          }
+        }
+      }
+    },
     "Open Models Folder" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开模型目录"
+          }
+        }
+      }
+    },
+    "Open OCRFlow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 OCRFlow"
+          }
+        }
+      }
+    },
+    "Open at login" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录时打开"
           }
         }
       }
@@ -4856,6 +4936,16 @@
         }
       }
     },
+    "Quit OCRFlow" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 OCRFlow"
+          }
+        }
+      }
+    },
     "Raise it to avoid clipping stroke edges; too high and neighboring text merges" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5272,6 +5362,16 @@
         }
       }
     },
+    "Recognizing… %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别… %@"
+          }
+        }
+      }
+    },
     "Recommended: tables, formulas and complex layouts" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5504,16 +5604,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "报告…"
-          }
-        }
-      }
-    },
-    "Requires macOS 15 or later" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要 macOS 15 或更高版本"
           }
         }
       }
@@ -6006,6 +6096,16 @@
         }
       }
     },
+    "Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置…"
+          }
+        }
+      }
+    },
     "Several images are decoded and recognized by Apple Vision at once, making full use of a multi-core CPU." : {
       "localizations" : {
         "zh-Hans" : {
@@ -6046,12 +6146,32 @@
         }
       }
     },
+    "Show floating capture button" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示悬浮截图按钮"
+          }
+        }
+      }
+    },
     "Show images and charts" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示图片与图表"
+          }
+        }
+      }
+    },
+    "Show in Dock" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在程序坞中显示"
           }
         }
       }
@@ -6082,6 +6202,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在列表中显示"
+          }
+        }
+      }
+    },
+    "Show in menu bar" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在菜单栏中显示"
           }
         }
       }
@@ -6262,6 +6392,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加文件后自动开始识别"
+          }
+        }
+      }
+    },
+    "Starts with your Mac, so capturing is ready straight away" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随 Mac 一起启动，随时可以截图"
           }
         }
       }
@@ -6922,6 +7062,16 @@
         }
       }
     },
+    "To hide the Dock icon, show OCRFlow in the menu bar first." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要隐藏程序坞图标，请先在菜单栏中显示 OCRFlow。"
+          }
+        }
+      }
+    },
     "Top to bottom (PaddleOCR's raw order)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7288,6 +7438,16 @@
         }
       }
     },
+    "Waiting for your approval in System Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待你在“系统设置”中允许"
+          }
+        }
+      }
+    },
     "Warning" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7344,6 +7504,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PDF 已有文字层时"
+          }
+        }
+      }
+    },
+    "When off, OCRFlow starts in the menu bar, and its Dock icon only appears while one of its windows is open" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后，OCRFlow 启动时只出现在菜单栏，程序坞图标仅在打开其窗口时出现"
           }
         }
       }

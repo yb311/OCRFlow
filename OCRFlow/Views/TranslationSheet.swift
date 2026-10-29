@@ -11,7 +11,6 @@ import UniformTypeIdentifiers
 ///
 /// What it translates is kept with the result, so a translation made here, or
 /// in the background after recognition, is there the next time it opens.
-@available(macOS 15.0, *)
 struct TranslationSheet: View {
     let items: [ImageItem]
 
@@ -236,7 +235,6 @@ struct TranslationSheet: View {
 
 /// Gives the background translator its sessions. Invisible; it sits in the
 /// main window because a translation session can only be had from a view.
-@available(macOS 15.0, *)
 struct AutoTranslationHost: View {
     @ObservedObject var translator: AutoTranslator
 

@@ -66,13 +66,12 @@ struct DocumentTranslation: Codable, Equatable {
 /// Translates finished results in the background, one after another, with
 /// macOS's own on-device translation.
 ///
-/// On macOS 15 a translation session can only be had from a view, through
+/// A translation session can only be had from a view, through
 /// `translationTask`, so the work is driven from `AutoTranslationHost`, an
 /// invisible view in the main window: this sets the configuration, the view
 /// hands over a session for it, and `run` works through every document
 /// waiting in that language. Documents in another language get a session of
 /// their own once it is done.
-@available(macOS 15.0, *)
 @MainActor
 final class AutoTranslator: ObservableObject {
     @Published private(set) var configuration: TranslationSession.Configuration?

@@ -4,16 +4,8 @@ extension OCRViewModel {
 
     // MARK: - Translation
 
-    @available(macOS 15.0, *)
-    var translator: AutoTranslator {
-        // Set in the initialiser whenever this version is available.
-        translatorBox as! AutoTranslator
-    }
-
-    /// Queues a finished result to be translated in the background. Does
-    /// nothing before macOS 15, which has no on-device translation to use.
+    /// Queues a finished result to be translated in the background.
     func translate(_ item: ImageItem, into target: String? = nil) {
-        guard #available(macOS 15.0, *) else { return }
         translator.enqueue(item, target: target ?? translationTarget)
     }
 
@@ -37,6 +29,6 @@ extension OCRViewModel {
     func forgetTranslations(_ ids: Set<UUID>) {
         translatingIDs.subtract(ids)
         watchedAwaitingTranslation.subtract(ids)
-        if #available(macOS 15.0, *) { translator.cancel(ids) }
+        translator.cancel(ids)
     }
 }
