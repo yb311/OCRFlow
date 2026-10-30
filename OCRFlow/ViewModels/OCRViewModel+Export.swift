@@ -100,17 +100,24 @@ extension OCRViewModel {
         panel.message = String(localized: "Choose where to export the originals of \(targets.count) files")
         panel.prompt = String(localized: "Export Here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
+        let (written, failures) = Self.writeOriginals(of: targets, into: folder)
+        reportExportFailures(failures)
+        if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+    }
+
+    /// Each item's original into `folder`: what was written, and what could
+    /// not be, said for the user.
+    nonisolated static func writeOriginals(of targets: [ImageItem], into folder: URL) -> (written: [URL], failures: [String]) {
         var written: [URL] = []
         var failures: [String] = []
         for item in targets {
             do {
-                written.append(try Self.exportOriginal(item.url, into: folder))
+                written.append(try exportOriginal(item.url, into: folder))
             } catch {
                 failures.append(String(localized: "\(item.fileName): \(error.localizedDescription)"))
             }
         }
-        reportExportFailures(failures)
-        if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+        return (written, failures)
     }
 
     /// Pages held in one image file: more than one only in a multi-page TIFF.

@@ -427,6 +427,74 @@ extension LiveCaptureTests {
     }
 }
 
+extension LiveCaptureTests {
+    /// Recording and running as the user does it, through the app: start
+    /// recording, take a capture with the screenshot command, turn the page,
+    /// click Done; then run it. What was captured while recording comes
+    /// first, and the run carries on from page 2 to the end: one document of
+    /// all five pages. Uses its own library folder, OCRFLOW_LIBRARY_DIR.
+    func testRecordsAndRunsThroughTheApp() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["OCRFLOW_LIBRARY_DIR"] != nil,
+                          "Set OCRFLOW_LIBRARY_DIR to a scratch folder: the app's list and macros are kept there")
+        let slides = try XCTUnwrap(slides)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let vm = OCRViewModel()
+        vm.macros.macros = []
+
+        vm.recordMacro()
+        try await Task.sleep(for: .milliseconds(800))
+        // Capture here, as the screenshot shortcut or the floating button
+        // would: the screen holds still, and a click takes the window.
+        vm.captureScreenshot()
+        try await Task.sleep(for: .milliseconds(1200))
+        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        try await Task.sleep(for: .milliseconds(1000))
+        press(124)   // →
+        try await Task.sleep(for: .milliseconds(800))
+        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width > 300 })
+        click(CGPoint(x: panel.frame.maxX - 14 - 25, y: top - (panel.frame.minY + 14 + 10)))
+        for _ in 0..<50 where vm.macros.macros.isEmpty { try await Task.sleep(for: .milliseconds(100)) }
+
+        let macro = try XCTUnwrap(vm.macros.macros.first)
+        XCTAssertEqual(macro.steps.count, 2, "\(macro.steps)")
+        guard case .capture? = macro.steps.first?.action, case .key? = macro.steps.last?.action else {
+            return XCTFail("\(macro.steps)")
+        }
+        XCTAssertEqual(macro.repetition, .untilUnchanged)
+        let recorded = try XCTUnwrap(vm.macros.recordedCapture(for: macro.steps[0].id))
+        XCTAssertTrue(try text(in: try XCTUnwrap(PageImages.wholeImage(at: recorded))).contains("Page 1"))
+
+        let before = Set(vm.items.map(\.id))
+        vm.runMacro(id: macro.id)
+        for _ in 0..<600 where vm.isCapturing || vm.items.count == before.count {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let added = vm.items.filter { !before.contains($0.id) }
+        XCTAssertEqual(added.count, 1)
+        let document = try XCTUnwrap(added.first).url
+        XCTAssertEqual(document.pathExtension, "tiff")
+        XCTAssertEqual(PageImages.frameCount(of: document), 5)
+        try assertSlides((0..<5).compactMap { PageImages.image(at: document, frame: $0) })
+        // Handed on: the next run starts afresh.
+        XCTAssertNil(vm.macros.recordedCapture(for: macro.steps[0].id))
+        vm.stopProcessing()
+
+        // Its originals: a picture a page, in a folder named after it.
+        let out = URL.temporaryDirectory.appending(path: "originals-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: out) }
+        let (written, failures) = OCRViewModel.writeOriginals(of: added, into: out)
+        XCTAssertEqual(failures, [])
+        let folder = try XCTUnwrap(written.first)
+        XCTAssertEqual(folder.lastPathComponent, document.deletingPathExtension().lastPathComponent)
+        let pictures = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        XCTAssertEqual(pictures.count, 5)
+        try assertSlides(pictures.compactMap { PageImages.wholeImage(at: $0) })
+    }
+}
+
 /// How many lines the helper's long page has.
 private enum LongPageLines {
     static let count = 120
