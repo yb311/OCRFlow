@@ -3,6 +3,12 @@ import CoreGraphics
 import PDFKit
 import Synchronization
 
+/// One line of a PDF's text layer, in the pixels of a rendered page.
+struct PDFTextLine: Equatable {
+    var rect: CGRect
+    var text: String
+}
+
 /// A PDF page drawn to pixels, and the way back from pixels to the page.
 struct RenderedPDFPage {
     let image: CGImage
@@ -68,7 +74,29 @@ final class PDFSource: Sendable {
         }
     }
 
+    /// The page's text layer line by line, each line where it sits in the
+    /// rendered page's pixels.
+    func textLines(page index: Int, rendering: RenderedPDFPage) -> [PDFTextLine] {
+        document.withLock { document in
+            guard let page = document.page(at: index),
+                  let all = page.selection(for: page.bounds(for: .mediaBox)) else { return [] }
+            let toPixel = rendering.pageToPixel
+            return all.selectionsByLine().compactMap { line in
+                let text = PDFTextLayer.cleaned(line.string ?? "")
+                guard !text.isEmpty else { return nil }
+                return PDFTextLine(rect: line.bounds(for: page).applying(toPixel).standardized, text: text)
+            }
+        }
+    }
+
     static func render(_ page: PDFPage, scale: CGFloat) -> RenderedPDFPage? {
+        // Drawn the way its text reads, which is not always the way the PDF
+        // says to turn it; the page is put back as it was afterwards.
+        let stated = page.rotation
+        let upright = uprightRotation(of: page)
+        if upright != stated { page.rotation = upright }
+        defer { page.rotation = stated }
+
         let box = page.bounds(for: .cropBox)
         let quarterTurns = ((page.rotation % 360) + 360) % 360 / 90
         let size = quarterTurns % 2 == 0 ? box.size : CGSize(width: box.height, height: box.width)
@@ -99,6 +127,72 @@ final class PDFSource: Sendable {
                                      tx: 0, ty: CGFloat(height))
         return RenderedPDFPage(image: image,
                                pageToPixel: page.transform(for: .cropBox).concatenating(flip))
+    }
+}
+
+extension PDFSource {
+    /// The quarter turn, in degrees, that puts the page's text the right way
+    /// up — the page's own `/Rotate` unless its text says otherwise.
+    ///
+    /// A page can be marked as turned when what it draws is already upright:
+    /// a portrait page saved with `/Rotate 90` shows sideways in every viewer,
+    /// and the orientation classifier is not asked about pages a PDF draws
+    /// itself. Which way the characters advance settles it. Vertical CJK
+    /// writing advances downwards on an upright page, so for CJK text only a
+    /// page whose lines run right to left — upside down — is turned.
+    static func uprightRotation(of page: PDFPage) -> Int {
+        let stated = ((page.rotation % 360) + 360) % 360
+        guard let (direction, cjk) = TextAdvance.dominant(on: page) else { return stated }
+        switch direction {
+        case .right: return 0
+        case .left:  return 180
+        case .up:    return cjk ? stated : 90
+        case .down:  return cjk ? stated : 270
+        }
+    }
+
+    /// Which way most of a page's text runs, in unrotated page space.
+    enum TextAdvance {
+        case right, left, up, down
+
+        /// Nil when the page has too little text, or no clear majority, to tell.
+        static func dominant(on page: PDFPage) -> (TextAdvance, cjk: Bool)? {
+            guard let string = page.string, !string.isEmpty else { return nil }
+            let text = string as NSString
+            let length = text.length
+            // Enough pairs to outvote a rotated figure label or a margin stamp,
+            // spread over the page, without measuring every character.
+            let stride = max(1, length / 300)
+            var votes: [TextAdvance: Int] = [:]
+            var cjkCount = 0, sampled = 0
+            var index = 0
+            while index + 1 < length {
+                defer { index += stride }
+                guard let a = UnicodeScalar(text.character(at: index)),
+                      let b = UnicodeScalar(text.character(at: index + 1)),
+                      CharacterSet.alphanumerics.contains(a), CharacterSet.alphanumerics.contains(b)
+                else { continue }
+                // A one-character selection, not `characterBounds(at:)`: the
+                // latter reports a turned glyph in the text's own frame, so
+                // sideways text looked as if it ran left to right.
+                guard let first = page.selection(for: NSRange(location: index, length: 1))?.bounds(for: page),
+                      let second = page.selection(for: NSRange(location: index + 1, length: 1))?.bounds(for: page),
+                      !first.isEmpty, !second.isEmpty else { continue }
+                let dx = second.midX - first.midX, dy = second.midY - first.midY
+                let size = max(min(first.width, first.height), 0.5)
+                // Neighbours on the same line advance by about a character;
+                // anything else is a line break or a jump between columns.
+                guard max(abs(dx), abs(dy)) > size * 0.2, max(abs(dx), abs(dy)) < size * 3 else { continue }
+                let direction: TextAdvance = abs(dx) >= abs(dy) ? (dx > 0 ? .right : .left)
+                                                                 : (dy > 0 ? .up : .down)
+                votes[direction, default: 0] += 1
+                sampled += 1
+                if a.properties.isIdeographic || (0x3040...0x30FF).contains(a.value) { cjkCount += 1 }
+            }
+            guard sampled >= 20, let (winner, count) = votes.max(by: { $0.value < $1.value }),
+                  Double(count) >= Double(sampled) * 0.6 else { return nil }
+            return (winner, cjkCount * 2 > sampled)
+        }
     }
 }
 

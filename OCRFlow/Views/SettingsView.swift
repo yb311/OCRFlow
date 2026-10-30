@@ -4,10 +4,11 @@ import SwiftUI
 /// The app's settings, grouped by what the user is trying to do rather than by
 /// which subsystem owns the code.
 ///
-/// The engine choice and that engine's own options live together in one pane,
-/// and only the selected engine's options are built. Panes therefore never show
-/// controls the current engine ignores, which is what the previous layout's
-/// "以下设置暂不生效" banners were apologising for.
+/// 识别 leads with one choice — fast, balanced or accurate — and the switches
+/// people actually reach for: what to read, how pages are straightened, the
+/// reading order and the language. Engines, model sizes and thresholds sit in
+/// 高级, where changing them shows the mode as 自定义. Only the selected
+/// engine's options are built, so no pane shows controls the engine ignores.
 struct SettingsView: View {
     @Bindable var vm: OCRViewModel
     @Bindable var updater: UpdaterController
@@ -16,6 +17,8 @@ struct SettingsView: View {
     /// Remembered across openings: someone who tunes thresholds keeps coming
     /// back to the same section, and re-opening it every time is friction.
     @AppStorage("settings.paddleAdvancedExpanded") private var showPaddleAdvanced = false
+    @AppStorage("settings.layeredPaddleExpanded") private var showLayeredPaddle = false
+    @AppStorage("settings.layeredVLExpanded") private var showLayeredVL = false
     /// Applied by the main window, which watches the same key.
     @AppStorage(AppAppearance.storageKey) private var appearance: AppAppearance = .system
     @State private var showResetConfirm = false
@@ -34,12 +37,14 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
             recognitionTab
                 .tabItem { Label("Recognition", systemImage: "text.viewfinder") }
             textTab
                 .tabItem { Label("Text & Export", systemImage: "text.alignleft") }
-            behaviorTab
-                .tabItem { Label("Behavior", systemImage: "gearshape.2") }
+            advancedTab
+                .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
         }
         // A settings window sizes itself to its content, and a flexible frame
         // makes it pick something shorter than the panes actually need. Fixed,
@@ -62,37 +67,172 @@ struct SettingsView: View {
     private var recognitionTab: some View {
         settingsScroll {
             if vm.isProcessing {
-                noticeBox("Recognition is running. Engine and model changes only affect files started afterwards.",
+                noticeBox("Recognition is running. Changes here only affect files started afterwards.",
                           tint: .orange)
             }
 
-            settingSection("Recognition Engine") {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(OCREngine.allCases) { engine in
-                        let ready = engine != .paddleVL || VLModelStore.isReady(for: vm.vlConfig)
-                        radioRow(title: engine.label,
-                                 subtitle: ready ? engine.hint : String(localized: "\(engine.hint) — model not downloaded yet"),
-                                 selected: vm.ocrEngine == engine,
-                                 enabled: ready) {
-                            vm.ocrEngine = engine
-                        }
-                    }
-                    if !VLModelStore.isReady(for: vm.vlConfig) {
-                        Divider().padding(.vertical, 2)
-                        modelManagerLink("Download PaddleOCR-VL Model")
-                    }
-                }
-            }
+            modeSection
+            contentSection
+            pageHandlingSection
+            readingOrderSection
 
             if vm.ocrEngine.usesVisionLanguages {
                 visionSettings
-            } else if vm.ocrEngine == .paddleOCR {
-                paddleSettings
-            } else if vm.ocrEngine == .auto {
-                layeredSettings
-            } else {
-                vlSettings
+            } else if vm.ocrEngine != .paddleVL {
+                languageSection
             }
+        }
+    }
+
+    /// Fast, balanced or accurate: the one decision most people need to make.
+    private var modeSection: some View {
+        settingSection("Recognition Mode") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Recognition Mode", selection: Binding(
+                    get: { vm.qualityPreset },
+                    set: { if let preset = $0 { vm.applyPreset(preset) } })) {
+                    ForEach(QualityPreset.allCases) { preset in
+                        Text(preset.label).tag(Optional(preset))
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                HStack {
+                    Label("Faster", systemImage: "hare")
+                    Spacer()
+                    Label("More accurate", systemImage: "scope")
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+                if let preset = vm.qualityPreset {
+                    Text(preset.hint)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    let missing = preset.missingModels
+                    if !missing.isEmpty {
+                        Divider().padding(.vertical, 2)
+                        HStack {
+                            Text("Download to get the most out of this mode")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            downloadSourceControl
+                        }
+                        ForEach(missing) { inlineDownloadRow($0) }
+                    }
+                } else {
+                    Label("Custom: the engine or its parameters were changed under Advanced (\(vm.ocrEngine.shortLabel)). Pick a mode above to go back to a preset.",
+                          systemImage: "slider.horizontal.3")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// Which kinds of content are read rather than kept as pictures.
+    @ViewBuilder
+    private var contentSection: some View {
+        settingSection("What to Recognize") {
+            VStack(alignment: .leading, spacing: 10) {
+                let usesVL = vm.ocrEngine == .auto || vm.ocrEngine == .paddleVL
+                if !usesVL {
+                    noticeBox("This mode reads text only. Choose Balanced or Accurate to also read tables, formulas, charts and seals.",
+                              tint: .accentColor)
+                }
+                Group {
+                    toggleRow(isOn: $vm.vlConfig.useSealRecognition,
+                              title: "Seals and stamps",
+                              subtitle: "Reads the curved text on seals")
+                    toggleRow(isOn: $vm.vlConfig.useChartRecognition,
+                              title: "Charts as data tables",
+                              subtitle: "Turns bar and line charts into tables. The numbers are the model's estimates, since a chart only draws them")
+                    toggleRow(isOn: $vm.vlConfig.useImageTextRecognition,
+                              title: "Text inside images",
+                              subtitle: "Also reads the words in photos and diagrams. When off, images are kept as pictures")
+                    toggleRow(isOn: $vm.vlConfig.inferHeadingLevels,
+                              title: "Heading levels",
+                              subtitle: "Tells headings apart by size (##, ###, ####). When off, all subheadings are one level")
+                }
+                .disabled(!usesVL)
+                hint("Tables and formulas are always read. Regions of a switched-off kind are still shown on the page; they just aren't read.")
+            }
+        }
+    }
+
+    /// Straightening the page before it is read.
+    private var pageHandlingSection: some View {
+        settingSection("Page Handling") {
+            VStack(alignment: .leading, spacing: 10) {
+                toggleRow(isOn: $vm.paddleConfig.useDocOrientation,
+                          title: "Turn sideways and upside-down pages upright",
+                          subtitle: "Detects pages rotated 90°, 180° or 270° and turns them before reading. Recommended")
+                    .disabled(vm.ocrEngine.usesVisionLanguages)
+                if !vm.ocrEngine.usesVisionLanguages && vm.ocrEngine != .paddleVL {
+                    toggleRow(isOn: $vm.paddleConfig.useTextLineOrientation,
+                              title: "Fix upside-down lines",
+                              subtitle: "Checks each line for upside-down text and flips it, at almost no cost")
+                }
+                toggleRow(isOn: $vm.useDocUnwarping,
+                          title: "Flatten curved or photographed pages",
+                          subtitle: "Straightens skewed, curled or folded pages, such as a phone photo of a book. Scans don't need it, and it takes extra time")
+                if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
+                    inlineDownloadRow(PPModelCatalog.unwarpingModel)
+                }
+            }
+        }
+    }
+
+    /// The order a page is read in.
+    @ViewBuilder
+    private var readingOrderSection: some View {
+        switch vm.ocrEngine {
+        case .auto:
+            settingSection("Reading Order & Layout") {
+                VStack(alignment: .leading, spacing: 10) {
+                    componentRow("PP-DocLayoutV3 layout analysis",
+                                 detail: "Finds columns, headings, tables and figures and the order to read them in. Without it, pages are read by column estimate only",
+                                 ready: VLModelStore.isLayoutModelInstalled)
+                    if !VLModelStore.isLayoutModelInstalled {
+                        inlineDownloadRow(PPModelCatalog.layoutModel)
+                    }
+                }
+            }
+        case .paddleOCR:
+            settingSection("Reading Order & Layout") {
+                VStack(alignment: .leading, spacing: 10) {
+                    let layoutReady = VLModelStore.isLayoutModelInstalled
+                    ForEach(PPTextOrder.allCases) { order in
+                        let ready = !order.needsLayoutModel || layoutReady
+                        radioRow(title: order.label,
+                                 subtitle: ready ? order.hint : String(localized: "\(order.hint) — not downloaded yet"),
+                                 selected: vm.paddleConfig.readingOrder == order,
+                                 enabled: ready) {
+                            vm.paddleConfig.readingOrder = order
+                        }
+                    }
+                    if !layoutReady {
+                        Divider().padding(.vertical, 2)
+                        inlineDownloadRow(PPModelCatalog.layoutModel)
+                    }
+                }
+            }
+        case .paddleVL:
+            settingSection("Reading Order & Layout") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.vlConfig.useLayoutDetection,
+                              title: "Analyze layout first, then read block by block",
+                              subtitle: "The official PaddleOCR pipeline: split the layout, decide the reading order, prompt each block appropriately, then assemble Markdown. When off, the whole page goes to the model at once — much faster, but content gets missed.")
+                    if !VLModelStore.isLayoutModelInstalled {
+                        inlineDownloadRow(PPModelCatalog.layoutModel)
+                    }
+                }
+            }
+        case .visionFast, .visionAccurate:
+            EmptyView()
         }
     }
 
@@ -299,12 +439,9 @@ struct SettingsView: View {
 
     // MARK: - Engine settings: 智能分层
 
-    @AppStorage("settings.layeredPaddleExpanded") private var showLayeredPaddle = false
-    @AppStorage("settings.layeredVLExpanded") private var showLayeredVL = false
-
     @ViewBuilder
     private var layeredSettings: some View {
-        settingSection("Pipeline Components") {
+        settingSection("Smart Layering Components") {
             VStack(alignment: .leading, spacing: 8) {
                 componentRow("PDF native text layer", detail: "Extracted directly, without OCR", ready: true)
                 componentRow("PP-DocLayoutV3 layout analysis",
@@ -315,17 +452,6 @@ struct SettingsView: View {
                 componentRow("PaddleOCR-VL \(vm.vlConfig.variant.label)",
                              detail: "Tables, formulas, charts, seals and low-confidence regions. Without it, these are only flagged for review",
                              ready: VLModelStore.isInstalled(vm.vlConfig.variant))
-                let missing = [PPModelCatalog.layoutModel, PPModelCatalog.vlQuantized]
-                    .filter { !$0.isInstalled }
-                if !missing.isEmpty, !VLModelStore.isInstalled(vm.vlConfig.variant) || !VLModelStore.isLayoutModelInstalled {
-                    Divider().padding(.vertical, 2)
-                    HStack {
-                        Text("Not installed").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        downloadSourceControl
-                    }
-                    ForEach(missing) { inlineDownloadRow($0) }
-                }
             }
         }
 
@@ -344,20 +470,6 @@ struct SettingsView: View {
                 hint("Text in a native PDF is already exact, so using it directly is fastest and most accurate. Hidden OCR layers that other software added to scans are of unknown quality, so those pages are recognized again by default.")
             }
         }
-
-        DisclosureGroup(isExpanded: $showLayeredPaddle) {
-            VStack(alignment: .leading, spacing: 16) { paddleSettings }
-                .padding(.top, 8)
-        } label: {
-            Text("PP-OCRv6 Parameters").font(.headline)
-        }
-
-        DisclosureGroup(isExpanded: $showLayeredVL) {
-            VStack(alignment: .leading, spacing: 16) { vlSettings }
-                .padding(.top, 8)
-        } label: {
-            Text("PaddleOCR-VL Parameters").font(.headline)
-        }
     }
 
     private func componentRow(_ title: LocalizedStringKey, detail: LocalizedStringKey, ready: Bool) -> some View {
@@ -372,6 +484,51 @@ struct SettingsView: View {
     }
 
     // MARK: - Engine settings: PaddleOCR
+
+    /// The language PP-OCRv6 reads, chosen by recognizer model.
+    ///
+    /// One menu: the built-in model covers what most people read, and the
+    /// languages it cannot read are a folded list of downloads underneath
+    /// rather than a column of them in the way of everything else.
+    @ViewBuilder
+    private var languageSection: some View {
+        settingSection("Language") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Recognition language", selection: Binding(
+                    get: { vm.paddleConfig.recognizer },
+                    set: { vm.selectRecognizer($0) })) {
+                    Text("Chinese, English, Japanese and 47 more (built in)").tag(PPRecognizerChoice.builtin)
+                    ForEach(PPModelStore.installedCustomRecognizers()) { recognizer in
+                        Text(verbatim: Self.recognizerName(recognizer))
+                            .tag(PPRecognizerChoice.custom(fileName: recognizer.fileName))
+                    }
+                }
+                .pickerStyle(.menu)
+                hint("The built-in model reads Simplified and Traditional Chinese, English, Japanese and 46 Latin-script languages. Korean, Russian, Arabic, Thai, Greek and Devanagari need a model of their own.")
+
+                // The languages the built-in model cannot read are installed
+                // from here. Left invisible, the app answers a Korean page
+                // with a page of wrong Chinese and nothing says why.
+                let missing = Self.downloadableLanguages
+                if !missing.isEmpty {
+                    DisclosureGroup("Download Other Languages") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Spacer()
+                                downloadSourceControl
+                            }
+                            ForEach(missing) { entry in
+                                inlineDownloadRow(entry)
+                            }
+                            hint("Once downloaded, choose the language in the menu above. Text detection is still done by PP-OCRv6.")
+                        }
+                        .padding(.top, 6)
+                    }
+                    .font(.callout)
+                }
+            }
+        }
+    }
 
     @ViewBuilder
     private var paddleSettings: some View {
@@ -401,67 +558,6 @@ struct SettingsView: View {
             }
         }
 
-        settingSection("Recognition Language") {
-            VStack(alignment: .leading, spacing: 10) {
-                radioRow(title: String(localized: "Built-in multilingual model"),
-                         subtitle: String(localized: "A single PP-OCRv6 model covers 50 languages: Simplified and Traditional Chinese, English, Japanese, and 46 Latin-script languages. Not Korean, Arabic, Cyrillic, Thai, Greek or Devanagari"),
-                         selected: vm.paddleConfig.recognizer == .builtin,
-                         enabled: true) {
-                    vm.selectRecognizer(.builtin)
-                }
-                ForEach(PPModelStore.installedCustomRecognizers()) { recognizer in
-                    let choice = PPRecognizerChoice.custom(fileName: recognizer.fileName)
-                    radioRow(title: Self.recognizerName(recognizer),
-                             subtitle: String(localized: "An installed single-language recognizer; detection is still done by PP-OCRv6"),
-                             selected: vm.paddleConfig.recognizer == choice,
-                             enabled: true) {
-                        vm.selectRecognizer(choice)
-                    }
-                }
-
-                // The languages the built-in model cannot read are listed here,
-                // and installed from here. Left invisible, the app answers a
-                // Korean page with a page of wrong Chinese and nothing says
-                // why; left to another window, installing one means losing
-                // your place in this one.
-                let missing = Self.downloadableLanguages
-                if !missing.isEmpty {
-                    Divider().padding(.vertical, 2)
-                    HStack {
-                        Text("Languages not installed")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        downloadSourceControl
-                    }
-                    ForEach(missing) { entry in
-                        inlineDownloadRow(entry)
-                    }
-                }
-                hint("PP-OCRv6 has no weights for these languages; the built-in model would only produce garbage for them. Download them here, then select one above. Text detection is still done by PP-OCRv6.")
-            }
-        }
-
-        settingSection("Reading Order & Layout") {
-            VStack(alignment: .leading, spacing: 10) {
-                let layoutReady = VLModelStore.isLayoutModelInstalled
-                ForEach(PPTextOrder.allCases) { order in
-                    let ready = !order.needsLayoutModel || layoutReady
-                    radioRow(title: order.label,
-                             subtitle: ready ? order.hint : String(localized: "\(order.hint) — not downloaded yet"),
-                             selected: vm.paddleConfig.readingOrder == order,
-                             enabled: ready) {
-                        vm.paddleConfig.readingOrder = order
-                    }
-                }
-                if !layoutReady {
-                    Divider().padding(.vertical, 2)
-                    inlineDownloadRow(PPModelCatalog.layoutModel)
-                }
-                hint("Text detection only gives each line's position, not its order. Layout analysis uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places lines back into their regions — as PaddleOCR's official document parsing does. Results also gain heading levels and image positions, ready to export as Markdown.")
-            }
-        }
-
         settingSection("Compute Backend") {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(PPComputeUnit.allCases) { unit in
@@ -475,34 +571,6 @@ struct SettingsView: View {
                          ? "Threads: Auto"
                          : "Threads: \(vm.paddleConfig.threadCount)")
                         .font(.callout)
-                }
-            }
-        }
-
-        settingSection("Image Preprocessing") {
-            VStack(alignment: .leading, spacing: 10) {
-                toggleRow(isOn: $vm.useDocUnwarping,
-                          title: "Page unwarping",
-                          subtitle: "Flattens skewed, curled or folded pages before recognition. Scans don't need it. When on, the preview shows the flattened page")
-                if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
-                    inlineDownloadRow(PPModelCatalog.unwarpingModel)
-                }
-                hint("Corresponds to PaddleOCR's use_doc_unwarping. Both engines use it.")
-            }
-        }
-
-        settingSection("Orientation") {
-            VStack(alignment: .leading, spacing: 10) {
-                toggleRow(isOn: $vm.paddleConfig.useDocOrientation,
-                          title: "Page orientation correction",
-                          subtitle: "Detects pages rotated 90°/180°/270° and straightens them. Recommended for scans")
-                toggleRow(isOn: $vm.paddleConfig.useTextLineOrientation,
-                          title: "Text line orientation correction",
-                          subtitle: "Checks each line for upside-down text and flips it, with almost no speed cost")
-                if vm.paddleConfig.useTextLineOrientation {
-                    valueSlider("Flip threshold", value: $vm.paddleConfig.clsThresh,
-                                range: 0.5...0.9, step: 0.05,
-                                hint: "Lines below this confidence are not flipped. Model output clusters around 0.27 / 0.73")
                 }
             }
         }
@@ -536,6 +604,9 @@ struct SettingsView: View {
                         valueSlider("Minimum confidence", value: $vm.paddleConfig.dropScore,
                                     range: 0...0.95, step: 0.05,
                                     hint: "Lines recognized with lower confidence than this are left out of the results")
+                        valueSlider("Line flip threshold", value: $vm.paddleConfig.clsThresh,
+                                    range: 0.5...0.9, step: 0.05,
+                                    hint: "With “Fix upside-down lines” on, lines below this confidence are not flipped. Model output clusters around 0.27 / 0.73")
                     }
                     .padding(.top, 8)
                 } label: {
@@ -584,28 +655,8 @@ struct SettingsView: View {
             }
         }
 
-        settingSection("Image Preprocessing") {
+        settingSection("Regions") {
             VStack(alignment: .leading, spacing: 10) {
-                toggleRow(isOn: $vm.useDocUnwarping,
-                          title: "Page unwarping",
-                          subtitle: "Flattens skewed, curled or folded pages before recognition. Scans don't need it. When on, the preview shows the flattened page")
-                if vm.useDocUnwarping, !PPModelStore.isUnwarpingModelInstalled {
-                    inlineDownloadRow(PPModelCatalog.unwarpingModel)
-                }
-            }
-        }
-
-        settingSection("Layout Analysis") {
-            VStack(alignment: .leading, spacing: 10) {
-                toggleRow(isOn: $vm.vlConfig.useLayoutDetection,
-                          title: "Analyze layout first, then read block by block",
-                          subtitle: "The official PaddleOCR pipeline: split the layout, decide the reading order, prompt each block appropriately, then assemble Markdown. When off, the whole page goes to the model at once — much faster, but content gets missed.")
-                if !VLModelStore.isLayoutModelInstalled {
-                    Label("The PP-DocLayoutV3 layout model isn't downloaded yet", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
                 valueSlider("Region padding ratio", value: $vm.vlConfig.cropUnclipRatio,
                             range: 1.0...1.3, step: 0.01,
                             hint: "How far to expand each layout region when cropping. Cropping tight to the text cuts off stroke edges and the model misses characters. Corresponds to the official unclip_ratio")
@@ -619,24 +670,6 @@ struct SettingsView: View {
                     }
                     hint(verbatim: vm.vlConfig.wholeImageTask.hint)
                 }
-            }
-        }
-
-        settingSection("Recognition Modules") {
-            VStack(alignment: .leading, spacing: 10) {
-                toggleRow(isOn: $vm.vlConfig.useChartRecognition,
-                          title: "Chart recognition",
-                          subtitle: "Reads bar and line charts into data tables. Off by default upstream — a chart only draws shapes, so the numbers are the model's estimates")
-                toggleRow(isOn: $vm.vlConfig.useSealRecognition,
-                          title: "Seal recognition",
-                          subtitle: "Reads the curved text on seals")
-                toggleRow(isOn: $vm.vlConfig.useImageTextRecognition,
-                          title: "Text in images",
-                          subtitle: "Also reads text inside image regions. When off, images are kept as illustrations only")
-                toggleRow(isOn: $vm.vlConfig.inferHeadingLevels,
-                          title: "Heading level detection",
-                          subtitle: "Infers heading levels from font size and outputs ##, ###, ####. When off, all subheadings are one level")
-                hint("Regions of a disabled module still appear in the preview; they just aren't sent for recognition.")
             }
         }
 
@@ -681,70 +714,6 @@ struct SettingsView: View {
 
     private var textTab: some View {
         settingsScroll {
-            settingSection("Line Breaks") {
-                VStack(alignment: .leading, spacing: 10) {
-                    // Never disabled: it used to switch itself off once both were
-                    // on, which left the pair locked with no way back.
-                    toggleRow(isOn: $vm.mergeLineBreaks,
-                              title: "Merge into one line (no line breaks)",
-                              subtitle: "Replaces every line break with a space, producing continuous paragraphs")
-                    toggleRow(isOn: $vm.removeEmptyLines,
-                              title: "Remove extra blank lines",
-                              subtitle: "Collapses consecutive blank lines into one")
-                        .disabled(vm.mergeLineBreaks)
-                    if vm.mergeLineBreaks {
-                        hint("After merging into one line there are no line breaks left, so “Remove extra blank lines” has no effect.")
-                    }
-                }
-            }
-
-            settingSection("Whitespace") {
-                VStack(alignment: .leading, spacing: 10) {
-                    toggleRow(isOn: $vm.trimWhitespace,
-                              title: "Trim spaces at line ends",
-                              subtitle: "Removes extra whitespace at both ends of each line")
-                    toggleRow(isOn: $vm.removeHyphenBreaks,
-                              title: "Join hyphenated line breaks",
-                              subtitle: "Good for English scans: rejoins words split across lines")
-                }
-            }
-
-            if vm.mergeLineBreaks || vm.removeEmptyLines || vm.trimWhitespace || vm.removeHyphenBreaks {
-                noticeBox("Text post-processing only affects new results; existing ones are not changed.", tint: .accentColor)
-            }
-
-            settingSection("Auxiliary Content") {
-                VStack(alignment: .leading, spacing: 8) {
-                    hint("Headers, footers, page numbers and the like are detected by the layout model and filtered out by default. Turn an item on to keep it in the results. Matches PaddleOCR's official auxiliary content options.")
-                    ForEach(PPLayoutLabel.auxiliary, id: \.rawValue) { label in
-                        Toggle(isOn: Binding(
-                            get: { vm.keptAuxiliary.contains(label) },
-                            set: { vm.setAuxiliary(label, kept: $0) })) {
-                            HStack(spacing: 6) {
-                                Text(label.label).font(.callout)
-                                Text(label.rawName)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                    }
-                    Divider().padding(.vertical, 2)
-                    hint("These regions are always recognized and always drawn in the preview (filtered ones with dashed boxes); this only decides whether they go into the text and Markdown. Changes apply immediately without recognizing again — except for multi-page PDFs, whose text is assembled page by page during recognition.")
-                }
-            }
-
-            settingSection("Result Rendering") {
-                VStack(alignment: .leading, spacing: 10) {
-                    toggleRow(isOn: $vm.renderFigures,
-                              title: "Show images and charts",
-                              subtitle: "Crops images and charts from the original at their detected positions and shows them in the Markdown result")
-                    toggleRow(isOn: $vm.renderTables,
-                              title: "Render tables as grids",
-                              subtitle: "When off, tables are shown as the model output them")
-                    hint("Only affects how the Markdown tab displays; the Source tab always shows the model's raw output. Other engines produce plain text and are not affected.")
-                }
-            }
-
             settingSection("Export") {
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Export format", selection: $vm.exportFormat) {
@@ -790,12 +759,65 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            settingSection("Text Cleanup") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.trimWhitespace,
+                              title: "Trim spaces at line ends",
+                              subtitle: "Removes extra whitespace at both ends of each line")
+                    toggleRow(isOn: $vm.removeHyphenBreaks,
+                              title: "Join hyphenated line breaks",
+                              subtitle: "Good for English scans: rejoins words split across lines")
+                    // Never disabled: it used to switch itself off once both
+                    // were on, which left the pair locked with no way back.
+                    toggleRow(isOn: $vm.mergeLineBreaks,
+                              title: "Merge into one line (no line breaks)",
+                              subtitle: "Replaces every line break with a space, producing continuous paragraphs")
+                    toggleRow(isOn: $vm.removeEmptyLines,
+                              title: "Remove extra blank lines",
+                              subtitle: "Collapses consecutive blank lines into one")
+                        .disabled(vm.mergeLineBreaks)
+                    hint("Only affects results recognized from now on; existing ones are not changed.")
+                }
+            }
+
+            settingSection("Headers, Footers & Page Numbers") {
+                VStack(alignment: .leading, spacing: 8) {
+                    hint("What frames a page rather than being part of it. Ticked items go into the results; the rest are left out. Footnotes are kept by default.")
+                    ForEach(PPLayoutLabel.auxiliary, id: \.rawValue) { label in
+                        Toggle(isOn: Binding(
+                            get: { vm.keptAuxiliary.contains(label) },
+                            set: { vm.setAuxiliary(label, kept: $0) })) {
+                            HStack(spacing: 6) {
+                                Text(label.label).font(.callout)
+                                Text(label.rawName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    Divider().padding(.vertical, 2)
+                    hint("Left-out regions are still recognized, and show on the page as “Not in result” under the pointer. Changes apply straight away without recognizing again — except for multi-page PDFs, whose text is put together page by page during recognition.")
+                }
+            }
+
+            settingSection("Result Rendering") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.renderFigures,
+                              title: "Show images and charts",
+                              subtitle: "Crops images and charts from the original at their detected positions and shows them in the Markdown result")
+                    toggleRow(isOn: $vm.renderTables,
+                              title: "Render tables as grids",
+                              subtitle: "When off, tables are shown as the model output them")
+                    hint("Only affects how the Markdown tab displays; the Source tab always shows the model's raw output. Other engines produce plain text and are not affected.")
+                }
+            }
         }
     }
 
-    // MARK: - Tab: Behavior
+    // MARK: - Tab: General
 
-    private var behaviorTab: some View {
+    private var generalTab: some View {
         settingsScroll {
             settingSection("Appearance") {
                 Picker("Appearance", selection: $appearance) {
@@ -890,29 +912,6 @@ struct SettingsView: View {
                 }
             }
 
-            settingSection("Recognition Cache") {
-                VStack(alignment: .leading, spacing: 10) {
-                    hint("If the same file (judged by content, regardless of name or location) was recognized with the same settings, the earlier result is reused. “Recognize Again” always reads afresh. The list and results are kept after quitting and are there next time.")
-                    Button("Clear Recognition Cache") { vm.store.clearCache() }
-                        .controlSize(.small)
-                }
-            }
-
-            settingSection("Batch Concurrency") {
-                VStack(alignment: .leading, spacing: 10) {
-                    // The GPU engines batch regions across files themselves, so
-                    // `processConcurrently` caps them at two files in flight.
-                    let capped = vm.ocrEngine.prefersFewFilesInFlight
-                    Stepper(value: $vm.maxConcurrentTasks, in: 1...8) {
-                        Text(capped
-                             ? "Process \(min(2, vm.maxConcurrentTasks)) files at a time"
-                             : "Process \(vm.maxConcurrentTasks) files at a time")
-                            .font(.callout)
-                    }
-                    hint(verbatim: concurrencyHint)
-                }
-            }
-
             settingSection("Software Update") {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $updater.automaticallyChecksForUpdates,
@@ -933,7 +932,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Button("Restore All Defaults…") { showResetConfirm = true }
                         .buttonStyle(.bordered)
-                    hint("Settings are saved automatically and kept for the next launch. This restores all three tabs to their initial state.")
+                    hint("Settings are saved automatically and kept for the next launch. This restores every tab to its initial state.")
                 }
             }
             .confirmationDialog("Restore all default settings?",
@@ -943,6 +942,78 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(String(localized: "The recognition engine, model choices, all parameters, and text and export options return to their initial values. Downloaded models and files in the list are not affected."))
+            }
+        }
+    }
+
+    // MARK: - Tab: Advanced
+
+    /// Everything the recognition mode sets for you, for whoever wants to set
+    /// it by hand.
+    private var advancedTab: some View {
+        settingsScroll {
+            noticeBox("These are the engine and model settings behind the recognition modes. Changing them shows the mode as Custom; picking a mode again resets them.",
+                      tint: .accentColor)
+
+            settingSection("Recognition Engine") {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(OCREngine.allCases) { engine in
+                        let ready = engine != .paddleVL || VLModelStore.isReady(for: vm.vlConfig)
+                        radioRow(title: engine.label,
+                                 subtitle: ready ? engine.hint : String(localized: "\(engine.hint) — model not downloaded yet"),
+                                 selected: vm.ocrEngine == engine,
+                                 enabled: ready) {
+                            vm.ocrEngine = engine
+                        }
+                    }
+                    if !VLModelStore.isReady(for: vm.vlConfig) {
+                        Divider().padding(.vertical, 2)
+                        modelManagerLink("Download PaddleOCR-VL Model")
+                    }
+                }
+            }
+
+            if vm.ocrEngine == .auto {
+                layeredSettings
+            }
+            if vm.ocrEngine == .auto || vm.ocrEngine == .paddleOCR {
+                DisclosureGroup(isExpanded: $showLayeredPaddle) {
+                    VStack(alignment: .leading, spacing: 16) { paddleSettings }
+                        .padding(.top, 8)
+                } label: {
+                    Text("PP-OCRv6").font(.headline)
+                }
+            }
+            if vm.ocrEngine == .auto || vm.ocrEngine == .paddleVL {
+                DisclosureGroup(isExpanded: $showLayeredVL) {
+                    VStack(alignment: .leading, spacing: 16) { vlSettings }
+                        .padding(.top, 8)
+                } label: {
+                    Text("PaddleOCR-VL").font(.headline)
+                }
+            }
+
+            settingSection("Recognition Cache") {
+                VStack(alignment: .leading, spacing: 10) {
+                    hint("If the same file (judged by content, regardless of name or location) was recognized with the same settings, the earlier result is reused. “Recognize Again” always reads afresh. The list and results are kept after quitting and are there next time.")
+                    Button("Clear Recognition Cache") { vm.store.clearCache() }
+                        .controlSize(.small)
+                }
+            }
+
+            settingSection("Performance") {
+                VStack(alignment: .leading, spacing: 10) {
+                    // The GPU engines batch regions across files themselves, so
+                    // `processConcurrently` caps them at two files in flight.
+                    let capped = vm.ocrEngine.prefersFewFilesInFlight
+                    Stepper(value: $vm.maxConcurrentTasks, in: 1...8) {
+                        Text(capped
+                             ? "Process \(min(2, vm.maxConcurrentTasks)) files at a time"
+                             : "Process \(vm.maxConcurrentTasks) files at a time")
+                            .font(.callout)
+                    }
+                    hint(verbatim: concurrencyHint)
+                }
             }
         }
     }

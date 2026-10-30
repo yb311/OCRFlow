@@ -168,6 +168,16 @@
         }
       }
     },
+    "%@ · Not in result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 未纳入结果"
+          }
+        }
+      }
+    },
     "%@ · Reused earlier result" : {
       "localizations" : {
         "zh-Hans" : {
@@ -628,6 +638,16 @@
         }
       }
     },
+    "%lld of %lld pages read last time. Recognizing reads only the remaining pages" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次已读 %1$lld/%2$lld 页。识别时只读剩下的页"
+          }
+        }
+      }
+    },
     "%lld pages" : {
       "localizations" : {
         "en" : {
@@ -1070,6 +1090,16 @@
         }
       }
     },
+    "Accurate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精准"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1115,7 +1145,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "高级参数"
+            "value" : "高级"
           }
         }
       }
@@ -1196,6 +1226,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "连图片区域里的文字也读出来；关闭时图片只作为插图保留"
+          }
+        }
+      }
+    },
+    "Also reads the words in photos and diagrams. When off, images are kept as pictures" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时识别照片和示意图里的文字。关闭时，图片只作为插图保留"
           }
         }
       }
@@ -1356,6 +1396,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回到工作台"
+          }
+        }
+      }
+    },
+    "Balanced" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "均衡"
           }
         }
       }
@@ -1650,6 +1700,16 @@
         }
       }
     },
+    "Charts as data tables" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图表转为数据表"
+          }
+        }
+      }
+    },
     "Check Now…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1690,12 +1750,32 @@
         }
       }
     },
+    "Checks each line for upside-down text and flips it, at almost no cost" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "逐行检查倒置的文字并翻正，几乎不影响速度"
+          }
+        }
+      }
+    },
     "Checks each line for upside-down text and flips it, with almost no speed cost" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "逐行判断是否倒置并翻转，几乎不影响速度"
+          }
+        }
+      }
+    },
+    "Chinese, English, Japanese and 47 more (built in)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中文、英文、日文等 50 种（内置）"
           }
         }
       }
@@ -2416,6 +2496,16 @@
         }
       }
     },
+    "Custom: the engine or its parameters were changed under Advanced (%@). Pick a mode above to go back to a preset." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义：已在「高级」中调整了引擎或参数（%@）。选择上面的任一模式即可恢复预设。"
+          }
+        }
+      }
+    },
     "Cyrillic" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2476,6 +2566,26 @@
         }
       }
     },
+    "Deselect All" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消全选"
+          }
+        }
+      }
+    },
+    "Deselect all files (Esc or ⇧⌘A)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消选择所有文件（Esc 或 ⇧⌘A）"
+          }
+        }
+      }
+    },
     "Detection model output shape %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2492,6 +2602,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检测分辨率"
+          }
+        }
+      }
+    },
+    "Detects pages rotated 90°, 180° or 270° and turns them before reading. Recommended" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别旋转了 90°、180° 或 270° 的页面，先转正再识别。建议开启"
           }
         }
       }
@@ -2606,6 +2726,16 @@
         }
       }
     },
+    "Download Other Languages" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载其他语言"
+          }
+        }
+      }
+    },
     "Download PaddleOCR-VL Model" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2632,6 +2762,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要先在设置中下载 PaddleOCR-VL 模型"
+          }
+        }
+      }
+    },
+    "Download to get the most out of this mode" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载以下模型，充分发挥此模式的效果"
           }
         }
       }
@@ -3048,6 +3188,16 @@
         }
       }
     },
+    "Fast" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速"
+          }
+        }
+      }
+    },
     "Fast mode often garbles Chinese, Korean, decorative fonts and curved pages. If results look wrong, switch to Accurate before changing other settings." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3064,6 +3214,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "速度快，适合批量快速处理"
+          }
+        }
+      }
+    },
+    "Faster" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更快"
           }
         }
       }
@@ -3128,6 +3288,26 @@
         }
       }
     },
+    "Find in Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在文件中查找"
+          }
+        }
+      }
+    },
+    "Finds columns, headings, tables and figures and the order to read them in. Without it, pages are read by column estimate only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找出分栏、标题、表格与图片，并确定阅读顺序。未安装时，只能按分栏估计顺序"
+          }
+        }
+      }
+    },
     "Fit to Window" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3144,6 +3324,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "适合窗口（⌘0）"
+          }
+        }
+      }
+    },
+    "Fix upside-down lines" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纠正倒置的文字行"
+          }
+        }
+      }
+    },
+    "Flatten curved or photographed pages" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展平弯曲或拍摄的页面"
           }
         }
       }
@@ -3268,6 +3468,16 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
+    },
     "German" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3348,6 +3558,16 @@
         }
       }
     },
+    "Headers, Footers & Page Numbers" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页眉、页脚与页码"
+          }
+        }
+      }
+    },
     "Headers, footers, page numbers and the like are detected by the layout model and filtered out by default. Turn an item on to keep it in the results. Matches PaddleOCR's official auxiliary content options." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3364,6 +3584,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "段落标题级别识别"
+          }
+        }
+      }
+    },
+    "Heading levels" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题层级"
           }
         }
       }
@@ -3648,6 +3878,16 @@
         }
       }
     },
+    "Language" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言"
+          }
+        }
+      }
+    },
     "Languages not installed" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3698,6 +3938,16 @@
         }
       }
     },
+    "Left-out regions are still recognized, and show on the page as “Not in result” under the pointer. Changes apply straight away without recognizing again — except for multi-page PDFs, whose text is put together page by page during recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未纳入的区域仍会识别，鼠标移到页面上时会标出「未纳入结果」。修改立即生效，无需重新识别——多页 PDF 除外，它的文字是在识别时逐页拼合的。"
+          }
+        }
+      }
+    },
     "Light" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3724,6 +3974,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "换行处理"
+          }
+        }
+      }
+    },
+    "Line flip threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字行翻转阈值"
           }
         }
       }
@@ -3894,6 +4154,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型来自 Hugging Face。除 PaddleOCR-VL 的 Q4 量化档为社区上传外，其余均为 PaddlePaddle 官方仓库。若连接不畅可切换镜像源。"
+          }
+        }
+      }
+    },
+    "More accurate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更准"
           }
         }
       }
@@ -4258,12 +4528,32 @@
         }
       }
     },
+    "Once downloaded, choose the language in the menu above. Text detection is still done by PP-OCRv6." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载后在上面的菜单中选择该语言。文字检测仍由 PP-OCRv6 完成。"
+          }
+        }
+      }
+    },
     "Only affects how the Markdown tab displays; the Source tab always shows the model's raw output. Other engines produce plain text and are not affected." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅影响「Markdown」标签页的显示方式；「源码」标签页始终是模型输出的原文。其它引擎只有纯文本，不受这里影响。"
+          }
+        }
+      }
+    },
+    "Only affects results recognized from now on; existing ones are not changed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只影响之后识别的结果，已有结果不变。"
           }
         }
       }
@@ -4384,6 +4674,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他语种识别器"
+          }
+        }
+      }
+    },
+    "Outlining only the region under the pointer. Click to show every recognized region" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只框出鼠标所指的区域。点按以显示所有识别区域"
           }
         }
       }
@@ -4554,6 +4854,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PP-OCRv6 模型，单模型覆盖 50 种语言，输出逐行文本框与置信度"
+          }
+        }
+      }
+    },
+    "PP-OCRv6 reads every page on its own. Fastest, but tables, formulas, charts and seals come out as plain text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只用 PP-OCRv6 识别。速度最快，但表格、公式、图表和印章只输出为普通文字"
           }
         }
       }
@@ -4808,6 +5118,16 @@
         }
       }
     },
+    "Page Handling" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面处理"
+          }
+        }
+      }
+    },
     "Page break" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4894,6 +5214,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "待处理"
+          }
+        }
+      }
+    },
+    "Performance" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能"
           }
         }
       }
@@ -5186,6 +5516,16 @@
         }
       }
     },
+    "Recognition Mode" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别模式"
+          }
+        }
+      }
+    },
     "Recognition Modules" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5216,12 +5556,32 @@
         }
       }
     },
+    "Recognition is running. Changes here only affect files started afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别。这里的修改只影响之后开始的文件。"
+          }
+        }
+      }
+    },
     "Recognition is running. Engine and model changes only affect files started afterwards." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在识别中，更改引擎或模型设置只会影响之后开始的文件。"
+          }
+        }
+      }
+    },
+    "Recognition language" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别语言"
           }
         }
       }
@@ -5262,6 +5622,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "识别在中途停止，已读 %lld/%lld 页。继续识别只读剩下的页。"
+          }
+        }
+      }
+    },
+    "Recognize" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始识别"
+          }
+        }
+      }
+    },
+    "Recognize %lld Files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别 %lld 个文件"
           }
         }
       }
@@ -5322,6 +5702,16 @@
         }
       }
     },
+    "Recognize After the Current Run" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前任务结束后识别"
+          }
+        }
+      }
+    },
     "Recognize Again" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5368,6 +5758,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新识别这一页，其他页不变"
+          }
+        }
+      }
+    },
+    "Recognize with PaddleOCR-VL Only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只用 PaddleOCR-VL 识别"
           }
         }
       }
@@ -5518,6 +5918,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "区域外扩系数"
+          }
+        }
+      }
+    },
+    "Regions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区域"
           }
         }
       }
@@ -6136,6 +6546,16 @@
         }
       }
     },
+    "Seals and stamps" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "印章"
+          }
+        }
+      }
+    },
     "Search names and text" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6202,6 +6622,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置会自动保存并在下次启动时沿用；这里可以把全部三个标签页恢复到初始状态。"
+          }
+        }
+      }
+    },
+    "Settings are saved automatically and kept for the next launch. This restores every tab to its initial state." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置会自动保存，下次启动仍然有效。此操作会把所有标签页恢复为初始状态。"
           }
         }
       }
@@ -6356,6 +6786,16 @@
         }
       }
     },
+    "Showing every recognized region. Click to outline only the one under the pointer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在显示所有识别区域。点按后只框出鼠标所指的区域"
+          }
+        }
+      }
+    },
     "Showing only “%@”. Click to change" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6426,12 +6866,42 @@
         }
       }
     },
+    "Smart Layering Components" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能分层组件"
+          }
+        }
+      }
+    },
+    "Smart Layering with the largest installed models, higher detection resolution and more regions read twice. The best results, and the slowest" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能分层，使用已安装的最大模型、更高的检测分辨率，并让更多区域复读一遍。效果最好，速度最慢"
+          }
+        }
+      }
+    },
     "Smart Layering, the default engine, uses a layout model to find tables, formulas and columns, and PaddleOCR-VL to read them. Without these, every page is read as plain lines of text." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认的“智能分层”引擎先用版面模型找出表格、公式和分栏，再交给 PaddleOCR-VL 识别。没有这两个模型时，每一页都只会按普通文字行识别。"
+          }
+        }
+      }
+    },
+    "Smart Layering: body text with PP-OCRv6, tables, formulas and doubtful regions with PaddleOCR-VL, native PDF text taken as is. Good results at a good speed (recommended)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能分层：正文用 PP-OCRv6，表格、公式和没把握的区域交给 PaddleOCR-VL，PDF 原生文字直接提取。效果与速度兼顾（推荐）"
           }
         }
       }
@@ -6566,6 +7036,16 @@
         }
       }
     },
+    "Straightens skewed, curled or folded pages, such as a phone photo of a book. Scans don't need it, and it takes extra time" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把歪斜、卷曲或折叠的页面拉平，例如用手机拍的书页。扫描件不需要，开启会多花时间"
+          }
+        }
+      }
+    },
     "Switching tiers resets the detection thresholds to that tier's official defaults." : {
       "localizations" : {
         "zh-Hans" : {
@@ -6616,6 +7096,16 @@
         }
       }
     },
+    "Tables and formulas are always read. Regions of a switched-off kind are still shown on the page; they just aren't read." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表格和公式始终会识别。关闭的类型仍会在页面上标出，只是不读取其中文字。"
+          }
+        }
+      }
+    },
     "Tables, formulas, charts, seals and low-confidence regions. Without it, these are only flagged for review" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6632,6 +7122,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "泰米尔语"
+          }
+        }
+      }
+    },
+    "Tells headings apart by size (##, ###, ####). When off, all subheadings are one level" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按字号区分标题层级（##、###、####）。关闭时所有小标题同一级"
           }
         }
       }
@@ -6676,6 +7176,16 @@
         }
       }
     },
+    "Text Cleanup" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本整理"
+          }
+        }
+      }
+    },
     "Text Detection & Recognition" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6712,6 +7222,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图片文字识别"
+          }
+        }
+      }
+    },
+    "Text inside images" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片中的文字"
           }
         }
       }
@@ -6822,6 +7342,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "内置的 PP-OCRv6 模型可离线识别简繁中文、英文、日文等 50 种语言。"
+          }
+        }
+      }
+    },
+    "The built-in model reads Simplified and Traditional Chinese, English, Japanese and 46 Latin-script languages. Korean, Russian, Arabic, Thai, Greek and Devanagari need a model of their own." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置模型可识别简繁中文、英文、日文和 46 种拉丁字母语言。韩文、俄文、阿拉伯文、泰文、希腊文和天城文需要单独下载模型。"
           }
         }
       }
@@ -7092,6 +7622,16 @@
         }
       }
     },
+    "These are the engine and model settings behind the recognition modes. Changing them shows the mode as Custom; picking a mode again resets them." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这里是各识别模式背后的引擎与模型设置。修改后识别模式会显示为「自定义」；重新选择一个模式会恢复对应设置。"
+          }
+        }
+      }
+    },
     "These match PaddleOCR's three official sampling parameters, with the same defaults (1.00 / 0.00 / 1.0)." : {
       "localizations" : {
         "zh-Hans" : {
@@ -7112,12 +7652,32 @@
         }
       }
     },
+    "This file hasn't been recognized yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个文件还没有识别"
+          }
+        }
+      }
+    },
     "This image may not contain any recognizable text" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "该图片可能不含可识别的文字内容"
+          }
+        }
+      }
+    },
+    "This mode reads text only. Choose Balanced or Accurate to also read tables, formulas, charts and seals." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此模式只识别文字。选择「均衡」或「精准」可同时识别表格、公式、图表和印章。"
           }
         }
       }
@@ -7428,12 +7988,32 @@
         }
       }
     },
+    "Turn sideways and upside-down pages upright" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动转正横放或倒置的页面"
+          }
+        }
+      }
+    },
     "Turns a chart back into a table" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "把图表内容还原成表格"
+          }
+        }
+      }
+    },
+    "Turns bar and line charts into tables. The numbers are the model's estimates, since a chart only draws them" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把柱状图、折线图转成表格。图表只画出了数值，表中数字是模型的估计"
           }
         }
       }
@@ -7678,6 +8258,26 @@
         }
       }
     },
+    "What frames a page rather than being part of it. Ticked items go into the results; the rest are left out. Footnotes are kept by default." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面四周的辅助内容，而不是正文。勾选的会放进结果，其余不放。脚注默认保留。"
+          }
+        }
+      }
+    },
+    "What to Recognize" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别内容"
+          }
+        }
+      }
+    },
     "When a PDF already has a text layer" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7774,6 +8374,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "整页提示词"
+          }
+        }
+      }
+    },
+    "With “Fix upside-down lines” on, lines below this confidence are not flipped. Model output clusters around 0.27 / 0.73" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启「纠正倒置的文字行」时，置信度低于此值的行不翻转。模型输出集中在 0.27 / 0.73 附近"
           }
         }
       }

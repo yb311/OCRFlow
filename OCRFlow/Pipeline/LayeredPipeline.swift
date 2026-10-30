@@ -140,7 +140,13 @@ struct LayeredPipeline {
                                     regions: layout.map(\.rect), policy: config.pdfText)
         guard native.texts.count == layout.count else { return nil }
 
-        var blocks = layout
+        // Text the layout model put in no region — a footnote under a column,
+        // a note in the margin — never reached the result before: the regions
+        // were the only places text was taken from.
+        let filled = Self.addingStrayText(pdf.textLines(page: pageIndex, rendering: rendered),
+                                          to: layout, texts: native.texts)
+        var blocks = filled.blocks
+        let texts = filled.texts
         var regions: [RegionReader.Region] = []
         var unread: [Int] = []
         for index in blocks.indices {
@@ -150,10 +156,10 @@ struct LayeredPipeline {
                !vlConfig.useImageTextRecognition {
                 continue
             }
-            blocks[index].text = native.texts[index]
+            blocks[index].text = texts[index]
             blocks[index].source = .pdfTextLayer
             if let task = structuralTask(for: blocks[index].label), vl != nil {
-                regions.append(.init(block: index, task: task, fallback: native.texts[index],
+                regions.append(.init(block: index, task: task, fallback: texts[index],
                                      isEscalation: false))
             } else if let formulas = blocks[index].inlineFormulas, formulas > 0, vl != nil {
                 // A text layer has the glyphs of a formula, not its structure —
@@ -161,9 +167,9 @@ struct LayeredPipeline {
                 // an arrow. The VLM writes it as LaTeX; the PDF's text stays as
                 // the fallback and the yardstick.
                 blocks[index].routing = .pdfInlineFormulas(formulas)
-                regions.append(.init(block: index, task: .ocr, fallback: native.texts[index],
+                regions.append(.init(block: index, task: .ocr, fallback: texts[index],
                                      isEscalation: true))
-            } else if blocks[index].label.vlTask != nil, native.texts[index].isEmpty,
+            } else if blocks[index].label.vlTask != nil, texts[index].isEmpty,
                       !blocks[index].label.isPageFurniture {
                 // A text region the text layer has nothing for: text set as a
                 // picture, most likely. It is read from the pixels instead.
@@ -200,6 +206,78 @@ struct LayeredPipeline {
                               notes: [.info(.pdfNativeBody)])
         try readRegions(regions, of: image, into: &page, progress: progress, isCancelled: isCancelled)
         return page
+    }
+
+    // MARK: - Text outside every region
+
+    /// Gives the text-layer lines no region covers regions of their own,
+    /// placed in the reading order after the region they sit under.
+    ///
+    /// Lines that follow one another down the page become one region. A line
+    /// set on its side — the arXiv stamp down a paper's margin — becomes a
+    /// side note, which is left out of the document unless kept, like the
+    /// side notes the layout model finds itself.
+    static func addingStrayText(_ lines: [PDFTextLine], to blocks: [PPLayoutBlock],
+                                texts: [String]) -> (blocks: [PPLayoutBlock], texts: [String]) {
+        let stray = lines.filter { line in
+            let area = line.rect.width * line.rect.height
+            guard area > 0, line.text.contains(where: { $0.isLetter || $0.isNumber }) else { return false }
+            // Summed over every region, so a line PDFKit runs across two
+            // columns counts as covered by the pair of them.
+            let covered = blocks.reduce(CGFloat(0)) { sum, block in
+                let overlap = block.rect.intersection(line.rect)
+                return overlap.isNull ? sum : sum + overlap.width * overlap.height
+            }
+            return covered < area * 0.5
+        }
+        guard !stray.isEmpty else { return (blocks, texts) }
+
+        // Runs of lines, top to bottom, that share a column and leave no more
+        // than about a line's gap between them.
+        var groups: [[PDFTextLine]] = []
+        for line in stray.sorted(by: { $0.rect.minY < $1.rect.minY }) {
+            let vertical = line.rect.height > line.rect.width * 2
+            if !vertical, let index = groups.lastIndex(where: { group in
+                guard let last = group.last, last.rect.height <= last.rect.width * 2 else { return false }
+                let gap = line.rect.minY - last.rect.maxY
+                let sharesColumn = min(line.rect.maxX, last.rect.maxX) - max(line.rect.minX, last.rect.minX) > 0
+                return sharesColumn && gap < max(line.rect.height, last.rect.height) * 1.2
+            }) {
+                groups[index].append(line)
+            } else {
+                groups.append([line])
+            }
+        }
+
+        var blocks = blocks, texts = texts
+        for group in groups {
+            let rect = group.dropFirst().reduce(group[0].rect) { $0.union($1.rect) }
+            let vertical = group.count == 1 && rect.height > rect.width * 2
+            var block = PPLayoutBlock(rect: rect, label: vertical ? .asideText : .text, score: 0)
+            block.text = group.map(\.text).joined(separator: "\n")
+            block.source = .pdfTextLayer
+            // After the last region above it in the same column, else after
+            // the nearest one.
+            let above = blocks.indices.filter { index in
+                let other = blocks[index].rect
+                return other.minY <= rect.minY
+                    && min(other.maxX, rect.maxX) - max(other.minX, rect.minX) > 0
+            }
+            let anchor = above.max() ?? blocks.indices.min { a, b in
+                squaredDistance(blocks[a].rect, rect) < squaredDistance(blocks[b].rect, rect)
+            }
+            let position = anchor.map { $0 + 1 } ?? blocks.count
+            blocks.insert(block, at: position)
+            texts.insert(block.text, at: position)
+        }
+        for index in blocks.indices { blocks[index].readingOrder = index }
+        return (blocks, texts)
+    }
+
+    private static func squaredDistance(_ a: CGRect, _ b: CGRect) -> CGFloat {
+        let dx = max(0, max(b.minX - a.maxX, a.minX - b.maxX))
+        let dy = max(0, max(b.minY - a.maxY, a.minY - b.maxY))
+        return dx * dx + dy * dy
     }
 
     // MARK: - Routing
@@ -350,10 +428,33 @@ enum RegionReader {
                 }
             }
         }
+        // A greedy decode that fell into a loop stops there, losing the rest
+        // of the region — a table cut off after its first row. Read once more
+        // with a mild penalty on what was already written, the remedy the
+        // reference pipeline suggests, and keep it if it got through.
+        let looped = results.indices.filter { index in
+            if case let .success(output) = results[index] { return output.ending == .repetition }
+            return false
+        }
+        if !looped.isEmpty, !isCancelled() {
+            var retries = looped.map { requests[$0] }
+            for index in retries.indices {
+                retries[index].repetitionPenalty = max(config.repetitionPenalty, Self.loopRetryPenalty)
+                retries[index].maxTokens = retryLimit
+            }
+            let second = vl.recognize(retries, isCancelled: isCancelled) { _, _ in }
+            for (index, result) in zip(looped, second) {
+                guard case let .success(output) = result, output.ending != .cancelled,
+                      case let .success(first) = results[index] else { continue }
+                if output.ending == .finished || output.text.count > first.text.count {
+                    results[index] = result
+                }
+            }
+        }
         progress?(1)
 
         for (index, region) in regions.enumerated() {
-            let limit = truncated.contains(index) ? retryLimit : config.maxOutputTokens
+            let limit = truncated.contains(index) || looped.contains(index) ? retryLimit : config.maxOutputTokens
             apply(results[index], for: region, to: &blocks[region.block], limit: limit)
         }
     }
@@ -361,6 +462,10 @@ enum RegionReader {
     /// How many times the configured budget a truncated region gets on its
     /// second reading.
     static let retryBudgetFactor = 4
+
+    /// The repetition penalty a looping region is read again with: inside the
+    /// 1.05–1.15 that breaks a loop without bending the transcription.
+    static let loopRetryPenalty = 1.1
 
     private static func apply(_ result: Result<VLOutput, Error>, for region: Region,
                               to block: inout PPLayoutBlock, limit: Int) {

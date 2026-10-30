@@ -54,6 +54,9 @@ struct DetailView: View {
             Button("Remove Selected Files", role: .destructive) { vm.removeSelectedItems() }
                 .buttonStyle(.bordered)
                 .foregroundStyle(.red)
+            Button("Deselect All") { vm.selectedIDs = [] }
+                .buttonStyle(.link)
+                .help("Deselect all files (Esc or ⇧⌘A)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $translating) {
@@ -274,8 +277,8 @@ struct ItemDetailView: View {
                 .buttonStyle(.borderless)
                 .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
                 .help(vm.showTextBoxes
-                      ? "Show all boxes (turn off to show only the block under the pointer)"
-                      : "Show only the block under the pointer (turn on to see all boxes at once)")
+                      ? "Showing every recognized region. Click to outline only the one under the pointer"
+                      : "Outlining only the region under the pointer. Click to show every recognized region")
 
                 // The auxiliary regions this page actually has, each one
                 // switchable from here: the decision is about what is on
@@ -801,14 +804,28 @@ struct ItemDetailView: View {
     private var textContent: some View {
         switch item.status {
         case .pending:
-            statusPlaceholder(
-                icon: "circle.dashed",
-                title: String(localized: "Waiting for Recognition"),
-                subtitle: item.resume.map {
-                    String(localized: "\($0.read) of \($0.total) pages read last time. Click Start Recognition to read only the remaining pages")
-                } ?? String(localized: "Click Start Recognition in the toolbar to process this file"),
-                color: .secondary
-            )
+            VStack(spacing: 14) {
+                statusPlaceholder(
+                    icon: "circle.dashed",
+                    title: String(localized: "Waiting for Recognition"),
+                    subtitle: item.resume.map {
+                        String(localized: "\($0.read) of \($0.total) pages read last time. Recognizing reads only the remaining pages")
+                    } ?? String(localized: "This file hasn't been recognized yet"),
+                    color: .secondary
+                )
+                .fixedSize(horizontal: false, vertical: true)
+                // The button is where the question is, not only in the
+                // toolbar's corner.
+                Button {
+                    vm.recognize(ids: [item.id])
+                } label: {
+                    Label(vm.isProcessing ? "Recognize After the Current Run" : "Recognize",
+                          systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .processing:
             VStack(spacing: 20) {
@@ -1313,7 +1330,9 @@ struct LayoutBlockOverlay: View {
                         // needs a look, grey for one left out of the document;
                         // being pointed at makes it heavier, not a different
                         // colour. The chip already says what the region is.
-                        let tint = isDropped ? Color.secondary : Self.color(for: block)
+                        // A fixed grey, not `.secondary`: the page is white
+                        // in dark mode too, and the light grey vanished on it.
+                        let tint = isDropped ? Color(white: 0.45) : Self.color(for: block)
                         let path = Path(roundedRect: rect, cornerRadius: 2)
 
                         // A region waiting for review has to be found at a
@@ -1329,8 +1348,13 @@ struct LayoutBlockOverlay: View {
                                                               : isHovered ? 1.4 : 0.75,
                                                           dash: isDropped ? [3, 2.5] : []))
 
+                        // A left-out region says so: a faint box with text in
+                        // it that never shows up in the result otherwise reads
+                        // as text the app failed to recognize.
                         let caption = isFlagged
                             ? String(localized: "\(block.readingOrder + 1) · Needs review")
+                            : isDropped && (lit || !showsAll)
+                            ? String(localized: "\(block.label.label) · Not in result")
                             : lit || !showsAll
                                 ? "\(block.readingOrder + 1) \(block.label.label)"
                                 : "\(block.readingOrder + 1)"
@@ -1345,10 +1369,10 @@ struct LayoutBlockOverlay: View {
                         let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
                                                                              height: size.height + 4),
                                                       avoiding: placed, within: fitted,
-                                                      outsideFirst: isFlagged)
+                                                      outsideFirst: isFlagged || isDropped)
                         placed.append(chip)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),
-                                     with: .color(tint.opacity(isDropped && !lit ? 0.5 : 1)))
+                                     with: .color(tint.opacity(isDropped && !lit && showsAll ? 0.6 : 1)))
                         context.draw(badge, at: CGPoint(x: chip.midX, y: chip.midY), anchor: .center)
                     }
                 }

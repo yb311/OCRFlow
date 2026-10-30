@@ -55,14 +55,17 @@ enum SearchablePDFWriter {
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index), let source = page.pageRef else { continue }
             let box = page.bounds(for: .cropBox)
-            let quarterTurns = ((page.rotation % 360) + 360) % 360 / 90
+            // Turned the way it was read, so the text layer lands on its words.
+            let upright = PDFSource.uprightRotation(of: page)
+            let quarterTurns = upright / 90
             let size = quarterTurns % 2 == 0 ? box.size : CGSize(width: box.height, height: box.width)
             var media = CGRect(origin: .zero, size: size)
+            let extraTurn = ((upright - page.rotation) % 360 + 360) % 360
 
             context.beginPage(mediaBox: &media)
             context.saveGState()
             context.clip(to: media)
-            context.concatenate(source.getDrawingTransform(.cropBox, rect: media, rotate: 0,
+            context.concatenate(source.getDrawingTransform(.cropBox, rect: media, rotate: Int32(extraTurn),
                                                            preserveAspectRatio: true))
             context.drawPDFPage(source)
             context.restoreGState()

@@ -151,6 +151,17 @@ struct OCRFlowApp: App {
                 }
             }
 
+            CommandGroup(after: .textEditing) {
+                Button("Find in Files") {
+                    viewModel.mode = .workspace
+                    viewModel.searchFocusRequest += 1
+                }
+                .keyboardShortcut("f", modifiers: .command)
+                Button("Deselect All") { viewModel.selectedIDs = [] }
+                    .keyboardShortcut("a", modifiers: [.command, .shift])
+                    .disabled(viewModel.selectedIDs.isEmpty)
+            }
+
             CommandGroup(before: .sidebar) {
                 Button("Workspace") { viewModel.mode = .workspace }
                     .keyboardShortcut("1", modifiers: .command)

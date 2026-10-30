@@ -9,7 +9,8 @@ import SwiftUI
 /// what is about to be captured is not disturbed.
 @MainActor
 final class FloatingCaptureButton {
-    static let diameter: CGFloat = 32
+    /// Big enough to hit without aiming; 32 was easy to miss.
+    static let diameter: CGFloat = 48
     /// Room around the circle for its shadow and for growing under the pointer.
     static let padding: CGFloat = 8
     static var side: CGFloat { diameter + padding * 2 }
@@ -322,13 +323,13 @@ private struct FloatingButtonFace: View {
             Circle()
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
             Image(systemName: "text.viewfinder")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
             if let progress = state.progress {
                 Circle()
-                    .inset(by: 1.25)
+                    .inset(by: 1.5)
                     .trim(from: 0, to: max(progress, 0.03))
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.easeOut(duration: 0.3), value: progress)
             }
@@ -336,7 +337,7 @@ private struct FloatingButtonFace: View {
         .frame(width: FloatingCaptureButton.diameter, height: FloatingCaptureButton.diameter)
         .scaleEffect(state.pressed ? 0.9 : lifted ? 1.1 : 1)
         // Faded while it waits, but never while it is showing progress.
-        .opacity(state.resting && state.progress == nil ? 0.5 : 1)
+        .opacity(state.resting && state.progress == nil ? 0.7 : 1)
         .animation(.snappy(duration: 0.18), value: state.pressed)
         .animation(.snappy(duration: 0.18), value: lifted)
         .animation(.easeInOut(duration: 0.4), value: state.resting)

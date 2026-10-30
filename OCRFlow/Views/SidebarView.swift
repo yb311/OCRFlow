@@ -47,6 +47,16 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var vm = vm
         VStack(spacing: 0) {
+            // A field above the list rather than `.searchable`: the sidebar
+            // placement lays the field over the list's top edge, and rows
+            // scrolled up slid underneath it.
+            if !vm.items.isEmpty {
+                SidebarSearchField(text: $vm.searchQuery, focusRequest: vm.searchFocusRequest,
+                                   prompt: String(localized: "Search names and text"))
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 6)
+            }
             // List or empty state
             if vm.items.isEmpty {
                 emptyState
@@ -63,6 +73,15 @@ struct SidebarView: View {
                             let allFailed    = targetItems.allSatisfy { $0.status == .failed }
                             let count = targetIDs.count
 
+                            // Files not read yet are read from here too, not
+                            // only from the toolbar's 开始识别.
+                            let unread = targetItems.filter { $0.status == .pending }
+                            if !unread.isEmpty {
+                                Button(unread.count > 1 ? String(localized: "Recognize \(unread.count) Files")
+                                                        : String(localized: "Recognize")) {
+                                    vm.recognize(ids: Set(unread.map(\.id)))
+                                }
+                            }
                             // Anything that has finished can be run again —
                             // re-reading a page with different settings was
                             // previously only reachable by removing and
@@ -89,8 +108,11 @@ struct SidebarView: View {
                                 }
                             }
                             if count == 1, vm.canReadWithVL(item) {
-                                Button("Recognize This File Again with PaddleOCR-VL") { vm.readWithVL(id: item.id) }
-                                    .disabled(vm.isProcessing)
+                                Button(item.status == .pending ? "Recognize with PaddleOCR-VL Only"
+                                                               : "Recognize This File Again with PaddleOCR-VL") {
+                                    vm.readWithVL(id: item.id)
+                                }
+                                .disabled(vm.isProcessing)
                             }
                             if allExportable {
                                 Button(count > 1 ? "Copy All Text" : "Copy Text") {
@@ -118,6 +140,9 @@ struct SidebarView: View {
                 }
                 .listStyle(.sidebar)
                 .onDeleteCommand { vm.removeSelectedItems() }
+                // Esc lets go of the selection — after ⌘A there was no way
+                // back short of clicking a single file.
+                .onExitCommand { vm.selectedIDs = [] }
                 // Shown over the list rather than in its place: the search
                 // field lives on the list, and swapping the list out the
                 // moment nothing matched took the field away mid-word.
@@ -129,7 +154,6 @@ struct SidebarView: View {
             Divider()
             bottomToolbar
         }
-        .searchable(text: $vm.searchQuery, placement: .sidebar, prompt: "Search names and text")
         .onChange(of: filter) {
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
@@ -401,8 +425,8 @@ struct SidebarRowView: View {
         String(localized: "\(resume.read)/\(resume.total) pages read; can resume")
     }
 
-    /// On hover, failed/completed rows swap their status badge for the
-    /// single most useful action, so retry/copy don't require a right-click.
+    /// On hover, a failed or stopped row swaps its status badge for retry,
+    /// so running it again doesn't require a right-click.
     @ViewBuilder
     private var trailingControl: some View {
         if isHovering, item.status == .failed || item.status == .cancelled {
@@ -420,17 +444,11 @@ struct SidebarRowView: View {
             }
             .buttonStyle(.plain)
             .help(item.resume != nil ? "Resume" : item.status == .cancelled ? "Recognize Again" : "Retry")
-        } else if isHovering, item.status == .completed, !item.ocrText.isEmpty {
-            Button {
-                vm.copyText(for: item.id)
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Copy Text")
         } else {
+            // A finished file keeps its badge under the pointer: the count of
+            // things to review is the button that opens them, and swapping it
+            // for a copy icon made it copy instead. Copying is in the result
+            // pane and the context menu.
             statusBadge
         }
     }
@@ -525,3 +543,47 @@ struct ProcessingRingView: View {
     }
 }
 
+
+/// The system search field, sitting above the list instead of over it.
+struct SidebarSearchField: NSViewRepresentable {
+    @Binding var text: String
+    /// Bumped to put the cursor in the field (⌘F).
+    var focusRequest: Int
+    var prompt: String
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = prompt
+        field.sendsSearchStringImmediately = true
+        field.delegate = context.coordinator
+        field.controlSize = .large
+        field.setAccessibilityLabel(prompt)
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        if field.stringValue != text { field.stringValue = text }
+        if context.coordinator.focusRequest != focusRequest {
+            context.coordinator.focusRequest = focusRequest
+            field.window?.makeFirstResponder(field)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, focusRequest: focusRequest) }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+        var focusRequest: Int
+
+        init(text: Binding<String>, focusRequest: Int) {
+            self.text = text
+            self.focusRequest = focusRequest
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            text.wrappedValue = field.stringValue
+        }
+    }
+}

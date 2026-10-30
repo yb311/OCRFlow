@@ -59,6 +59,74 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
     var usesVisionLanguages: Bool { self == .visionFast || self == .visionAccurate }
 }
 
+// MARK: - Quality presets
+
+/// How much time a page is worth — the one choice the settings lead with.
+///
+/// Each preset is a consistent set of the engine and model settings that sit
+/// under 高级: which engine, which model sizes, how hard detection looks and
+/// how readily a doubtful region is read a second time. Someone who only
+/// wants "faster" or "better" picks one; the individual knobs stay for anyone
+/// who wants them, and touching one shows the setup as 自定义.
+enum QualityPreset: String, CaseIterable, Identifiable {
+    case fast, balanced, accurate
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fast:     return String(localized: "Fast")
+        case .balanced: return String(localized: "Balanced")
+        case .accurate: return String(localized: "Accurate")
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .fast:
+            return String(localized: "PP-OCRv6 reads every page on its own. Fastest, but tables, formulas, charts and seals come out as plain text")
+        case .balanced:
+            return String(localized: "Smart Layering: body text with PP-OCRv6, tables, formulas and doubtful regions with PaddleOCR-VL, native PDF text taken as is. Good results at a good speed (recommended)")
+        case .accurate:
+            return String(localized: "Smart Layering with the largest installed models, higher detection resolution and more regions read twice. The best results, and the slowest")
+        }
+    }
+
+    /// Detection resolution: higher finds smaller print, at a cost.
+    var detectionSide: Int { self == .accurate ? 1280 : 960 }
+
+    /// PaddleOCR-VL's answer budget per region.
+    var vlOutputTokens: Int { self == .accurate ? 2048 : 1024 }
+
+    /// Below this average PP-OCRv6 confidence a region is read again.
+    var escalationConfidence: Double { self == .accurate ? 0.92 : 0.85 }
+
+    var engine: OCREngine { self == .fast ? .paddleOCR : .auto }
+
+    /// The biggest PP-OCRv6 tier this preset wants that is on disk.
+    var tier: PPModelTier {
+        self == .accurate && PPModelStore.isInstalled(.medium) ? .medium : .small
+    }
+
+    /// The PaddleOCR-VL weights this preset wants, of those on disk.
+    func vlVariant(current: VLModelVariant) -> VLModelVariant {
+        let wanted: VLModelVariant = self == .accurate ? .official : .quantized
+        if VLModelStore.isInstalled(wanted) { return wanted }
+        return VLModelVariant.allCases.first(where: VLModelStore.isInstalled) ?? current
+    }
+
+    /// Models that would make this preset better and are not installed yet.
+    var missingModels: [PPModelCatalog.Entry] {
+        var entries: [PPModelCatalog.Entry] = []
+        if self != .fast, !VLModelVariant.allCases.contains(where: VLModelStore.isInstalled) {
+            entries.append(PPModelCatalog.vlQuantized)
+        }
+        if !VLModelStore.isLayoutModelInstalled { entries.append(PPModelCatalog.layoutModel) }
+        if self == .accurate, !PPModelStore.isInstalled(.medium) { entries.append(PPModelCatalog.mediumTier) }
+        return entries.filter { !$0.isInstalled }
+    }
+}
+
 // MARK: - Persisted settings
 
 /// Everything the app remembers between launches.
@@ -71,7 +139,9 @@ struct OCRSettings: Codable, Equatable {
     var engine: OCREngine = .auto
     var recognitionLanguages: [String] = ["zh-Hans", "zh-Hant", "en-US"]
     var maxConcurrentTasks: Int = OCRViewModel.defaultConcurrency
-    var showTextBoxes = true
+    /// Off: the page shows as the page, and a region is outlined where the
+    /// pointer is. Every box at once is an analysis view, not a reading one.
+    var showTextBoxes = false
     var paddle: PPOCRConfig = .default
     var vl: VLConfig = .default
     var layered: LayeredConfig = .default
@@ -79,7 +149,8 @@ struct OCRSettings: Codable, Equatable {
     var removeEmptyLines = false
     var trimWhitespace = true
     var removeHyphenBreaks = false
-    var autoStartOnAdd = false
+    /// Dropping a file in is asking for it to be read.
+    var autoStartOnAdd = true
     var skipCompleted = true
     var exportSeparator: OCRViewModel.ExportSeparator = .emptyLine
     var exportIncludeFilename = true
@@ -91,8 +162,10 @@ struct OCRSettings: Codable, Equatable {
     var dropPageFurniture = true
     /// `rawName` of every auxiliary region kept in the document. Stored as
     /// strings so a label added to the model later cannot make the file
-    /// unreadable.
-    var keptAuxiliary: [String] = []
+    /// unreadable. Footnotes are kept: they are part of what a page says,
+    /// and text that is framed on the page but missing from the result reads
+    /// as a recognition failure.
+    var keptAuxiliary: [String] = [PPLayoutLabel.footnote.rawName]
     var useDocUnwarping = false
     var watchEnabled = false
     var watchFolderPath: String?
@@ -170,6 +243,8 @@ final class OCRViewModel {
     /// What the sidebar is searching for. The document pane reads it too, to
     /// open a file found by its contents at the place it says that.
     var searchQuery = ""
+    /// Bumped by 查找 (⌘F) to put the cursor in the sidebar's search field.
+    var searchFocusRequest = 0
     var isProcessing = false
     /// Set between pressing 停止 and the last in-flight image actually letting
     /// go. A run cannot be restarted in that window: the worker still holds the
@@ -209,7 +284,7 @@ final class OCRViewModel {
         }
     }
     /// Draw PaddleOCR's detected text boxes over the preview.
-    var showTextBoxes = true {
+    var showTextBoxes = OCRSettings().showTextBoxes {
         didSet { persistSettings() }
     }
 
@@ -480,6 +555,47 @@ final class OCRViewModel {
         paddleConfig.recognizer = recognizer
     }
 
+    /// The preset the current setup amounts to, or nil when it has been
+    /// tuned into something none of them is (自定义).
+    var qualityPreset: QualityPreset? {
+        QualityPreset.allCases.first(where: matches)
+    }
+
+    private func matches(_ preset: QualityPreset) -> Bool {
+        guard ocrEngine == preset.engine, paddleConfig.tier == preset.tier,
+              paddleConfig.detLimitSideLen == preset.detectionSide else { return false }
+        let tierDefaults = preset.tier.detectionDefaults
+        guard paddleConfig.detThresh == tierDefaults.thresh,
+              paddleConfig.detBoxThresh == tierDefaults.boxThresh,
+              paddleConfig.detUnclipRatio == tierDefaults.unclipRatio else { return false }
+        // PaddleOCR-VL and the routing only matter to the engine that uses them.
+        guard preset.engine == .auto else { return true }
+        return vlConfig.variant == preset.vlVariant(current: vlConfig.variant)
+            && vlConfig.maxOutputTokens == preset.vlOutputTokens
+            && layeredConfig.escalateLowConfidence
+            && layeredConfig.escalationConfidence == preset.escalationConfidence
+    }
+
+    /// Sets everything the preset stands for. What it does not stand for —
+    /// languages, the page-handling switches, which content to read, export —
+    /// is left as the user set it.
+    func applyPreset(_ preset: QualityPreset) {
+        ocrEngine = preset.engine
+        var paddle = paddleConfig
+        paddle.tier = preset.tier
+        paddle.applyDetectionDefaults()
+        paddle.detLimitSideLen = preset.detectionSide
+        paddleConfig = paddle
+        if preset.engine == .auto {
+            var vl = vlConfig
+            vl.variant = preset.vlVariant(current: vl.variant)
+            vl.maxOutputTokens = preset.vlOutputTokens
+            vlConfig = vl
+            layeredConfig.escalateLowConfidence = true
+            layeredConfig.escalationConfidence = preset.escalationConfidence
+        }
+    }
+
     /// Resets the tuning knobs but keeps the chosen models and backend, which
     /// is what "restore defaults" means next to a set of sliders.
     func resetPaddleTuning() {
@@ -504,7 +620,7 @@ final class OCRViewModel {
 
     // MARK: - Behavior settings
     /// 添加文件后自动开始识别
-    var autoStartOnAdd = false { didSet { persistSettings() } }
+    var autoStartOnAdd = OCRSettings().autoStartOnAdd { didSet { persistSettings() } }
     /// 重新处理时跳过已完成的文件
     var skipCompleted = true { didSet { persistSettings() } }
 
@@ -626,7 +742,7 @@ final class OCRViewModel {
     /// Which auxiliary regions stay in the document. Everything not in here is
     /// filtered out, which is how PaddleOCR's own 辅助内容解析 switches read:
     /// off means "the model found it and left it out".
-    var keptAuxiliary: Set<PPLayoutLabel> = [] {
+    var keptAuxiliary: Set<PPLayoutLabel> = Set(OCRSettings().keptAuxiliary.compactMap(PPLayoutLabel.init(rawName:))) {
         didSet {
             guard oldValue != keptAuxiliary else { return }
             persistSettings()
@@ -1105,8 +1221,10 @@ final class OCRViewModel {
         recalcProgress()
         store.saveQueue(items)
         loadThumbnails(for: uniqueNew.map(\.id))
+        // Only what was just added: a run started here used to pick up every
+        // pending file, and one already under way ignored the new ones.
         if autoStartOnAdd {
-            Task { @MainActor in self.startProcessing() }
+            recognize(ids: Set(uniqueNew.map(\.id)))
         }
     }
 
@@ -1143,8 +1261,10 @@ final class OCRViewModel {
     /// Where the last screenshot was taken, so the same place can be taken
     /// again — the next page of a document shown on screen, say.
     private(set) var lastCaptureTarget: CaptureTarget?
-    /// Screenshots taken while a run was busy, read once it ends.
-    @ObservationIgnored private var capturesWaiting = Set<UUID>()
+    /// Files asked to be read while a run was busy — screenshots, files
+    /// added with 「添加后自动识别」 on, 「开始识别」 from the list — read once
+    /// it ends.
+    @ObservationIgnored private var waitingForRun = Set<UUID>()
 
     /// Lets the user drag out a part of the screen or click a window, then
     /// reads it like any other file.
@@ -1242,11 +1362,7 @@ final class OCRViewModel {
         add([(url, nil)])
         guard let new = items.first(where: { !before.contains($0.id) }) else { return }
         selectedIDs = [new.id]
-        if isProcessing {
-            capturesWaiting.insert(new.id)
-        } else {
-            run(ids: [new.id], useCache: false)
-        }
+        recognize(ids: [new.id], useCache: false)
     }
 
     /// Asks the main window to show the file picker.
@@ -1365,14 +1481,14 @@ final class OCRViewModel {
             isProcessing = false
             isStopping = false
             runStartedAt = nil
-            // Files the watcher found, and screenshots taken, while this run
+            // Files the watcher found, and files asked for, while this run
             // was busy.
             let watched = watchBacklog ? watchedIDs : []
             watchBacklog = false
             let waiting = items.filter {
-                (watched.contains($0.id) || capturesWaiting.contains($0.id)) && $0.status == .pending
+                (watched.contains($0.id) || waitingForRun.contains($0.id)) && $0.status == .pending
             }.map(\.id)
-            capturesWaiting.removeAll()
+            waitingForRun.removeAll()
             run(ids: waiting, useCache: true)
         }
     }
@@ -1433,6 +1549,18 @@ final class OCRViewModel {
     /// Carries stopped documents on from the page they got to.
     func resumeItems(ids: Set<UUID>) {
         run(ids: items.filter { ids.contains($0.id) && isActionable($0) }.map(\.id), useCache: true)
+    }
+
+    /// Reads the given files now, or as soon as the run in progress ends.
+    /// Files already read are left alone; 「重新识别」 is for those.
+    func recognize(ids: Set<UUID>, useCache: Bool = true) {
+        let pending = items.filter { ids.contains($0.id) && $0.status == .pending }.map(\.id)
+        guard !pending.isEmpty else { return }
+        if isProcessing || isStopping {
+            waitingForRun.formUnion(pending)
+        } else {
+            run(ids: pending, useCache: useCache)
+        }
     }
 
     /// The engine a single file is being read with when it is not the one

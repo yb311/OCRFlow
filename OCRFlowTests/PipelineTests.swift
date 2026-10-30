@@ -38,6 +38,40 @@ final class PipelineTests {
         #expect(!PPDocumentAssembler.plainText(from: blocks, dropping: [.header]).contains("#"))
     }
 
+    @Test func pdfTextOutsideEveryRegionGetsItsOwn() {
+        let column = PPLayoutBlock(rect: CGRect(x: 0, y: 0, width: 300, height: 200),
+                                   label: .text, score: 0.9, readingOrder: 0)
+        let title = PPLayoutBlock(rect: CGRect(x: 400, y: 0, width: 300, height: 40),
+                                  label: .docTitle, score: 0.9, readingOrder: 1)
+        let lines = [
+            PDFTextLine(rect: CGRect(x: 10, y: 20, width: 200, height: 12), text: "covered"),
+            PDFTextLine(rect: CGRect(x: 0, y: 260, width: 280, height: 10), text: "*Equal contribution."),
+            PDFTextLine(rect: CGRect(x: 0, y: 272, width: 280, height: 10), text: "Permission to copy."),
+            PDFTextLine(rect: CGRect(x: 760, y: 0, width: 14, height: 400), text: "arXiv:1912.13318v5"),
+        ]
+        let filled = LayeredPipeline.addingStrayText(lines, to: [column, title], texts: ["covered", "Title"])
+        #expect(filled.blocks.count == 4)
+        #expect(filled.texts.count == 4)
+        // The footnote follows the column it sits under, before the title.
+        #expect(filled.blocks[1].text == "*Equal contribution.\nPermission to copy.")
+        #expect(filled.blocks[1].label == .text)
+        #expect(filled.blocks.contains { $0.label == .asideText && $0.text == "arXiv:1912.13318v5" })
+        #expect(filled.blocks.map(\.readingOrder) == [0, 1, 2, 3])
+    }
+
+    @Test func identicalTableCellsAreNotALoop() {
+        // `<fcel>0.9099` four times: a row of equal scores.
+        let cell: [Int32] = [7, 15, 3, 901, 9]
+        let row = Array(repeating: cell, count: 4).joined()
+        #expect(VLEngine.runawayRepeat(in: Array(row)) == nil)
+        // The same cell until the budget runs out is a loop.
+        let stuck = Array(Array(repeating: cell, count: 20).joined())
+        #expect(VLEngine.runawayRepeat(in: stuck)?.period == 5)
+        // One token over and over is caught too.
+        #expect(VLEngine.runawayRepeat(in: Array(repeating: 42, count: 64)) != nil)
+        #expect(VLEngine.runawayRepeat(in: Array(repeating: 42, count: 20)) == nil)
+    }
+
     // MARK: - Excel
 
     @Test func tableCellsKeepTheirSpans() throws {

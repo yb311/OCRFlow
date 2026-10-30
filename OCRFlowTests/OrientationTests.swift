@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import AppKit
+import PDFKit
 @testable import OCRFlow
 
 /// Runs the bundled PP-OCRv6 models on a real rendered page: no mocks.
@@ -74,5 +75,51 @@ struct OrientationTests {
             // A line of text on a page turned sideways runs down the image.
             #expect(line.boundingBox.height > line.boundingBox.width, "\(line.text)")
         }
+    }
+
+    // MARK: - PDF pages
+
+    /// A US Letter page of English text, drawn upright or turned a quarter so
+    /// that it runs up the page.
+    private func textPDF(sideways: Bool) throws -> PDFDocument {
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let consumer = try #require(CGDataConsumer(data: data))
+        let context = try #require(CGContext(consumer: consumer, mediaBox: &box, nil))
+        context.beginPDFPage(nil)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        if sideways {
+            context.translateBy(x: 560, y: 60)
+            context.rotate(by: .pi / 2)
+        }
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12)]
+        for row in 0..<12 {
+            ("Attention is all you need, line \(row + 1) of the abstract" as NSString)
+                .draw(at: NSPoint(x: sideways ? 0 : 60, y: sideways ? -CGFloat(row) * 18 : 700 - CGFloat(row) * 18),
+                      withAttributes: attributes)
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        context.endPDFPage()
+        context.closePDF()
+        return try #require(PDFDocument(data: data as Data))
+    }
+
+    @Test func uprightTextWinsOverAStatedQuarterTurn() throws {
+        let page = try #require(try textPDF(sideways: false).page(at: 0))
+        page.rotation = 90
+        #expect(PDFSource.uprightRotation(of: page) == 0)
+        let rendered = try #require(PDFSource.render(page, scale: 1))
+        #expect(rendered.image.height > rendered.image.width)
+        // The page is left as the document says it is.
+        #expect(page.rotation == 90)
+    }
+
+    @Test func sidewaysTextIsTurnedUpright() throws {
+        let page = try #require(try textPDF(sideways: true).page(at: 0))
+        #expect(page.rotation == 0)
+        #expect(PDFSource.uprightRotation(of: page) == 90)
+        let rendered = try #require(PDFSource.render(page, scale: 1))
+        #expect(rendered.image.width > rendered.image.height)
     }
 }

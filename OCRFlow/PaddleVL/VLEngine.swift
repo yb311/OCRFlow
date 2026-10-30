@@ -11,6 +11,9 @@ struct VLRequest {
     var task: VLTask
     /// Overrides `VLConfig.maxOutputTokens` for this one region.
     var maxTokens: Int?
+    /// Overrides `VLConfig.repetitionPenalty` for this one region — the way
+    /// out for a region whose greedy reading fell into a loop.
+    var repetitionPenalty: Double?
 }
 
 /// What the model read out of one region, and how it stopped.
@@ -226,6 +229,51 @@ final class VLEngine: @unchecked Sendable {
     }
 }
 
+// MARK: - Loops
+
+extension VLEngine {
+    /// Fewest tokens a loop has to fill before it counts as one.
+    ///
+    /// A stuck decoder repeats until its budget runs out, so waiting a few
+    /// dozen tokens costs little. Text repeats legitimately for less: a
+    /// table row of identical scores — `<fcel>0.9099` four times over — was
+    /// taken for a loop, and the table was cut off after its first row.
+    static let minimumLoopSpan = 64
+
+    /// Detects a degenerate loop at the tail: the last `period` tokens
+    /// repeated `repeats` times over.
+    ///
+    /// Short cycles have to repeat more often before they count, and every
+    /// loop has to fill `minimumLoopSpan` tokens: a handful of tokens
+    /// repeating is ordinary text, a stuck decoder goes on until stopped.
+    ///
+    /// A cycle made only of `ignoring` tokens never counts: in a sparse
+    /// table eight empty cells in a row are just eight empty cells, and
+    /// treating them as a loop cut real tables off mid-row.
+    static func runawayRepeat(in tokens: [llama_token],
+                              ignoring structural: Set<llama_token> = []) -> (period: Int, repeats: Int)? {
+        for period in 1...16 {
+            let floor = period >= 5 ? 4 : 8
+            let repeats = max(floor, (minimumLoopSpan + period - 1) / period)
+            guard tokens.count >= period * repeats else { continue }
+            if !structural.isEmpty, tokens.suffix(period).allSatisfy(structural.contains) { continue }
+            var isLoop = true
+            check: for pass in 1..<repeats {
+                for offset in 0..<period {
+                    let last = tokens[tokens.count - offset - 1]
+                    let earlier = tokens[tokens.count - offset - 1 - period * pass]
+                    if last != earlier {
+                        isLoop = false
+                        break check
+                    }
+                }
+            }
+            if isLoop { return (period, repeats) }
+        }
+        return nil
+    }
+}
+
 // MARK: - Scheduler
 
 extension VLEngine {
@@ -241,6 +289,8 @@ extension VLEngine {
         /// answer it is allowed to give.
         let need: Int
         let limit: Int
+        /// The sampling settings for this region.
+        let sampling: VLConfig
         let isCancelled: (() -> Bool)?
         let complete: (Result<VLOutput, Error>) -> Void
         /// The vision encoder's output for `imageChunk`, copied out of mtmd's
@@ -248,7 +298,7 @@ extension VLEngine {
         /// once the language model has read it.
         var embedding: [Float]?
 
-        init(chunks: OpaquePointer, need: Int, limit: Int,
+        init(chunks: OpaquePointer, need: Int, limit: Int, sampling: VLConfig,
              isCancelled: (() -> Bool)?, complete: @escaping (Result<VLOutput, Error>) -> Void) {
             self.chunks = chunks
             imageChunk = (0..<mtmd_input_chunks_size(chunks))
@@ -256,6 +306,7 @@ extension VLEngine {
                 .first { mtmd_input_chunk_get_type($0) == MTMD_INPUT_CHUNK_TYPE_IMAGE }
             self.need = need
             self.limit = limit
+            self.sampling = sampling
             self.isCancelled = isCancelled
             self.complete = complete
         }
@@ -424,7 +475,9 @@ extension VLEngine {
 
             let limit = max(1, request.maxTokens ?? config.maxOutputTokens)
             let input = Int(mtmd_helper_get_n_tokens(chunks))
-            return Job(chunks: chunks, need: input + limit, limit: limit,
+            var sampling = config
+            if let penalty = request.repetitionPenalty { sampling.repetitionPenalty = penalty }
+            return Job(chunks: chunks, need: input + limit, limit: limit, sampling: sampling,
                        isCancelled: isCancelled, complete: complete)
         }
 
@@ -622,7 +675,7 @@ extension VLEngine {
             guard let logits else { return .decodeFailed }
 
             let best = Self.sample(logits: logits, vocabSize: vocabSize,
-                                   produced: slot.tokens, config: config)
+                                   produced: slot.tokens, config: slot.job.sampling)
             if llama_vocab_is_eog(vocab, best) { return .finished }
 
             let written = piece.withUnsafeMutableBufferPointer {
@@ -642,7 +695,7 @@ extension VLEngine {
             // then spends the whole token budget on it — which is what turned
             // the bottom of a page into the same line over and over. Stop at
             // the loop and drop everything but its first pass.
-            if let loop = Self.runawayRepeat(in: slot.tokens, ignoring: structuralTokens) {
+            if let loop = VLEngine.runawayRepeat(in: slot.tokens, ignoring: structuralTokens) {
                 let discard = (loop.repeats - 1) * loop.period
                 let removedBytes = slot.pieceLengths.suffix(discard).reduce(0, +)
                 slot.bytes.removeLast(min(removedBytes, slot.bytes.count))
@@ -723,40 +776,6 @@ extension VLEngine {
                 if running >= roll { return llama_token(candidates[index].id) }
             }
             return llama_token(candidates[0].id)
-        }
-
-        /// Detects a degenerate loop at the tail: the last `period` tokens
-        /// repeated `repeats` times over.
-        ///
-        /// Short cycles have to repeat more often before they count — a table
-        /// row of empty cells is a handful of tokens repeating legitimately,
-        /// while a stuck decoder repeats until the budget runs out. Nothing
-        /// shorter than four passes is ever treated as a loop, so ordinary
-        /// repetition survives.
-        ///
-        /// A cycle made only of `ignoring` tokens never counts: in a sparse
-        /// table eight empty cells in a row are just eight empty cells, and
-        /// treating them as a loop cut real tables off mid-row.
-        static func runawayRepeat(in tokens: [llama_token],
-                                  ignoring structural: Set<llama_token> = []) -> (period: Int, repeats: Int)? {
-            for period in 1...16 {
-                let repeats = period >= 5 ? 4 : 8
-                guard tokens.count >= period * repeats else { continue }
-                if !structural.isEmpty, tokens.suffix(period).allSatisfy(structural.contains) { continue }
-                var isLoop = true
-                check: for pass in 1..<repeats {
-                    for offset in 0..<period {
-                        let last = tokens[tokens.count - offset - 1]
-                        let earlier = tokens[tokens.count - offset - 1 - period * pass]
-                        if last != earlier {
-                            isLoop = false
-                            break check
-                        }
-                    }
-                }
-                if isLoop { return (period, repeats) }
-            }
-            return nil
         }
     }
 }
