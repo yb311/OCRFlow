@@ -62,6 +62,10 @@ enum ScreenCapture {
 
     private static let requestedKey = "screenCapture.requested"
 
+    /// Whether the screen can be captured, asking — or telling the user how
+    /// to allow it — when it cannot.
+    static func checkAllowed() -> Bool { isAllowed() }
+
     private static func isAllowed() -> Bool {
         if CGPreflightScreenCaptureAccess() { return true }
         // The first time, the system asks, and offers to reopen the app once

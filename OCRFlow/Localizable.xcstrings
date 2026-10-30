@@ -208,6 +208,27 @@
         }
       }
     },
+    "%@%@ at %@, %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@位置 %3$@, %4$@"
+          }
+        }
+      },
+      "comment" : "A click by position in its window: modifier keys, the kind of click, x, y"
+    },
+    "%@%@ “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@“%3$@”"
+          }
+        }
+      }
+    },
     "%@%@-Table %lld" : {
       "localizations" : {
         "zh-Hans" : {
@@ -800,6 +821,16 @@
         }
       }
     },
+    "%lld times" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 次"
+          }
+        }
+      }
+    },
     "%lld · %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1010,6 +1041,16 @@
         }
       }
     },
+    "A number of times" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指定次数"
+          }
+        }
+      }
+    },
     "A region goes to PaddleOCR-VL when the average confidence of its PP-OCRv6 lines is below this value, or more than a quarter of its lines are below “Minimum confidence”. Higher is more accurate but slower" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1130,12 +1171,32 @@
         }
       }
     },
+    "Add Step" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加步骤"
+          }
+        }
+      }
+    },
     "Add images or folders" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加图片或文件夹"
+          }
+        }
+      }
+    },
+    "Addresses" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网址"
           }
         }
       }
@@ -1166,6 +1227,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重读后"
+          }
+        }
+      }
+    },
+    "Aim at" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定位方式"
           }
         }
       }
@@ -1620,6 +1691,16 @@
         }
       }
     },
+    "Capture Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取此处"
+          }
+        }
+      }
+    },
     "Capture Page by Page…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1650,6 +1731,26 @@
         }
       }
     },
+    "Capture an area of %@ × %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取 %1$@ × %2$@ 的区域"
+          }
+        }
+      }
+    },
+    "Capture the window" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取整个窗口"
+          }
+        }
+      }
+    },
     "Capture with %@ from any app" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1666,6 +1767,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在屏幕顶部的图标里截图、打开文件和进入设置"
+          }
+        }
+      }
+    },
+    "Captures become" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图合成为"
+          }
+        }
+      }
+    },
+    "Capture…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取…"
           }
         }
       }
@@ -1996,6 +2117,16 @@
         }
       }
     },
+    "Click" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按"
+          }
+        }
+      }
+    },
     "Click Start Recognition in the toolbar to process this file" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2172,6 +2303,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上下文长度：%lld"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
           }
         }
       }
@@ -2546,6 +2687,16 @@
         }
       }
     },
+    "Delete Step" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除步骤"
+          }
+        }
+      }
+    },
     "Delete from History" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2666,6 +2817,26 @@
         }
       }
     },
+    "Do something once while OCRFlow watches — turn the pages of a slideshow, scroll a page, click through a list — and it can do it again, capturing as it goes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 OCRFlow 看你做一遍——翻幻灯片、滚动网页、逐个点开列表——它就能照着再做，一边做一边截图。"
+          }
+        }
+      }
+    },
+    "Do what you want repeated, the way you normally would. To keep what is on screen at a point, click Capture Here — or use the screenshot shortcut." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照常做一遍想让它重复的操作。需要留下屏幕上的内容时，点“截取此处”，或者用截图快捷键。"
+          }
+        }
+      }
+    },
     "Document orientation model output shape %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2702,6 +2873,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成"
+          }
+        }
+      }
+    },
+    "Double-click" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连按两次"
           }
         }
       }
@@ -2772,6 +2953,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载以下模型，充分发挥此模式的效果"
+          }
+        }
+      }
+    },
+    "Drag" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移"
           }
         }
       }
@@ -4018,6 +4209,16 @@
         }
       }
     },
+    "Long Screenshot %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长截图 %@"
+          }
+        }
+      }
+    },
     "Manage All Models…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4168,6 +4369,26 @@
         }
       }
     },
+    "Move Down" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下移"
+          }
+        }
+      }
+    },
+    "Move Up" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上移"
+          }
+        }
+      }
+    },
     "Move down" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4194,6 +4415,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "多线程并行，识别结果与 Core ML 一致（推荐）"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
           }
         }
       }
@@ -4348,6 +4579,16 @@
         }
       }
     },
+    "No Recorded Actions Selected" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未选择录制的操作"
+          }
+        }
+      }
+    },
     "No Tables to Export" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4384,6 +4625,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无响应"
+          }
+        }
+      }
+    },
+    "No steps." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有步骤。"
           }
         }
       }
@@ -4434,6 +4685,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未安装"
+          }
+        }
+      }
+    },
+    "Nothing changed on screen in the last round. A dialog may be in the way, or a click may have missed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一轮操作后屏幕没有变化。可能有对话框挡住了，或者点按没有点中。"
           }
         }
       }
@@ -4518,6 +4779,26 @@
         }
       }
     },
+    "On the screen" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕上"
+          }
+        }
+      }
+    },
+    "Once" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次"
+          }
+        }
+      }
+    },
     "Once a file is recognized, it is written to the output folder in the format chosen under Text & Export, keeping the subfolder structure. Source files whose output already exists count as done and aren't recognized again. Without an output folder, results stay in the list only." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4534,6 +4815,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载后在上面的菜单中选择该语言。文字检测仍由 PP-OCRv6 完成。"
+          }
+        }
+      }
+    },
+    "One address a line. Each is opened in turn and the steps are done on it. Leave empty to work wherever things are." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行一个网址，依次打开，在每个网页上执行这些步骤。留空则在当前界面直接执行。"
+          }
+        }
+      }
+    },
+    "One document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一份文档"
+          }
+        }
+      }
+    },
+    "One long picture" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一张长图"
           }
         }
       }
@@ -5078,6 +5389,16 @@
         }
       }
     },
+    "Page %lld of %lld · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld/%2$lld 个网页 · %3$@"
+          }
+        }
+      }
+    },
     "Page %lld of %lld, needs review" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5188,6 +5509,16 @@
         }
       }
     },
+    "Pages to Open" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要打开的网页"
+          }
+        }
+      }
+    },
     "Paragraph title" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5204,6 +5535,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PP-OCRv6 读得没把握的段落改由视觉语言模型重新识别；关闭后只标记为待复核"
+          }
+        }
+      }
+    },
+    "Paused while you use the mouse or keyboard." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在使用鼠标或键盘，已暂停。"
           }
         }
       }
@@ -5244,6 +5585,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "纯文本"
+          }
+        }
+      }
+    },
+    "Press %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 %@"
+          }
+        }
+      }
+    },
+    "Press Esc to stop. Clicking or typing pauses the run." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 Esc 停止。点按或打字会暂停运行。"
           }
         }
       }
@@ -5882,12 +6243,62 @@
         }
       }
     },
+    "Record Actions…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制操作…"
+          }
+        }
+      }
+    },
+    "Recorded Actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制的操作"
+          }
+        }
+      }
+    },
+    "Recorded Actions…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制的操作…"
+          }
+        }
+      }
+    },
     "Recorded: %lld" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已录制：%lld"
+          }
+        }
+      }
+    },
+    "Recording %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制 %lld"
+          }
+        }
+      }
+    },
+    "Recording your actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制你的操作"
           }
         }
       }
@@ -6064,6 +6475,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表格渲染为网格"
+          }
+        }
+      }
+    },
+    "Repeat" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复"
           }
         }
       }
@@ -6258,6 +6679,16 @@
         }
       }
     },
+    "Result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        }
+      }
+    },
     "Result Rendering" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6426,12 +6857,52 @@
         }
       }
     },
+    "Right-click" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右键点按"
+          }
+        }
+      }
+    },
+    "Round %lld, %lld captured" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 轮，已截取 %2$lld 张"
+          }
+        }
+      }
+    },
     "Routing" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "路由策略"
+          }
+        }
+      }
+    },
+    "Run" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行"
+          }
+        }
+      }
+    },
+    "Run Recorded Actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行录制的操作"
           }
         }
       }
@@ -6526,6 +6997,56 @@
         }
       }
     },
+    "Scroll down %lld pt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向下滚动 %lld 点"
+          }
+        }
+      }
+    },
+    "Scroll left %lld pt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向左滚动 %lld 点"
+          }
+        }
+      }
+    },
+    "Scroll right %lld pt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向右滚动 %lld 点"
+          }
+        }
+      }
+    },
+    "Scroll up %lld pt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向上滚动 %lld 点"
+          }
+        }
+      }
+    },
+    "Scrolling Capture…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滚动截长图…"
+          }
+        }
+      }
+    },
     "Seal" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6592,6 +7113,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "向两个下载源各发一个请求，看看哪个通"
+          }
+        }
+      }
+    },
+    "Separate pictures" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分开的图片"
           }
         }
       }
@@ -6916,6 +7447,16 @@
         }
       }
     },
+    "Space" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空格"
+          }
+        }
+      }
+    },
     "Spanish" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6992,6 +7533,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "随 Mac 一起启动，随时可以截图"
+          }
+        }
+      }
+    },
+    "Steps" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步骤"
+          }
+        }
+      }
+    },
+    "Steps run one after another, each once the screen has settled. Right-click a step to move or delete it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步骤依次执行，每一步都等屏幕稳定后再继续。右键点按步骤可以移动或删除。"
           }
         }
       }
@@ -7152,6 +7713,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试"
+          }
+        }
+      }
+    },
+    "Text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字"
           }
         }
       }
@@ -7366,6 +7937,16 @@
         }
       }
     },
+    "The control, wherever it is" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按名称找控件，不论它在哪"
+          }
+        }
+      }
+    },
     "The detection probability map is incomplete" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7572,6 +8153,16 @@
         }
       }
     },
+    "The same place in the window" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口中的同一位置"
+          }
+        }
+      }
+    },
     "The screen could not be captured" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7648,6 +8239,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这些区域始终会被识别，也始终画在预览里（被过滤的画成虚线框），这里只决定它们要不要进入文本和 Markdown。改动立刻生效，不需要重新识别；多页 PDF 例外，它的正文在识别时就已经逐页拼好了。"
+          }
+        }
+      }
+    },
+    "They are read straight away. Export them from the list as a searchable PDF, Word or Markdown." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图会立即识别，之后可以在列表中导出为可搜索 PDF、Word 或 Markdown。"
           }
         }
       }
@@ -8018,6 +8619,16 @@
         }
       }
     },
+    "Type “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入“%@”"
+          }
+        }
+      }
+    },
     "UVDoc page unwarping" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8044,6 +8655,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未知错误"
+          }
+        }
+      }
+    },
+    "Until the screen stops changing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直到屏幕不再变化"
           }
         }
       }
@@ -8164,6 +8785,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vision 会优先按靠前的语言来判读同一个字形。混排页面把主要语言排在第一位，识别质量差别很大——韩文排在中文、英文之后就会明显变差。"
+          }
+        }
+      }
+    },
+    "Wait" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待"
+          }
+        }
+      }
+    },
+    "Wait %@ s" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待 %@ 秒"
           }
         }
       }

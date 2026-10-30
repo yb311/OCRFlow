@@ -426,16 +426,26 @@ enum PageImages {
         let count = CGImageSourceGetCount(source)
         guard count > 0 else { return 0 }
         let type = (CGImageSourceGetType(source) as String?) ?? ""
-        return type == "public.tiff" ? count : 1
+        if type == "public.tiff", count > 1 { return count }
+        return LongImagePages.pages(of: url)?.count ?? 1
     }
 
-    /// One frame at full resolution, turned upright.
+    /// One page at full resolution, turned upright: a frame of a multi-page
+    /// TIFF, a page of a long screenshot, or the whole picture.
     ///
     /// A phone photo stores its pixels as the sensor saw them and an EXIF tag
     /// saying which way is up. Reading the pixels without the tag hands the
     /// detectors a sideways page; the thumbnail API applies it, and asked for
     /// a thumbnail as large as the image, returns the whole image.
     static func image(at url: URL, frame: Int = 0) -> CGImage? {
+        if frame > 0 || LongImagePages.mayBeLong(url), let pages = LongImagePages.pages(of: url) {
+            return LongImagePages.page(frame, of: url, cutAt: pages)
+        }
+        return wholeImage(at: url, frame: frame)
+    }
+
+    /// One frame, all of it, however long.
+    static func wholeImage(at url: URL, frame: Int = 0) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, frame, nil) as? [CFString: Any]
         else { return nil }

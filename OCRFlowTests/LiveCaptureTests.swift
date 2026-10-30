@@ -3,7 +3,7 @@ import Vision
 @testable import OCRFlow
 
 /// Capture, recording and repeating on the real screen, against a small
-/// five-page "document" app. They take over the mouse and keyboard for a
+/// five-page "document" app — or, for scrolling, one long page. They take over the mouse and keyboard for a
 /// few seconds, and need Screen Recording and Accessibility permission for
 /// the test host, so they only run when asked for:
 ///
@@ -28,6 +28,7 @@ final class LiveCaptureTests: XCTestCase {
     }
 
     private var slides: Slides?
+    private var helper = ""
 
     override func setUp() async throws {
         guard let helper = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_SLIDES"] else {
@@ -40,6 +41,7 @@ final class LiveCaptureTests: XCTestCase {
         try XCTSkipUnless(CGPreflightScreenCaptureAccess() && AXIsProcessTrusted(),
                           "Turn on Screen Recording (\(CGPreflightScreenCaptureAccess())) and Accessibility "
                           + "(\(AXIsProcessTrusted())) for \(Bundle.main.bundlePath), then run again")
+        self.helper = helper
         slides = try await launch(helper)
     }
 
@@ -48,11 +50,11 @@ final class LiveCaptureTests: XCTestCase {
         slides = nil
     }
 
-    private func launch(_ helper: String) async throws -> Slides {
+    private func launch(_ helper: String, scrolling: Bool = false) async throws -> Slides {
         let info = URL.temporaryDirectory.appending(path: "slides-\(UUID().uuidString).json")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: helper)
-        process.arguments = [info.path]
+        process.arguments = [info.path] + (scrolling ? ["scroll"] : [])
         try process.run()
         for _ in 0..<50 where !FileManager.default.fileExists(atPath: info.path) {
             try await Task.sleep(for: .milliseconds(100))
@@ -250,4 +252,150 @@ final class LiveCaptureTests: XCTestCase {
         XCTAssertEqual(PageImages.frameCount(of: document), 5)
         try assertSlides((0..<5).compactMap { PageImages.image(at: document, frame: $0) })
     }
+
+    // MARK: - Macros
+
+    /// The slides window as a recorded step would remember it.
+    private func place() throws -> WindowPlace {
+        let slides = try XCTUnwrap(slides)
+        return try XCTUnwrap(ScreenWindows.all().first { $0.id == slides.window }).place
+    }
+
+    /// Records a capture of the window and then `turn`, as the user would
+    /// show it, and runs it until the last page.
+    private func recordAndRun(turn: () async throws -> Void,
+                              beforeRunning: () async throws -> Void = {}) async throws -> (steps: [MacroStep], pages: [CGImage]) {
+        let recorder = MacroRecorder()
+        recorder.start()
+        recorder.addCapture(CaptureArea(rect: nil), in: try place())
+        try await turn()
+        try await Task.sleep(for: .milliseconds(600))
+        let steps = await recorder.stop()
+        try await beforeRunning()
+        let runs = await MacroPlayer().run(Macro(name: "Slides", steps: steps))
+        return (steps, runs.first ?? [])
+    }
+
+    private func assertSlides(_ pages: [CGImage], from first: Int, file: StaticString = #filePath, line: UInt = #line) throws {
+        let texts = try pages.map { try text(in: $0) }
+        XCTAssertEqual(pages.count, 5 - first + 1, "\(texts)", file: file, line: line)
+        for (index, text) in texts.enumerated() {
+            XCTAssertTrue(text.contains("Page \(first + index)"), "page \(first + index) read \(text)", file: file, line: line)
+        }
+    }
+
+    /// A click on Next, recorded, then done again after the window has been
+    /// moved and the button has gone to the window's other side: the window
+    /// is put back where it was, and the button found by its name.
+    func testRunsAMacroThatFindsTheButtonByName() async throws {
+        let slides = try XCTUnwrap(slides)
+        let recorded = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let button = CGPoint(x: recorded.maxX - 30 - 45, y: top - (recorded.minY + 20 + 16))
+        let (steps, pages) = try await recordAndRun(turn: {
+            click(button)
+        }, beforeRunning: {
+            kill(slides.process.processIdentifier, SIGUSR1)
+            kill(slides.process.processIdentifier, SIGUSR2)
+            try await Task.sleep(for: .milliseconds(400))
+            XCTAssertNotEqual(ScreenCapture.frame(of: .window(slides.window)), recorded)
+        })
+        XCTAssertEqual(steps.count, 2, "\(steps)")
+        guard case let .click(click)? = steps.last?.action else { return XCTFail("no click: \(steps)") }
+        XCTAssertEqual(click.element?.title, "Next")
+        XCTAssertTrue(click.findsElement)
+        let now = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        XCTAssertEqual(now.minX, recorded.minX, accuracy: 2)
+        XCTAssertEqual(now.minY, recorded.minY, accuracy: 2)
+        // The recorded click turned to page 2 already.
+        try assertSlides(pages, from: 2)
+    }
+
+    func testRunsAMacroThatPressesAKey() async throws {
+        let (steps, pages) = try await recordAndRun(turn: {
+            press(124)   // →
+        })
+        guard case let .key(key)? = steps.last?.action else { return XCTFail("no key: \(steps)") }
+        XCTAssertEqual(key.keyCode, 124)
+        try assertSlides(pages, from: 2)
+    }
+
+    /// Scrolled from top to bottom a screenful at a time, and joined: every
+    /// line once, none missing.
+    func testScrollsALongPageAndJoinsItIntoOnePicture() async throws {
+        slides?.process.terminate()
+        let slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        let target = CaptureTarget.window(slides.window)
+        let first = try await ScreenCapture.grab(target)
+        let look = await PageByPageCapture.look(at: target)
+        let firstLook = try XCTUnwrap(look)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: target))
+        let top = NSScreen.screens[0].frame.maxY
+        let steps = PageByPageCapture.scrollSteps(by: -(frame.height * 0.7).rounded(),
+                                                  at: CGPoint(x: frame.midX, y: top - frame.midY))
+        var pages = [first]
+        await PageByPageCapture().turnPages(with: steps, of: target, recordedFrame: frame, first: firstLook,
+                                            alreadyTurned: false) { image in
+            pages.append(image)
+            return pages.count
+        }
+        XCTAssertGreaterThan(pages.count, 4)
+        if ScrollStitcher.stitch(pages) == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
+            for (index, page) in pages.enumerated() {
+                _ = PageByPageCapture.write(page, to: URL(fileURLWithPath: dump).appending(path: "scroll-\(index).png"))
+            }
+        }
+        let joined = try XCTUnwrap(ScrollStitcher.stitch(pages))
+        XCTAssertEqual(joined.count, 1)
+
+        // Read as a long screenshot is: in pages.
+        let url = URL.temporaryDirectory.appending(path: "long-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertTrue(PageByPageCapture.write(joined[0], to: url))
+        let count = PageImages.frameCount(of: url)
+        XCTAssertGreaterThan(count, 1)
+        let text = try (0..<count).compactMap { PageImages.image(at: url, frame: $0) }.map { try self.text(in: $0) }
+            .joined(separator: "\n")
+        let numbers = text.matches(of: /Line (\d+):/).compactMap { Int($0.1) }
+        XCTAssertEqual(Set(numbers).count, numbers.count, "a line twice: \(numbers)")
+        XCTAssertTrue(numbers.contains(1) && numbers.contains(LongPageLines.count), "\(numbers)")
+        XCTAssertGreaterThanOrEqual(Set(numbers).count, LongPageLines.count - 3, "\(numbers)")
+    }
+}
+
+extension LiveCaptureTests {
+    /// A scroll, recorded as the user would make it — a wheel turned a few
+    /// times — and done again until the page ends: one long picture.
+    func testRunsARecordedScrollIntoOneLongPicture() async throws {
+        slides?.process.terminate()
+        let slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let point = CGPoint(x: frame.midX, y: top - frame.midY)
+        let (steps, pages) = try await recordAndRun(turn: {
+            for _ in 0..<10 {
+                let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -40,
+                                    wheel2: 0, wheel3: 0)
+                event?.location = point
+                event?.post(tap: .cghidEventTap)
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        })
+        guard case let .scroll(scroll)? = steps.last?.action else { return XCTFail("no scroll: \(steps)") }
+        XCTAssertEqual(steps.count, 2, "\(steps)")
+        XCTAssertEqual(scroll.dy, -400, accuracy: 1)
+        XCTAssertGreaterThan(pages.count, 5)
+        let joined = try XCTUnwrap(ScrollStitcher.stitch(pages))
+        XCTAssertEqual(joined.count, 1)
+        // The recorded scroll moved the page before the first capture was
+        // repeated; from there, everything to the end.
+        XCTAssertGreaterThan(joined[0].height, 6000)
+    }
+}
+
+/// How many lines the helper's long page has.
+private enum LongPageLines {
+    static let count = 120
 }

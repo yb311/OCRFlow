@@ -52,7 +52,10 @@ enum ScreenGrabber {
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
                 throw Failure.gone
             }
-            return try await image(of: SCContentFilter(desktopIndependentWindow: window), rect: nil, maxWidth: maxWidth)
+            // By the window's own size: what the filter reports wavers by a
+            // point or so from one capture to the next, and the picture with it.
+            return try await image(of: SCContentFilter(desktopIndependentWindow: window), rect: nil,
+                                   size: window.frame.size, maxWidth: maxWidth)
         }
     }
 
@@ -67,8 +70,9 @@ enum ScreenGrabber {
 
     /// `rect` is in points from the top-left of what the filter shows; nil
     /// takes all of it.
-    private static func image(of filter: SCContentFilter, rect: CGRect?, maxWidth: Int? = nil) async throws -> CGImage {
-        let size = rect?.size ?? filter.contentRect.size
+    private static func image(of filter: SCContentFilter, rect: CGRect?, size: CGSize? = nil,
+                              maxWidth: Int? = nil) async throws -> CGImage {
+        let size = rect?.size ?? size ?? filter.contentRect.size
         var scale = CGFloat(filter.pointPixelScale)
         if let maxWidth, size.width * scale > CGFloat(maxWidth) { scale = CGFloat(maxWidth) / max(size.width, 1) }
         let config = SCStreamConfiguration()

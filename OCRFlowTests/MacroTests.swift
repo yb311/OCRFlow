@@ -1,0 +1,325 @@
+import CoreGraphics
+import Foundation
+import ImageIO
+import Testing
+import UniformTypeIdentifiers
+@testable import OCRFlow
+
+struct MacroTests {
+
+    // MARK: - Pictures
+
+    private func context(width: Int, height: Int) -> CGContext {
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(),
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context
+    }
+
+    /// A long page of "text": dark bars of differing lengths, in lines.
+    private func longPage(width: Int = 480, height: Int = 3000, seed: Int = 1) -> CGImage {
+        let context = context(width: width, height: height)
+        context.setFillColor(CGColor(gray: 0.15, alpha: 1))
+        var line = 0
+        for top in stride(from: 12, to: height - 20, by: 28) {
+            line += 1
+            // A blank line now and then, as between paragraphs.
+            if (line * 7 + seed) % 9 == 0 { continue }
+            let start = 16 + (line * 37 + seed * 11) % 60
+            let length = 60 + (line * 131 + seed * 53) % (width - 140)
+            // Drawn from the top: the context's y runs upward.
+            context.fill(CGRect(x: start, y: height - top - 12, width: length, height: 12))
+            context.fill(CGRect(x: start + length + 10, y: height - top - 12, width: (line * 17) % 40 + 8, height: 12))
+        }
+        return context.makeImage()!
+    }
+
+    private struct Layout {
+        var width = 480
+        var header = 50
+        var footer = 30
+        var middle = 420
+        var sidebar = 0
+        var height: Int { header + middle + footer }
+    }
+
+    /// The window showing `page` scrolled to `offset`, between a toolbar and
+    /// a status bar, beside a sidebar when there is one.
+    private func frame(of page: CGImage, at offset: Int, _ layout: Layout) -> CGImage {
+        let width = layout.sidebar + layout.width
+        let context = context(width: width, height: layout.height)
+        context.setFillColor(CGColor(gray: 0.3, alpha: 1))
+        context.fill(CGRect(x: 0, y: layout.height - layout.header, width: width, height: layout.header))
+        context.setFillColor(CGColor(gray: 0.9, alpha: 1))
+        context.fill(CGRect(x: 12, y: layout.height - 35, width: 180, height: 18))
+        context.setFillColor(CGColor(gray: 0.5, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: layout.footer))
+        if layout.sidebar > 0 {
+            context.setFillColor(CGColor(gray: 0.85, alpha: 1))
+            context.fill(CGRect(x: 0, y: layout.footer, width: layout.sidebar, height: layout.middle))
+            context.setFillColor(CGColor(gray: 0.2, alpha: 1))
+            for row in 0..<10 { context.fill(CGRect(x: 10, y: layout.footer + 20 + row * 36, width: 80, height: 10)) }
+        }
+        let visible = page.cropping(to: CGRect(x: 0, y: offset, width: layout.width, height: layout.middle))!
+        context.draw(visible, in: CGRect(x: layout.sidebar, y: layout.footer, width: layout.width, height: layout.middle))
+        return context.makeImage()!
+    }
+
+    private func pixels(_ image: CGImage) -> [UInt8] {
+        let context = context(width: image.width, height: image.height)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let data = context.data!.assumingMemoryBound(to: UInt8.self)
+        return Array(UnsafeBufferPointer(start: data, count: context.bytesPerRow * image.height))
+    }
+
+    // MARK: - Joining scrolled pictures
+
+    @Test func joinsScrolledPicturesKeepingTheToolbarOnce() throws {
+        let page = longPage()
+        let layout = Layout()
+        // Uneven steps, the last one short: the bottom of the page.
+        let offsets = [0, 300, 590, 880, 1170, 1460, 1750, 2040, 2330, 2580]
+        let frames = offsets.map { frame(of: page, at: $0, layout) }
+        let joined = try #require(ScrollStitcher.stitch(frames))
+        #expect(joined.count == 1)
+        let long = try #require(joined.first)
+
+        // The toolbar, the whole page down to where the last picture ends,
+        // the status bar.
+        let shown = offsets.last! + layout.middle
+        let expected = context(width: layout.width, height: layout.header + shown + layout.footer)
+        let top = frames[0].cropping(to: CGRect(x: 0, y: 0, width: layout.width, height: layout.header))!
+        expected.draw(top, in: CGRect(x: 0, y: shown + layout.footer, width: layout.width, height: layout.header))
+        let body = page.cropping(to: CGRect(x: 0, y: 0, width: layout.width, height: shown))!
+        expected.draw(body, in: CGRect(x: 0, y: layout.footer, width: layout.width, height: shown))
+        let bottom = frames[0].cropping(to: CGRect(x: 0, y: layout.height - layout.footer, width: layout.width,
+                                                   height: layout.footer))!
+        expected.draw(bottom, in: CGRect(x: 0, y: 0, width: layout.width, height: layout.footer))
+
+        #expect(long.width == layout.width)
+        #expect(long.height == layout.header + shown + layout.footer)
+        let a = pixels(long), b = pixels(expected.makeImage()!)
+        let differing = zip(a, b).filter { abs(Int($0) - Int($1)) > 2 }.count
+        #expect(differing == 0)
+    }
+
+    @Test func leavesOutASidebarThatStaysPut() throws {
+        let page = longPage()
+        var layout = Layout()
+        layout.sidebar = 120
+        let offsets = [0, 350, 700, 1050]
+        let joined = try #require(ScrollStitcher.stitch(offsets.map { frame(of: page, at: $0, layout) }))
+        let long = try #require(joined.first)
+        #expect(long.width < layout.sidebar + layout.width)
+        #expect(long.width >= layout.width - 40)
+        #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
+    }
+
+    /// A title bar shades a little as its window comes to the front, and
+    /// draws a line under itself once something has scrolled beneath it.
+    @Test func aTitleBarThatChangesFaintlyStaysPut() throws {
+        let page = longPage()
+        let layout = Layout()
+        let offsets = [0, 300, 600, 900]
+        let frames = offsets.enumerated().map { index, offset -> CGImage in
+            let plain = frame(of: page, at: offset, layout)
+            let context = context(width: plain.width, height: plain.height)
+            context.draw(plain, in: CGRect(x: 0, y: 0, width: plain.width, height: plain.height))
+            if index == 0 {
+                context.setFillColor(CGColor(gray: 1, alpha: 0.012))
+                context.fill(CGRect(x: 0, y: layout.height - layout.header, width: plain.width, height: layout.header))
+            } else {
+                context.setFillColor(CGColor(gray: 0, alpha: 1))
+                context.fill(CGRect(x: 0, y: layout.height - layout.header - 1, width: plain.width, height: 1))
+            }
+            return context.makeImage()!
+        }
+        let long = try #require(ScrollStitcher.stitch(frames)?.first)
+        #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
+    }
+
+    @Test func slidesTurnedOneByOneAreNotJoined() {
+        let layout = Layout()
+        let frames = (1...4).map { frame(of: longPage(seed: $0), at: 0, layout) }
+        #expect(ScrollStitcher.stitch(frames) == nil)
+    }
+
+    @Test func blankPicturesAreNotJoined() {
+        let blank = context(width: 400, height: 300).makeImage()!
+        #expect(ScrollStitcher.stitch([blank, blank, blank]) == nil)
+    }
+
+    @Test func aVeryLongPictureComesInParts() throws {
+        let page = longPage(height: 3000)
+        let layout = Layout()
+        let offsets = Array(stride(from: 0, through: 2580, by: 300)) + [2580]
+        let frames = offsets.reduce(into: [Int]()) { if $0.last != $1 { $0.append($1) } }.map { frame(of: page, at: $0, layout) }
+        let whole = try #require(ScrollStitcher.stitch(frames))
+        #expect(whole.count == 1)
+        let total = try #require(whole.first).height
+        // With a limit of about a third of the whole: three parts or so.
+        let parts = try #require(ScrollStitcher.stitch(frames, maxHeight: total / 3 + layout.header + layout.footer + 10))
+        #expect(parts.count >= 3)
+        for part in parts {
+            #expect(part.height <= total / 3 + layout.header + layout.footer + 10)
+            #expect(part.width == layout.width)
+        }
+    }
+
+    // MARK: - Long pictures read as pages
+
+    @Test func cutsBetweenLinesOfText() {
+        // Lines 20 rows tall with 10 blank between.
+        let ink = (0..<1000).map { $0 % 30 < 20 ? 100 : 0 }
+        let pages = LongImagePages.cut(height: 1000, pageHeight: 300, ink: ink)
+        #expect(pages.first?.lowerBound == 0)
+        #expect(pages.last?.upperBound == 1000)
+        for (a, b) in zip(pages, pages.dropFirst()) {
+            #expect(a.upperBound == b.lowerBound)
+            #expect(ink[b.lowerBound] == 0, "cut across a line at \(b.lowerBound)")
+        }
+        for page in pages.dropLast() { #expect(page.count <= 300 && page.count >= 210) }
+    }
+
+    @Test func cutsAcrossTheLightestRowWhenThereIsNoGap() {
+        var ink = Array(repeating: 100, count: 800)
+        ink[250] = 3
+        let pages = LongImagePages.cut(height: 800, pageHeight: 300, ink: ink)
+        #expect(pages.first == 0..<250)
+    }
+
+    @Test func aLongScreenshotIsReadAsPages() throws {
+        let folder = URL.temporaryDirectory.appending(path: "long-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        func save(_ image: CGImage, _ name: String) -> URL {
+            let url = folder.appending(path: name)
+            let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+            CGImageDestinationAddImage(destination, image, nil)
+            CGImageDestinationFinalize(destination)
+            return url
+        }
+        let long = save(longPage(width: 480, height: 3000), "long.png")
+        let count = PageImages.frameCount(of: long)
+        #expect(count >= 4)
+        let pages = (0..<count).compactMap { PageImages.image(at: long, frame: $0) }
+        #expect(pages.count == count)
+        #expect(pages.allSatisfy { $0.width == 480 && $0.height <= Int(480 * LongImagePages.pageShape * 1.13) })
+        #expect(pages.reduce(0) { $0 + $1.height } == 3000)
+
+        let ordinary = save(longPage(width: 480, height: 800), "ordinary.png")
+        #expect(PageImages.frameCount(of: ordinary) == 1)
+        #expect(PageImages.image(at: ordinary)?.height == 800)
+    }
+
+    // MARK: - Making steps of what the user did
+
+    private let window = WindowPlace(bundleID: "com.example.viewer", appName: "Viewer", title: "Deck",
+                                     frame: CGRect(x: 100, y: 50, width: 800, height: 600))
+
+    private func input(_ kind: RecordedInput.Kind, at point: CGPoint = .zero, modifiers: CGEventFlags = [],
+                       element: ElementDescription? = nil) -> RecordedInput {
+        RecordedInput(kind: kind, location: point, modifiers: modifiers.rawValue, window: window, element: element)
+    }
+
+    @Test func aPressAndReleaseInPlaceIsAClickInTheWindow() throws {
+        let next = ElementDescription(role: "AXButton", title: "Next", center: CGPoint(x: 700, y: 560))
+        let steps = MacroStepBuilder.steps(from: [
+            input(.mouseDown(.left, clickCount: 1), at: CGPoint(x: 800, y: 610), element: next),
+            input(.mouseUp, at: CGPoint(x: 801, y: 610)),
+        ])
+        #expect(steps.count == 1)
+        guard case let .click(click) = try #require(steps.first).action else { Issue.record("not a click"); return }
+        #expect(click.point == CGPoint(x: 700, y: 560))
+        #expect(click.count == 1)
+        #expect(click.findsElement)
+        #expect(steps.first?.window == window)
+    }
+
+    @Test func aSecondClickInPlaceMakesADoubleClick() throws {
+        let steps = MacroStepBuilder.steps(from: [
+            input(.mouseDown(.left, clickCount: 1), at: CGPoint(x: 300, y: 300)), input(.mouseUp, at: CGPoint(x: 300, y: 300)),
+            input(.mouseDown(.left, clickCount: 2), at: CGPoint(x: 301, y: 300)), input(.mouseUp, at: CGPoint(x: 301, y: 300)),
+        ])
+        #expect(steps.count == 1)
+        guard case let .click(click) = try #require(steps.first).action else { Issue.record("not a click"); return }
+        #expect(click.count == 2)
+    }
+
+    @Test func aPressMovedFarIsADrag() throws {
+        let steps = MacroStepBuilder.steps(from: [
+            input(.mouseDown(.left, clickCount: 1), at: CGPoint(x: 200, y: 200)),
+            input(.mouseDragged, at: CGPoint(x: 230, y: 200)),
+            input(.mouseDragged, at: CGPoint(x: 260, y: 210)),
+            input(.mouseUp, at: CGPoint(x: 300, y: 220)),
+        ])
+        guard case let .drag(drag) = try #require(steps.first).action else { Issue.record("not a drag"); return }
+        #expect(drag.path.first == CGPoint(x: 100, y: 150))
+        #expect(drag.path.last == CGPoint(x: 200, y: 170))
+    }
+
+    @Test func oneSwipeIsOneScroll() throws {
+        let steps = MacroStepBuilder.steps(from: [
+            input(.scroll(dx: 0, dy: -10, continues: false), at: CGPoint(x: 400, y: 400)),
+            input(.scroll(dx: 0, dy: -30, continues: true), at: CGPoint(x: 400, y: 400)),
+            input(.scroll(dx: 0, dy: -60, continues: true), at: CGPoint(x: 400, y: 400)),
+            input(.scroll(dx: 0, dy: -5, continues: false), at: CGPoint(x: 400, y: 400)),
+        ])
+        #expect(steps.count == 2)
+        guard case let .scroll(scroll) = try #require(steps.first).action else { Issue.record("not a scroll"); return }
+        #expect(scroll.dy == -100)
+        #expect(scroll.point == CGPoint(x: 300, y: 350))
+    }
+
+    @Test func keysTypedInARowAreText() throws {
+        let steps = MacroStepBuilder.steps(from: [
+            input(.key(code: 4, characters: "h")), input(.key(code: 34, characters: "i")),
+            input(.key(code: 49, characters: " ")), input(.key(code: 13, characters: "w")),
+            input(.key(code: 36, characters: "\r")),
+            // A space alone is a page turn, not typing.
+            input(.key(code: 49, characters: " ")),
+            input(.key(code: 8, characters: "c"), modifiers: .maskCommand),
+            input(.key(code: 124, characters: "\u{F703}")),
+        ])
+        #expect(steps.count == 5)
+        guard case let .type(text) = steps[0].action else { Issue.record("not typing: \(steps[0])"); return }
+        #expect(text.text == "hi w")
+        #expect(text.keyCodes == [4, 34, 49, 13])
+        guard case let .key(enter) = steps[1].action, case let .key(space) = steps[2].action,
+              case let .key(copy) = steps[3].action, case let .key(arrow) = steps[4].action else {
+            Issue.record("not keys: \(steps)")
+            return
+        }
+        #expect(enter.keyCode == 36)
+        #expect(space.keyCode == 49)
+        #expect(MacroStepDescription.keyName(copy) == "⌘C")
+        #expect(MacroStepDescription.keyName(arrow) == "→")
+    }
+
+    @Test func capturesStayWhereTheyWereTaken() {
+        let area = CaptureArea(rect: CGRect(x: 10, y: 60, width: 500, height: 400))
+        let steps = MacroStepBuilder.steps(from: [
+            input(.capture(area)),
+            input(.key(code: 124, characters: "\u{F703}")),
+        ])
+        #expect(steps.count == 2)
+        #expect(steps.first?.action == .capture(area))
+    }
+
+    @Test func aMacroIsKeptAsItWas() throws {
+        var macro = Macro(name: "Deck", steps: MacroStepBuilder.steps(from: [
+            input(.capture(CaptureArea(rect: nil))),
+            input(.mouseDown(.left, clickCount: 1), at: CGPoint(x: 800, y: 610)), input(.mouseUp, at: CGPoint(x: 800, y: 610)),
+            input(.key(code: 4, characters: "h")), input(.key(code: 34, characters: "i")),
+        ]))
+        macro.steps.append(MacroStep(action: .wait(seconds: 1.5)))
+        macro.repetition = .times(12)
+        macro.urls = ["example.com/a", "https://example.com/b", ""]
+        macro.output = .longImage
+        let decoded = try JSONDecoder().decode(Macro.self, from: JSONEncoder().encode(macro))
+        #expect(decoded == macro)
+        #expect(decoded.openableURLs.map(\.absoluteString) == ["https://example.com/a", "https://example.com/b"])
+    }
+}

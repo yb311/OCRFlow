@@ -85,16 +85,21 @@ enum StepPlayer {
             } else {
                 event.location = CGPoint(x: event.location.x + offset.dx, y: event.location.y + offset.dy)
             }
-            event.setIntegerValueField(.eventSourceUserData, value: marker)
-            // Now, in the units the system uses: a fresh event carries it.
-            if let now = CGEvent(source: nil)?.timestamp { event.timestamp = now }
-            event.post(tap: .cghidEventTap)
+            post(event)
         }
+    }
+
+    /// Sends an event as if the user had done it, marked as OCRFlow's own.
+    static func post(_ event: CGEvent) {
+        event.setIntegerValueField(.eventSourceUserData, value: marker)
+        // Now, in the units the system uses: a fresh event carries it.
+        if let now = CGEvent(source: nil)?.timestamp { event.timestamp = now }
+        event.post(tap: .cghidEventTap)
     }
 
     /// Keys go to the app in front. If another app has come forward since,
     /// the one that had the keys gets them back first.
-    private static func bringForward(_ pid: pid_t?) async {
+    static func bringForward(_ pid: pid_t?) async {
         guard let pid, NSWorkspace.shared.frontmostApplication?.processIdentifier != pid,
               let app = NSRunningApplication(processIdentifier: pid) else { return }
         app.activate()

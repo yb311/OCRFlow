@@ -149,6 +149,20 @@ struct OCRFlowApp: App {
                 Button("Capture Page by Page…") {
                     viewModel.capturePageByPage()
                 }
+
+                Button("Scrolling Capture…") {
+                    viewModel.captureScrolling()
+                }
+
+                Divider()
+
+                Button("Record Actions…") {
+                    viewModel.recordMacro()
+                }
+
+                Button("Recorded Actions…") {
+                    openWindow(id: MacroEditorView.windowID)
+                }
             }
 
             CommandGroup(after: .textEditing) {
@@ -231,6 +245,12 @@ struct OCRFlowApp: App {
         .defaultSize(width: 900, height: 600)
         .keyboardShortcut("y", modifiers: .command)
 
+        Window("Recorded Actions", id: MacroEditorView.windowID) {
+            MacroEditorView()
+                .environment(viewModel)
+        }
+        .defaultSize(width: 780, height: 600)
+
         Window("Report a Problem", id: ReportProblemView.windowID) {
             ReportProblemView()
                 .environment(viewModel)
@@ -253,6 +273,10 @@ extension OCRFlowApp {
         appDelegate.open = { [weak viewModel] urls in viewModel?.addImages(urls: urls) }
         let show = { [openWindow] in Self.showMainWindow(openWindow) }
         viewModel.showMainWindow = show
+        viewModel.showMacros = { [openWindow] in
+            NSApp.activate()
+            openWindow(id: MacroEditorView.windowID)
+        }
         appDelegate.showMainWindow = show
         appDelegate.willTerminate = { [weak viewModel] in viewModel?.prepareForTermination() }
     }

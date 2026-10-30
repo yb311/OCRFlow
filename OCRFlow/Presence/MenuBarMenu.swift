@@ -18,6 +18,25 @@ struct MenuBarMenu: View {
                               ? KeyboardShortcut("3", modifiers: [.command, .shift, .option]) : nil)
             .disabled(vm.lastCaptureTarget == nil)
         Button("Capture Page by Page…") { vm.capturePageByPage() }
+        Button("Scrolling Capture…") { vm.captureScrolling() }
+
+        Divider()
+        Button("Record Actions…") { vm.recordMacro() }
+        if !vm.macros.macros.isEmpty {
+            Menu("Run Recorded Actions") {
+                ForEach(vm.macros.macros) { macro in
+                    Button(macro.name) { vm.runMacro(id: macro.id) }
+                        .disabled(macro.steps.isEmpty)
+                }
+            }
+            .disabled(vm.isCapturing)
+        }
+        Button("Recorded Actions…") {
+            NSApp.activate()
+            openWindow(id: MacroEditorView.windowID)
+        }
+
+        Divider()
         Button("Open Images…") {
             OCRFlowApp.showMainWindow(openWindow)
             vm.openFilePicker()

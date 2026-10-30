@@ -21,6 +21,9 @@ final class PageByPageCapture {
     private var panel: NSPanel?
     private var stopRequested = false
     private var escapeMonitor: Any?
+    /// Whether the pages were turned by scrolling, which makes them one long
+    /// picture rather than pages.
+    private(set) var turnedByScrolling = false
 
     /// The pages, as files in a folder of their own, in order. Empty when
     /// cancelled.
@@ -65,6 +68,8 @@ final class PageByPageCapture {
             return []
         }
 
+        turnedByScrolling = steps.allSatisfy { $0.event.type == .scrollWheel || $0.event.type == .mouseMoved }
+
         // Then it is done again and again.
         state.phase = .running
         state.onStop = { [weak self] in self?.stopRequested = true }
@@ -79,15 +84,74 @@ final class PageByPageCapture {
         return pages
     }
 
+    /// Scrolls what the user chooses from top to bottom, a screenful at a
+    /// time, capturing each. The pictures, in order, to be joined into one
+    /// long one; empty when cancelled.
+    func runScrolling() async -> [URL] {
+        guard InputControl.isAllowed() else { return [] }
+        guard let first = await ScreenCapture.choose(returnFocus: true),
+              let firstPrint = await Self.look(at: first.target),
+              let frame = ScreenCapture.frame(of: first.target) else { return [] }
+        let target = first.target
+        let folder = URL.temporaryDirectory
+            .appending(path: "OCRFlow Pages \(UUID().uuidString)", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var pages: [URL] = []
+        func keep(_ image: CGImage) {
+            let url = folder.appending(path: String(format: "%04d.png", pages.count + 1))
+            if Self.write(image, to: url) { pages.append(url) }
+        }
+        keep(first.image)
+        turnedByScrolling = true
+
+        // Most of a screenful down, from the middle of it, so each picture
+        // shares a band with the one before to be joined along.
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        let point = CGPoint(x: frame.midX, y: top - frame.midY)
+        let steps = Self.scrollSteps(by: -(frame.height * 0.7).rounded(), at: point)
+
+        state.phase = .running
+        state.onStop = { [weak self] in self?.stopRequested = true }
+        showPanel(avoiding: frame)
+        watchForEscape()
+        await turnPages(with: steps, of: target, recordedFrame: frame, first: firstPrint, alreadyTurned: false) { image in
+            keep(image)
+            state.pages = pages.count
+            return pages.count
+        }
+        stopWatchingForEscape()
+        closePanel()
+        return pages
+    }
+
+    /// The pointer moved to `point`, then a scroll of `distance` points
+    /// there, in wheel-sized steps.
+    static func scrollSteps(by distance: CGFloat, at point: CGPoint) -> [RecordedStep] {
+        var steps: [RecordedStep] = []
+        if let move = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left) {
+            steps.append(RecordedStep(event: move, delay: 0, app: nil))
+        }
+        let parts = max(1, Int((abs(distance) / 40).rounded(.up)))
+        for _ in 0..<parts {
+            guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                                      wheel1: Int32((distance / CGFloat(parts)).rounded()), wheel2: 0, wheel3: 0)
+            else { continue }
+            event.location = point
+            steps.append(RecordedStep(event: event, delay: 0.012, app: nil))
+        }
+        return steps
+    }
+
     /// Turns page after page with the recorded steps, handing each new page to
     /// `keep`, which says how many there are now. Ends at the last page, at
-    /// the limit, or when stopped. The first turn has been made already, by
-    /// the user. `first` is a look at the first page, taken with `look(at:)`.
+    /// the limit, or when stopped. Unless `alreadyTurned` is false, the first
+    /// turn has been made already, by the user. `first` is a look at the
+    /// first page, taken with `look(at:)`.
     func turnPages(with steps: [RecordedStep], of target: CaptureTarget, recordedFrame: CGRect?,
-                   first: PageFingerprint, keep: (CGImage) -> Int) async {
+                   first: PageFingerprint, alreadyTurned: Bool = true, keep: (CGImage) -> Int) async {
         var last = first
         var count = 1
-        var turned = true
+        var turned = alreadyTurned
         while !stopRequested, count < Self.pageLimit {
             if !turned {
                 await StepPlayer.play(steps, offset: offset(of: target, from: recordedFrame)) { [weak self] in
@@ -174,7 +238,7 @@ final class PageByPageCapture {
 
     // MARK: - Files
 
-    private static func write(_ image: CGImage, to url: URL) -> Bool {
+    static func write(_ image: CGImage, to url: URL) -> Bool {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { return false }
         CGImageDestinationAddImage(destination, image, nil)
@@ -183,6 +247,16 @@ final class PageByPageCapture {
 
     /// One multi-page TIFF, which is read as one document: one result, one
     /// export, one searchable PDF. Each page keeps its full resolution.
+    nonisolated static func assemble(_ images: [CGImage], into url: URL) -> Bool {
+        guard !images.isEmpty,
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.tiff.identifier as CFString,
+                                                                images.count, nil) else { return false }
+        let properties = [kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFCompression: 5]] as CFDictionary
+        for image in images { CGImageDestinationAddImage(destination, image, properties) }
+        return CGImageDestinationFinalize(destination)
+    }
+
+    /// The same, from files of one page each.
     nonisolated static func assemble(_ pages: [URL], into url: URL) -> Bool {
         guard !pages.isEmpty,
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.tiff.identifier as CFString,
@@ -198,39 +272,8 @@ final class PageByPageCapture {
 
     // MARK: - Panel
 
-    /// Near the bottom of the screen, clear of what is being captured where
-    /// possible: a recorded click must land on the page, not on the panel.
     private func showPanel(avoiding target: CGRect?) {
-        let host = FirstMouseHostingView(rootView: PageRunView(state: state))
-        let size = host.fittingSize
-        let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
-                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        panel.hidesOnDeactivate = false
-        panel.becomesKeyOnlyIfNeeded = true
-        panel.isMovableByWindowBackground = true
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.contentView = host
-
-        let center = target.map { CGPoint(x: $0.midX, y: $0.midY) } ?? NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { NSMouseInRect(center, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
-        let area = screen.visibleFrame
-        let candidates = [
-            CGPoint(x: area.midX - size.width / 2, y: area.minY + 24),
-            CGPoint(x: area.midX - size.width / 2, y: area.maxY - size.height - 24),
-            CGPoint(x: area.maxX - size.width - 24, y: area.minY + 24),
-        ]
-        let origin = candidates.first { origin in
-            guard let target else { return true }
-            return !CGRect(origin: origin, size: size).intersects(target)
-        } ?? candidates[0]
-        panel.setFrameOrigin(origin)
-        panel.orderFrontRegardless()
-        self.panel = panel
+        panel = HUDPanel.show(PageRunView(state: state), avoiding: target)
     }
 
     private func closePanel() {
@@ -267,10 +310,6 @@ private struct PageRunView: View {
             case .running: running
             }
         }
-        .padding(14)
-        .frame(width: 340, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.primary.opacity(0.1), lineWidth: 0.5))
     }
 
     private var recording: some View {
@@ -315,9 +354,4 @@ private struct PageRunView: View {
             Button("Stop") { state.onStop() }
         }
     }
-}
-
-/// The panel never becomes key, so the first click on a button has to count.
-private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

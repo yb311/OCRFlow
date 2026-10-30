@@ -339,6 +339,7 @@ final class OCRViewModel {
 
     init() {
         store = ResultStore()
+        macros = MacroLibrary(directory: store.directory)
         sentinel = LaunchSentinel(directory: store.directory)
         crashLogFromLastSession = sentinel.begin()
         restoreSettings()
@@ -1257,7 +1258,7 @@ final class OCRViewModel {
 
     /// From the moment capture is asked for until the picture is taken or
     /// the user gives up, so a second press does not start a second one.
-    private(set) var isCapturing = false
+    var isCapturing = false
     /// Where the last screenshot was taken, so the same place can be taken
     /// again — the next page of a document shown on screen, say.
     private(set) var lastCaptureTarget: CaptureTarget?
@@ -1266,9 +1267,26 @@ final class OCRViewModel {
     /// it ends.
     @ObservationIgnored private var waitingForRun = Set<UUID>()
 
+    /// Macros the user recorded, to do again.
+    let macros: MacroLibrary
+    /// The macro shown in the Recorded Actions window.
+    var selectedMacroID: UUID?
+    /// A recording under way: a screenshot taken now is a step of it.
+    @ObservationIgnored var activeRecording: MacroRecording?
+    /// The macro being done again, while it is.
+    var runningMacroID: UUID?
+    /// Opens the Recorded Actions window. Set by the app.
+    @ObservationIgnored var showMacros: (() -> Void)?
+
     /// Lets the user drag out a part of the screen or click a window, then
     /// reads it like any other file.
     func captureScreenshot() {
+        // While recording, the user's usual way to take a screenshot marks
+        // where the macro captures.
+        if let activeRecording {
+            Task { await activeRecording.captureHere() }
+            return
+        }
         guard !isCapturing else { return }
         isCapturing = true
         Task {
@@ -1311,14 +1329,64 @@ final class OCRViewModel {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
-            let pages = await PageByPageCapture().run()
+            let capture = PageByPageCapture()
+            let pages = await capture.run()
             isCapturing = false
-            guard let folder = pages.first?.deletingLastPathComponent() else { return }
-            defer { try? FileManager.default.removeItem(at: folder) }
-            let url = newCaptureURL(named: String(localized: "Pages \(Self.captureDate())"), extension: "tiff")
-            guard PageByPageCapture.assemble(pages, into: url) else { return }
-            showMainWindow?()
-            addCapture(url)
+            await receivePages(pages, scrolled: capture.turnedByScrolling)
+        }
+    }
+
+    /// Scrolls what the user chooses from top to bottom, into one long
+    /// picture read as one document.
+    func captureScrolling() {
+        guard !isCapturing else { return }
+        isCapturing = true
+        Task {
+            let pages = await PageByPageCapture().runScrolling()
+            isCapturing = false
+            await receivePages(pages, scrolled: true)
+        }
+    }
+
+    /// Pages captured one after another, as one document: a long picture when
+    /// they were scrolled through, else a page each.
+    private func receivePages(_ pages: [URL], scrolled: Bool) async {
+        guard let folder = pages.first?.deletingLastPathComponent() else { return }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let images = pages.compactMap { PageImages.wholeImage(at: $0) }
+        let files = await captureFiles(for: images, as: scrolled ? .longImage : .document, named: nil)
+        guard !files.isEmpty else { return }
+        showMainWindow?()
+        addCaptures(files)
+    }
+
+    /// Writes what was captured into the screenshots folder: one document,
+    /// one long picture (or a few, for a very long one) or a file each.
+    /// `name` heads the file names; by default they say what they are.
+    func captureFiles(for images: [CGImage], as output: Macro.Output, named name: String?) async -> [URL] {
+        guard !images.isEmpty else { return [] }
+        let date = Self.captureDate()
+        func png(_ image: CGImage, _ label: String) -> URL? {
+            let url = newCaptureURL(named: label, extension: "png")
+            return PageByPageCapture.write(image, to: url) ? url : nil
+        }
+        switch output {
+        case .images:
+            return images.compactMap { png($0, name.map { "\($0) \(date)" } ?? String(localized: "Screenshot \(date)")) }
+        case .longImage where images.count > 1:
+            let joined = await Task.detached { [images] in ScrollStitcher.stitch(images) }.value
+            if let joined {
+                return joined.compactMap { png($0, name.map { "\($0) \(date)" } ?? String(localized: "Long Screenshot \(date)")) }
+            }
+            // Not one scrolled view after all: pages, then.
+            return await captureFiles(for: images, as: .document, named: name)
+        case .document, .longImage:
+            if images.count == 1 {
+                return [png(images[0], name.map { "\($0) \(date)" } ?? String(localized: "Screenshot \(date)"))].compactMap { $0 }
+            }
+            let url = newCaptureURL(named: name.map { "\($0) \(date)" } ?? String(localized: "Pages \(date)"),
+                                    extension: "tiff")
+            return PageByPageCapture.assemble(images, into: url) ? [url] : []
         }
     }
 
@@ -1358,11 +1426,17 @@ final class OCRViewModel {
 
     /// Adds a capture to the list, selected, and reads it.
     private func addCapture(_ url: URL) {
+        addCaptures([url])
+    }
+
+    /// Adds captures to the list, selected, and reads them.
+    func addCaptures(_ urls: [URL]) {
         let before = Set(items.map(\.id))
-        add([(url, nil)])
-        guard let new = items.first(where: { !before.contains($0.id) }) else { return }
-        selectedIDs = [new.id]
-        recognize(ids: [new.id], useCache: false)
+        add(urls.map { ($0, nil) })
+        let new = Set(items.filter { !before.contains($0.id) }.map(\.id))
+        guard !new.isEmpty else { return }
+        selectedIDs = new
+        recognize(ids: new, useCache: false)
     }
 
     /// Asks the main window to show the file picker.

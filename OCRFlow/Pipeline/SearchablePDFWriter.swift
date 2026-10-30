@@ -103,8 +103,10 @@ enum SearchablePDFWriter {
     /// becomes an A4 page rather than a poster. Screenshots and photos, which
     /// carry 72 or nothing, come out at 72.
     private static func resolution(of url: URL, frame: Int) -> CGFloat {
+        // The pages of a long screenshot all come from its one frame.
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, frame, nil) as? [CFString: Any],
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, min(frame, CGImageSourceGetCount(source) - 1),
+                                                                  nil) as? [CFString: Any],
               let dpi = properties[kCGImagePropertyDPIWidth] as? Double, dpi >= 72 else { return 72 }
         return CGFloat(dpi)
     }

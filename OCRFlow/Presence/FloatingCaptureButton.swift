@@ -133,6 +133,26 @@ final class FloatingCaptureButton {
         menu.addItem(MenuAction.item(String(localized: "Capture Page by Page…")) { [weak model] in
             model?.capturePageByPage()
         })
+        menu.addItem(MenuAction.item(String(localized: "Scrolling Capture…")) { [weak model] in
+            model?.captureScrolling()
+        })
+        menu.addItem(.separator())
+        menu.addItem(MenuAction.item(String(localized: "Record Actions…")) { [weak model] in
+            model?.recordMacro()
+        })
+        if !model.macros.macros.isEmpty {
+            let run = NSMenuItem(title: String(localized: "Run Recorded Actions"), action: nil, keyEquivalent: "")
+            let list = NSMenu()
+            list.autoenablesItems = false
+            for macro in model.macros.macros {
+                let item = MenuAction.item(macro.name) { [weak model] in model?.runMacro(id: macro.id) }
+                item.isEnabled = !model.isCapturing && !macro.steps.isEmpty
+                list.addItem(item)
+            }
+            run.submenu = list
+            menu.addItem(run)
+        }
+        menu.addItem(.separator())
         menu.addItem(MenuAction.item(String(localized: "Open OCRFlow")) { [weak model] in
             model?.showMainWindow?()
         })

@@ -1,9 +1,27 @@
 import AppKit
 
 // A five-page "document" for testing page-by-page capture. → or the Next
-// button turns the page; the last page does not turn. SIGUSR1 moves the window.
+// button turns the page; the last page does not turn. SIGUSR1 moves the window;
+// SIGUSR2 moves the Next button to the window's other side.
+// With "scroll" after the path: one long page of 120 lines to scroll instead.
 // Writes its window id, frame and button centre (event coordinates) to argv[1].
 let infoPath = CommandLine.arguments[1]
+let scrolling = CommandLine.arguments.dropFirst(2).first == "scroll"
+
+final class LongPage: NSView {
+    static let lines = 120
+    override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.white.setFill(); dirtyRect.fill()
+        for line in 1...Self.lines {
+            let top = CGFloat(line - 1) * 34 + 16
+            guard top + 34 >= dirtyRect.minY, top <= dirtyRect.maxY else { continue }
+            let text = "Line \(line): " + String(repeating: "text\(line % 7) ", count: 2 + (line * 5) % 9)
+            (text as NSString).draw(at: NSPoint(x: 30, y: top),
+                                    withAttributes: [.font: NSFont.systemFont(ofSize: 20), .foregroundColor: NSColor.black])
+        }
+    }
+}
 
 final class Slide: NSView {
     var page = 1 { didSet { needsDisplay = true } }
@@ -41,9 +59,16 @@ button.frame = NSRect(x: 780, y: 20, width: 90, height: 32)
 // Keys stay with the page after the button is clicked.
 button.refusesFirstResponder = true
 slide.addSubview(button)
-window.contentView = slide
+if scrolling {
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+    scroll.hasVerticalScroller = true
+    scroll.documentView = LongPage(frame: NSRect(x: 0, y: 0, width: 880, height: CGFloat(LongPage.lines) * 34 + 40))
+    window.contentView = scroll
+} else {
+    window.contentView = slide
+}
 window.makeKeyAndOrderFront(nil)
-window.makeFirstResponder(slide)
+window.makeFirstResponder(scrolling ? window.contentView : slide)
 
 func report() {
     let top = NSScreen.screens[0].frame.maxY
@@ -62,4 +87,11 @@ move.setEventHandler {
     report()
 }
 move.resume()
+signal(SIGUSR2, SIG_IGN)
+let shift = DispatchSource.makeSignalSource(signal: SIGUSR2, queue: .main)
+shift.setEventHandler {
+    button.setFrameOrigin(NSPoint(x: 20, y: 20))
+    report()
+}
+shift.resume()
 app.run()
