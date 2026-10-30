@@ -10,10 +10,11 @@ extension OCRViewModel {
         let recording = MacroRecording()
         activeRecording = recording
         Task {
-            let steps = await recording.run()
+            let recorded = await recording.run()
             activeRecording = nil
             isCapturing = false
-            guard let steps else { return }
+            guard let recorded else { return }
+            let steps = recorded.steps
             let captures = steps.filter { if case .capture = $0.action { true } else { false } }.count
             let onlyScrolls = steps.allSatisfy { step in
                 switch step.action {
@@ -27,6 +28,7 @@ extension OCRViewModel {
             macro.repetition = captures > 0 ? .untilUnchanged : .once
             macro.output = captures > 0 && onlyScrolls ? .longImage : .document
             macros.macros.append(macro)
+            for (step, image) in recorded.captures { macros.keep(image, for: step) }
             selectedMacroID = macro.id
             showMacros?()
         }
@@ -41,14 +43,31 @@ extension OCRViewModel {
         let shown = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }
         shown.forEach { $0.orderOut(nil) }
         Task {
-            let runs = await MacroPlayer().run(macro)
+            let player = MacroPlayer()
+            var runs = await player.run(macro)
+            defer { try? FileManager.default.removeItem(at: player.folder) }
             isCapturing = false
             runningMacroID = nil
             shown.forEach { $0.orderFront(nil) }
-            var files: [URL] = []
-            for images in runs where !images.isEmpty {
-                files += await captureFiles(for: images, as: macro.output, named: macro.name)
+
+            // What was captured while recording comes first: the run started
+            // where the recording left off. Unless the run began by taking
+            // the same again — on a page it opened afresh, say.
+            var recorded = macros.recordedCaptures(of: macro)
+            if !recorded.isEmpty {
+                if let last = recorded.last, let first = runs.first?.first,
+                   let a = PageImages.wholeImage(at: last).flatMap({ PageFingerprint($0) }),
+                   let b = PageImages.wholeImage(at: first).flatMap({ PageFingerprint($0) }), a.isSamePage(as: b) {
+                    recorded.removeLast()
+                }
+                if runs.isEmpty { runs = [recorded] } else { runs[0] = recorded + runs[0] }
             }
+
+            var files: [URL] = []
+            for pages in runs where !pages.isEmpty {
+                files += await captureFiles(from: pages, as: macro.output, named: macro.name)
+            }
+            macros.discardRecordedCaptures(of: macro)
             guard !files.isEmpty else { return }
             showMainWindow?()
             addCaptures(files)

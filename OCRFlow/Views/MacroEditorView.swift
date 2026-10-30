@@ -74,7 +74,8 @@ private struct MacroDetailView: View {
                     Text("No steps.").foregroundStyle(.secondary)
                 }
                 ForEach($macro.steps) { $step in
-                    MacroStepRow(step: $step, number: (macro.steps.firstIndex { $0.id == step.id } ?? 0) + 1)
+                    MacroStepRow(step: $step, number: (macro.steps.firstIndex { $0.id == step.id } ?? 0) + 1,
+                                 recorded: vm.macros.recordedCapture(for: step.id))
                         .contextMenu {
                             Button("Move Up") { move(step.id, by: -1) }
                                 .disabled(macro.steps.first?.id == step.id)
@@ -183,6 +184,8 @@ private struct MacroDetailView: View {
 private struct MacroStepRow: View {
     @Binding var step: MacroStep
     let number: Int
+    /// What a capture step took while it was recorded, still to be handed on.
+    let recorded: URL?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -197,6 +200,17 @@ private struct MacroStepRow: View {
                 Text(MacroStepDescription.title(of: step))
                 if let place = MacroStepDescription.place(of: step) {
                     Text(place).font(.caption).foregroundStyle(.secondary)
+                }
+                if let recorded, let preview = PageImages.thumbnail(of: recorded, maxPixels: 240) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(decorative: preview, scale: 2)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                            .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.separator))
+                        Text("Captured while recording. It comes first in the next run; deleting this step deletes it too.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 editor
             }

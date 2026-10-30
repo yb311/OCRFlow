@@ -1771,6 +1771,16 @@
         }
       }
     },
+    "Captured while recording. It comes first in the next run; deleting this step deletes it too." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制时截取的，下次运行时排在最前面。删除这一步，这张图也会一起删除。"
+          }
+        }
+      }
+    },
     "Captures become" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1967,6 +1977,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择图片、PDF 或文件夹（包括其中的子文件夹）"
+          }
+        }
+      }
+    },
+    "Choose where to export the originals of %lld files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择导出位置，%lld 个文件的原图会保存在这里"
           }
         }
       }
@@ -3163,6 +3183,16 @@
         }
       }
     },
+    "Export All Original Files…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出全部原图…"
+          }
+        }
+      }
+    },
     "Export All Results (%lld Files)…" : {
       "localizations" : {
         "en" : {
@@ -3217,6 +3247,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导出到此处"
+          }
+        }
+      }
+    },
+    "Export Original Files…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出原图…"
+          }
+        }
+      }
+    },
+    "Export Original File…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出原图…"
           }
         }
       }
@@ -3325,6 +3375,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "导出 %lld 个文件的识别结果（合并为一个文件）"
+          }
+        }
+      }
+    },
+    "Export the original of “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出“%@”的原图"
           }
         }
       }

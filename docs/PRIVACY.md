@@ -21,7 +21,9 @@ locally. There are no accounts, no analytics and no tracking.
 - For **Record Actions**, the steps you record — clicks, key presses, text you
   type, scrolls, the names of buttons you click and the windows they are in —
   are saved in `Macros.json` inside `Library` until you delete the macro, and
-  repeated with the Accessibility permission. They are watched only between
+  repeated with the Accessibility permission. What you capture while
+  recording waits in `Macro Captures` beside it until the macro next runs, or
+  until you delete that step. They are watched only between
   starting a recording and clicking Done or Cancel. Text typed while recording
   is saved as typed, so avoid recording passwords.
 
@@ -66,7 +68,7 @@ macOS wrote, with your home folder replaced by `~`.
 - 下载的模型,存放在 `~/Library/Application Support/OCRFlow/Models`。
 - 截图,存放在 `Library` 里的 `Screenshots` 文件夹。截图需要 macOS 的“录屏”权限;只有在你截图时,应用才会读取屏幕。
 - 使用**逐页截取**时,你演示翻页时的点按、按键和滚动。它们只在这次截取期间保存在内存里,并借助 macOS 的“辅助功能”权限重复执行;除此之外不会记录你的任何输入。
-- 使用**录制操作**时,你录下的步骤——点按、按键、输入的文字、滚动,以及点按的按钮名称和所在窗口——保存在 `Library` 里的 `Macros.json`,直到你删除这个操作为止,并借助“辅助功能”权限重复执行。只有从开始录制到点按“完成”或“取消”的这段时间才会记录。录制时输入的文字会原样保存,请不要录制密码。
+- 使用**录制操作**时,你录下的步骤——点按、按键、输入的文字、滚动,以及点按的按钮名称和所在窗口——保存在 `Library` 里的 `Macros.json`,直到你删除这个操作为止,并借助“辅助功能”权限重复执行。录制时截的图存放在旁边的 `Macro Captures` 文件夹里,下次运行这个操作时取用,或者在你删除那一步时一起删除。只有从开始录制到点按“完成”或“取消”的这段时间才会记录。录制时输入的文字会原样保存,请不要录制密码。
 
 从历史记录里删除一条,会删除它的文字和识别结果。**清除历史记录**会删除全部记录,连同识别缓存一起清空。删除上面的 `OCRFlow` 文件夹,就会清除应用存储的全部数据。
 

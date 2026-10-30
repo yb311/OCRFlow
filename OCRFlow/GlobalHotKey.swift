@@ -27,6 +27,14 @@ final class GlobalHotKey {
         GlobalHotKey(id: 2, keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(optionKey | shiftKey | cmdKey), action: action)
     }
 
+    /// Whether a key press is one of OCRFlow's own shortcuts: while
+    /// recording, it takes a capture rather than being a step.
+    nonisolated static func isOwn(keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        let held = flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl])
+        return held == [.maskCommand, .maskShift, .maskAlternate]
+            && (keyCode == UInt16(kVK_ANSI_2) || keyCode == UInt16(kVK_ANSI_3))
+    }
+
     private let id: UInt32
     private let keyCode: UInt32
     private let modifiers: UInt32

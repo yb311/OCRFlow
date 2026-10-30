@@ -67,6 +67,97 @@ extension OCRViewModel {
         }
     }
 
+    // MARK: - Originals
+
+    /// The files themselves, as they were added — screenshots, scans, PDFs —
+    /// whether or not they have been read. A capture of several pages comes
+    /// out as a picture a page, in a folder of its own.
+    func exportOriginals(ids: Set<UUID>) {
+        let targets = items.filter { ids.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        if targets.count == 1, Self.pagesInside(targets[0].url) == 1 {
+            let item = targets[0]
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = item.url.lastPathComponent
+            panel.message = String(localized: "Export the original of “\(item.fileName)”")
+            panel.prompt = String(localized: "Export")
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try? FileManager.default.removeItem(at: url)
+            do {
+                try FileManager.default.copyItem(at: item.url, to: url)
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                reportExportFailures([String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")])
+            }
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = String(localized: "Choose where to export the originals of \(targets.count) files")
+        panel.prompt = String(localized: "Export Here")
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        var written: [URL] = []
+        var failures: [String] = []
+        for item in targets {
+            do {
+                written.append(try Self.exportOriginal(item.url, into: folder))
+            } catch {
+                failures.append(String(localized: "\(item.fileName): \(error.localizedDescription)"))
+            }
+        }
+        reportExportFailures(failures)
+        if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+    }
+
+    /// Pages held in one image file: more than one only in a multi-page TIFF.
+    /// A long screenshot is one picture here, however it is read.
+    private nonisolated static func pagesInside(_ url: URL) -> Int {
+        guard url.pathExtension.lowercased() != "pdf",
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              (CGImageSourceGetType(source) as String?) == UTType.tiff.identifier else { return 1 }
+        return max(1, CGImageSourceGetCount(source))
+    }
+
+    /// Copies a file into `folder` under a name not taken there — or, for a
+    /// file of several pages, writes a folder of PNGs. Returns what it wrote.
+    nonisolated static func exportOriginal(_ source: URL, into folder: URL) throws -> URL {
+        func free(_ name: String, _ pathExtension: String?) -> URL {
+            func url(_ name: String) -> URL {
+                let url = folder.appending(path: name)
+                return pathExtension.map { url.appendingPathExtension($0) } ?? url
+            }
+            var candidate = url(name), count = 1
+            while FileManager.default.fileExists(atPath: candidate.path(percentEncoded: false)) {
+                count += 1
+                candidate = url("\(name) \(count)")
+            }
+            return candidate
+        }
+        let stem = source.deletingPathExtension().lastPathComponent
+        let pages = pagesInside(source)
+        guard pages > 1 else {
+            let target = free(stem, source.pathExtension)
+            try FileManager.default.copyItem(at: source, to: target)
+            return target
+        }
+        let pagesFolder = free(stem, nil)
+        try FileManager.default.createDirectory(at: pagesFolder, withIntermediateDirectories: true)
+        let digits = String(pages).count
+        for page in 0..<pages {
+            guard let image = PageImages.wholeImage(at: source, frame: page),
+                  let destination = CGImageDestinationCreateWithURL(
+                      pagesFolder.appending(path: "\(stem) \(String(format: "%0\(digits)d", page + 1)).png") as CFURL,
+                      UTType.png.identifier as CFString, 1, nil) else { continue }
+            CGImageDestinationAddImage(destination, image, nil)
+            CGImageDestinationFinalize(destination)
+        }
+        return pagesFolder
+    }
+
     /// Writes one exported file; says what went wrong when it could not.
     private func write(_ data: Data, to url: URL) -> String? {
         do {

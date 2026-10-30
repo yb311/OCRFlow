@@ -9,9 +9,17 @@ final class MacroRecording {
     private let recorder = MacroRecorder()
     private let state = MacroRecordState()
     private var panel: NSPanel?
+    /// What each capture took while recording, in order.
+    private var taken: [CGImage] = []
 
-    /// The steps, or nil when cancelled.
-    func run() async -> [MacroStep]? {
+    struct Recorded {
+        var steps: [MacroStep]
+        /// What each capture step took while recording, by step.
+        var captures: [UUID: CGImage]
+    }
+
+    /// The steps and what was captured, or nil when cancelled.
+    func run() async -> Recorded? {
         guard InputControl.isAllowed(), ScreenCapture.checkAllowed() else { return nil }
         panel = HUDPanel.show(MacroRecordView(state: state), avoiding: ScreenWindows.frontWindow().map { window in
             let top = NSScreen.screens.first?.frame.maxY ?? 0
@@ -36,7 +44,11 @@ final class MacroRecording {
         let steps = await recorder.stop()
         panel?.orderOut(nil)
         panel = nil
-        return done && !steps.isEmpty ? steps : nil
+        guard done, !steps.isEmpty else { return nil }
+        // Steps are made of what was recorded in order, every capture kept.
+        let captureSteps = steps.filter { if case .capture = $0.action { true } else { false } }
+        return Recorded(steps: steps,
+                        captures: Dictionary(uniqueKeysWithValues: zip(captureSteps.map(\.id), taken)))
     }
 
     /// The user chooses an area or a window, and taking it becomes a step.
@@ -48,6 +60,7 @@ final class MacroRecording {
               let step = Self.captureStep(for: chosen.target),
               case let .capture(area) = step.action else { return }
         recorder.addCapture(area, in: step.window)
+        taken.append(chosen.image)
     }
 
     /// A step that takes the same again: the same window, or the same part

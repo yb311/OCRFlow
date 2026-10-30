@@ -21,8 +21,15 @@ final class MacroPlayer {
     /// Windows already put back where they were recorded, this run.
     private var restored: Set<CGWindowID> = []
 
-    /// What the capture steps took: one list for each address, or one in all.
-    func run(_ macro: Macro) async -> [[CGImage]] {
+    /// Where what the capture steps take is written, as it is taken: a long
+    /// run's screenfuls do not fit in memory. The caller removes it.
+    let folder = URL.temporaryDirectory.appending(path: "OCRFlow Run \(UUID().uuidString)", directoryHint: .isDirectory)
+    private var written = 0
+
+    /// What the capture steps took, as files in `folder`: one list for each
+    /// address, or one in all.
+    func run(_ macro: Macro) async -> [[URL]] {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         guard InputControl.isAllowed(), ScreenCapture.checkAllowed() else { return [] }
         state.name = macro.name
         let urls: [URL?] = macro.openableURLs.isEmpty ? [nil] : macro.openableURLs
@@ -39,7 +46,7 @@ final class MacroPlayer {
             panel = nil
         }
 
-        var results: [[CGImage]] = []
+        var results: [[URL]] = []
         for (index, url) in urls.enumerated() {
             guard !stopRequested else { break }
             state.address = index + 1
@@ -52,14 +59,14 @@ final class MacroPlayer {
     }
 
     /// The steps, again and again as the macro says, with what they took.
-    private func rounds(of macro: Macro) async -> [CGImage] {
+    private func rounds(of macro: Macro) async -> [URL] {
         let limit: Int
         switch macro.repetition {
         case .once: limit = 1
         case let .times(count): limit = max(1, min(count, Self.roundLimit))
         case .untilUnchanged: limit = Self.roundLimit
         }
-        var taken: [CGImage] = []
+        var taken: [URL] = []
         var firstLook: PageFingerprint?
         var lastLook: PageFingerprint?
         var round = 0
@@ -73,7 +80,7 @@ final class MacroPlayer {
                 if let image = await perform(step) { took.append(image) }
             }
             guard !stopRequested else {
-                taken += took
+                taken += keep(took)
                 break
             }
 
@@ -93,10 +100,19 @@ final class MacroPlayer {
             if case .untilUnchanged = macro.repetition, round > 2, let look, let firstLook, look.isSamePage(as: firstLook) { break }
             if firstLook == nil { firstLook = look }
             lastLook = look
-            taken += took
+            taken += keep(took)
             state.captured += took.count
         }
         return taken
+    }
+
+    /// Writes pictures to `folder`, numbered in the order taken.
+    private func keep(_ images: [CGImage]) -> [URL] {
+        images.compactMap { image in
+            written += 1
+            let url = folder.appending(path: String(format: "%04d.png", written))
+            return PageByPageCapture.write(image, to: url) ? url : nil
+        }
     }
 
     // MARK: - Steps

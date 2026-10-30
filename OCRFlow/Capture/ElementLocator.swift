@@ -71,10 +71,10 @@ enum ElementLocator {
                                y: (window?.minY ?? 0) + description.center.y)
         var best: (element: AXUIElement, frame: CGRect, distance: CGFloat)?
         let deadline = Date().addingTimeInterval(1.5)
-        var queue = roots, seen = 0
-        while !queue.isEmpty, seen < 8000, Date() < deadline {
-            let element = queue.removeFirst()
-            seen += 1
+        var queue = roots, next = 0
+        while next < queue.count, next < 8000, Date() < deadline {
+            let element = queue[next]
+            next += 1
             if matches(element, description), let frame = frame(of: element), frame.width > 0, frame.height > 0 {
                 let distance = hypot(frame.midX - expected.x, frame.midY - expected.y)
                 if distance < best?.distance ?? .infinity { best = (element, frame, distance) }

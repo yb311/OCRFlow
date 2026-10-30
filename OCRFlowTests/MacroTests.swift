@@ -322,4 +322,98 @@ struct MacroTests {
         #expect(decoded == macro)
         #expect(decoded.openableURLs.map(\.absoluteString) == ["https://example.com/a", "https://example.com/b"])
     }
+
+    // MARK: - Files
+
+    private func folder() throws -> URL {
+        let url = URL.temporaryDirectory.appending(path: "macro-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func save(_ image: CGImage, to url: URL) {
+        let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+    }
+
+    /// Joined from files, read a pair at a time, as from pictures in memory.
+    @Test func joinsScrolledPicturesFromFiles() throws {
+        let page = longPage()
+        let layout = Layout()
+        let frames = [0, 300, 600, 900].map { frame(of: page, at: $0, layout) }
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let files = frames.enumerated().map { index, frame in
+            let url = folder.appending(path: "\(index).png")
+            save(frame, to: url)
+            return url
+        }
+        let fromFiles = try #require(ScrollStitcher.stitch(files)?.first)
+        let fromMemory = try #require(ScrollStitcher.stitch(frames)?.first)
+        #expect(fromFiles.height == fromMemory.height)
+        #expect(pixels(fromFiles) == pixels(fromMemory))
+    }
+
+    @Test func theCaptureShortcutsAreNotSteps() {
+        let held: CGEventFlags = [.maskCommand, .maskShift, .maskAlternate]
+        #expect(GlobalHotKey.isOwn(keyCode: 19, flags: held))
+        #expect(GlobalHotKey.isOwn(keyCode: 20, flags: held.union(.maskNonCoalesced)))
+        #expect(!GlobalHotKey.isOwn(keyCode: 19, flags: [.maskCommand, .maskShift]))
+        #expect(!GlobalHotKey.isOwn(keyCode: 124, flags: held))
+    }
+
+    /// What a step captured while recorded is kept until the step goes.
+    @MainActor @Test func aRecordedCaptureGoesWithItsStep() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let library = MacroLibrary(directory: folder)
+        let capture = MacroStep(action: .capture(CaptureArea(rect: nil)))
+        let key = MacroStep(action: .key(MacroStep.Key(keyCode: 124)))
+        library.macros = [Macro(name: "Deck", steps: [capture, key])]
+        library.keep(longPage(height: 600), for: capture.id)
+        #expect(library.recordedCaptures(of: library.macros[0]).count == 1)
+
+        // Kept across launches.
+        #expect(MacroLibrary(directory: folder).recordedCapture(for: capture.id) != nil)
+
+        library.macros[0].steps.removeAll { $0.id == capture.id }
+        #expect(library.recordedCapture(for: capture.id) == nil)
+    }
+
+    @MainActor @Test func aRunTakesTheRecordedCapturesIn() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let library = MacroLibrary(directory: folder)
+        let capture = MacroStep(action: .capture(CaptureArea(rect: nil)))
+        library.macros = [Macro(name: "Deck", steps: [capture])]
+        library.keep(longPage(height: 600), for: capture.id)
+        library.discardRecordedCaptures(of: library.macros[0])
+        #expect(library.recordedCaptures(of: library.macros[0]).isEmpty)
+        #expect(library.macros[0].steps.count == 1)
+    }
+
+    /// A capture of several pages comes out as a picture a page; any other
+    /// file as it is, under a name not taken.
+    @Test func originalsAreExportedAsTheyWere() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let out = folder.appending(path: "out", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+
+        let tiff = folder.appending(path: "Pages.tiff")
+        #expect(PageByPageCapture.assemble((1...3).map { longPage(height: 500, seed: $0) }, into: tiff))
+        let pages = try OCRViewModel.exportOriginal(tiff, into: out)
+        let written = try FileManager.default.contentsOfDirectory(atPath: pages.path(percentEncoded: false)).sorted()
+        #expect(written == ["Pages 1.png", "Pages 2.png", "Pages 3.png"])
+
+        let png = folder.appending(path: "Shot.png")
+        save(longPage(height: 3000), to: png)
+        let first = try OCRViewModel.exportOriginal(png, into: out)
+        let second = try OCRViewModel.exportOriginal(png, into: out)
+        #expect(first.lastPathComponent == "Shot.png")
+        #expect(second.lastPathComponent == "Shot 2.png")
+        // The long screenshot whole, not cut into the pages it is read as.
+        #expect(PageImages.wholeImage(at: first)?.height == 3000)
+    }
 }

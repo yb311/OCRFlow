@@ -126,6 +126,9 @@ struct SidebarView: View {
                             if allFailed {
                                 Button("Copy Diagnostic Info") { vm.copyDiagnostics(for: targetIDs) }
                             }
+                            Button(count > 1 ? "Export Original Files…" : "Export Original File…") {
+                                vm.exportOriginals(ids: targetIDs)
+                            }
                             Divider()
                             if count == 1 {
                                 Button("Show in Finder") {

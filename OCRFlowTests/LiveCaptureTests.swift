@@ -272,8 +272,10 @@ final class LiveCaptureTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(600))
         let steps = await recorder.stop()
         try await beforeRunning()
-        let runs = await MacroPlayer().run(Macro(name: "Slides", steps: steps))
-        return (steps, runs.first ?? [])
+        let player = MacroPlayer()
+        let runs = await player.run(Macro(name: "Slides", steps: steps))
+        defer { try? FileManager.default.removeItem(at: player.folder) }
+        return (steps, (runs.first ?? []).compactMap { PageImages.wholeImage(at: $0) })
     }
 
     private func assertSlides(_ pages: [CGImage], from first: Int, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -392,6 +394,36 @@ extension LiveCaptureTests {
         // The recorded scroll moved the page before the first capture was
         // repeated; from there, everything to the end.
         XCTAssertGreaterThan(joined[0].height, 6000)
+    }
+}
+
+extension LiveCaptureTests {
+    /// Recording started with another app in front — OCRFlow, when started
+    /// from its window: the click that brings the slides forward only does
+    /// that, and is no step. Repeated, it would click the page every round.
+    func testTheClickThatOnlyBringsAWindowForwardIsNoStep() async throws {
+        let slides = try XCTUnwrap(slides)
+        // Another app in front: a second copy of the helper, moved aside to
+        // leave a strip of the first one showing on the left.
+        let other = try await launch(helper)
+        defer { other.process.terminate() }
+        kill(other.process.processIdentifier, SIGUSR1)
+        try await Task.sleep(for: .milliseconds(600))
+        try XCTSkipUnless(NSWorkspace.shared.frontmostApplication?.processIdentifier == other.process.processIdentifier,
+                          "The second helper did not come to the front")
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let recorder = MacroRecorder()
+        recorder.start()
+        click(CGPoint(x: frame.minX + 30, y: top - frame.midY))
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, slides.process.processIdentifier)
+        press(124)   // →
+        try await Task.sleep(for: .milliseconds(500))
+        let steps = await recorder.stop()
+        XCTAssertEqual(steps.count, 1, "\(steps)")
+        guard case let .key(key)? = steps.first?.action else { return XCTFail("not a key: \(steps)") }
+        XCTAssertEqual(key.keyCode, 124)
     }
 }
 

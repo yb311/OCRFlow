@@ -1,4 +1,6 @@
 import CoreGraphics
+import Foundation
+import ImageIO
 
 /// Joins pictures of something scrolled, one after another, into one long
 /// picture.
@@ -18,30 +20,72 @@ enum ScrollStitcher {
     /// `maxHeight`. Nil when the pictures are not one scrolled view, such as
     /// slides turned one by one.
     static func stitch(_ images: [CGImage], maxHeight: Int = maxHeight) -> [CGImage]? {
-        guard images.count > 1,
-              let width = images.map(\.width).min(), let height = images.map(\.height).min(),
-              images.allSatisfy({ $0.width - width <= 4 && $0.height - height <= 4 }) else { return nil }
-        // A pixel or two of difference, from rounding, is cut off.
-        var images = images.compactMap { image in
-            image.width == width && image.height == height
-                ? image : image.cropping(to: CGRect(x: 0, y: 0, width: width, height: height))
+        stitch(count: images.count, maxHeight: maxHeight) { images[$0] }
+    }
+
+    /// The same, from files.
+    static func stitch(_ files: [URL], maxHeight: Int = maxHeight) -> [CGImage]? {
+        stitch(count: files.count, maxHeight: maxHeight) { index in
+            guard let source = CGImageSourceCreateWithURL(files[index] as CFURL, nil) else { return nil }
+            return CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
         }
-        guard images.count > 1, let first = images.first else { return nil }
-        var grays = images.map(Gray.init)
-        if let span = movingColumns(grays), span.count < first.width * 9 / 10 {
-            let cut = CGRect(x: span.lowerBound, y: 0, width: span.count, height: first.height)
-            let cropped = images.compactMap { $0.cropping(to: cut) }
-            guard cropped.count == images.count else { return nil }
-            images = cropped
-            grays = images.map(Gray.init)
+    }
+
+    /// The pictures are asked for as they are needed, a pair at a time, and
+    /// several times over: hundreds of screenfuls do not fit in memory at
+    /// once.
+    static func stitch(count: Int, maxHeight: Int = maxHeight, picture: (Int) -> CGImage?) -> [CGImage]? {
+        guard count > 1 else { return nil }
+        var sizes: [(width: Int, height: Int)] = []
+        for index in 0..<count {
+            guard let image = picture(index) else { return nil }
+            sizes.append((image.width, image.height))
         }
-        let (top, bottom) = fixedEdges(grays)
+        guard let width = sizes.map(\.width).min(), let height = sizes.map(\.height).min(),
+              sizes.allSatisfy({ $0.width - width <= 4 && $0.height - height <= 4 }) else { return nil }
+
+        // A pixel or two of difference, from rounding, is cut off; so is a
+        // sidebar that stays put.
+        var cut = CGRect(x: 0, y: 0, width: width, height: height)
+        func frame(_ index: Int) -> CGImage? {
+            guard let image = picture(index) else { return nil }
+            return image.width == Int(cut.width) && image.height == Int(cut.height) && cut.minX == 0
+                ? image : image.cropping(to: cut)
+        }
+        /// Each pair of neighbours in turn, in grey.
+        func pairs(_ body: (Gray, Gray) -> Bool) -> Bool {
+            guard let first = frame(0) else { return false }
+            var previous = Gray(first)
+            for index in 1..<count {
+                guard let image = frame(index) else { return false }
+                let next = Gray(image)
+                guard body(previous, next) else { return false }
+                previous = next
+            }
+            return true
+        }
+
+        var moving = [Bool](repeating: false, count: width)
+        guard pairs({ markMovingColumns(from: $0, to: $1, in: &moving); return true }) else { return nil }
+        if let span = columns(moving), span.count < width * 9 / 10 {
+            cut = CGRect(x: span.lowerBound, y: 0, width: span.count, height: height)
+        }
+
+        var top = height / 2, bottom = height / 2 - 1
+        guard pairs({ a, b in
+            top = sameRows(a, b, from: 0, by: 1, upTo: top)
+            bottom = sameRows(a, b, from: height - 1, by: -1, upTo: bottom)
+            return true
+        }) else { return nil }
+
         var shifts: [Int] = []
-        for (a, b) in zip(grays, grays.dropFirst()) {
-            guard let shift = shift(from: a, to: b, top: top, bottom: bottom, near: shifts.last) else { return nil }
+        guard pairs({ a, b in
+            guard let shift = shift(from: a, to: b, top: top, bottom: bottom, near: shifts.last) else { return false }
             shifts.append(shift)
-        }
-        return compose(images, shifts: shifts, top: top, bottom: bottom, maxHeight: maxHeight)
+            return true
+        }) else { return nil }
+        return compose(count: count, shifts: shifts, height: height, top: top, bottom: bottom,
+                       maxHeight: maxHeight, picture: frame)
     }
 
     // MARK: - Measuring
@@ -114,40 +158,36 @@ enum ScrollStitcher {
         }
     }
 
-    /// The columns that change from one picture to the next, with a little
-    /// room either side. Nil when nothing changes.
-    static func movingColumns(_ grays: [Gray]) -> Range<Int>? {
-        guard let first = grays.first else { return nil }
-        let rows = Array(stride(from: 0, to: first.height, by: 4))
-        func moves(_ x: Int) -> Bool {
-            zip(grays, grays.dropFirst()).contains { a, b in
-                var sum = 0
-                for y in rows { sum += abs(Int(a.pixels[y * a.width + x]) - Int(b.pixels[y * b.width + x])) }
-                return sum > rows.count * 3 / 2
-            }
+    /// Marks the columns that differ between two pictures.
+    static func markMovingColumns(from a: Gray, to b: Gray, in moving: inout [Bool]) {
+        let rows = Array(stride(from: 0, to: a.height, by: 4))
+        for x in 0..<min(moving.count, a.width) where !moving[x] {
+            var sum = 0
+            for y in rows { sum += abs(Int(a.pixels[y * a.width + x]) - Int(b.pixels[y * b.width + x])) }
+            if sum > rows.count * 3 / 2 { moving[x] = true }
         }
-        guard let left = (0..<first.width).first(where: moves),
-              let right = (0..<first.width).last(where: moves) else { return nil }
-        let room = 12
-        return max(0, left - room)..<min(first.width, right + 1 + room)
     }
 
-    /// Rows at the top and at the bottom that are the same in every picture.
+    /// The marked columns, first to last, with a little room either side.
+    /// Nil when none is marked.
+    static func columns(_ moving: [Bool]) -> Range<Int>? {
+        guard let left = moving.firstIndex(of: true), let right = moving.lastIndex(of: true) else { return nil }
+        let room = 12
+        return max(0, left - room)..<min(moving.count, right + 1 + room)
+    }
+
+    /// How many rows from `start`, going `step` at a time, two pictures share
+    /// — at most `limit`.
     ///
-    /// Nearly the same: a title bar over scrolled content lets it show
-    /// through faintly, and shades a little darker or lighter as its window
-    /// comes and goes from the front.
-    static func fixedEdges(_ grays: [Gray]) -> (top: Int, bottom: Int) {
-        guard let first = grays.first else { return (0, 0) }
-        let height = first.height
-        func same(_ y: Int) -> Bool {
-            zip(grays, grays.dropFirst()).allSatisfy { $0.difference(row: y, from: $1, row: y) < 4 }
+    /// Nearly the same is the same: a title bar over scrolled content lets it
+    /// show through faintly, and shades a little darker or lighter as its
+    /// window comes and goes from the front.
+    static func sameRows(_ a: Gray, _ b: Gray, from start: Int, by step: Int, upTo limit: Int) -> Int {
+        var count = 0
+        while count < limit, a.difference(row: start + count * step, from: b, row: start + count * step) < 4 {
+            count += 1
         }
-        var top = 0
-        while top < height / 2, same(top) { top += 1 }
-        var bottom = 0
-        while bottom < height / 2 - 1, same(height - 1 - bottom) { bottom += 1 }
-        return (top, bottom)
+        return count
     }
 
     /// How many rows `b` has moved on from `a` between the fixed edges. Nil
@@ -199,17 +239,17 @@ enum ScrollStitcher {
 
     // MARK: - Drawing
 
-    private typealias Slice = (image: CGImage, rows: Range<Int>)
+    /// Rows of one of the pictures.
+    private typealias Slice = (picture: Int, rows: Range<Int>)
 
-    private static func compose(_ images: [CGImage], shifts: [Int], top: Int, bottom: Int,
-                                maxHeight: Int) -> [CGImage]? {
-        let height = images[0].height
+    private static func compose(count: Int, shifts: [Int], height: Int, top: Int, bottom: Int, maxHeight: Int,
+                                picture: (Int) -> CGImage?) -> [CGImage]? {
         let middle = height - top - bottom
-        // What each picture adds, as rows of it: all of the first above the
-        // footer, then only what came into view at the bottom.
-        var slices: [Slice] = [(images[0], 0..<(top + middle))]
-        for (image, shift) in zip(images.dropFirst(), shifts) {
-            slices.append((image, (top + middle - shift)..<(top + middle)))
+        // What each picture adds: all of the first above the footer, then
+        // only what came into view at the bottom.
+        var slices: [Slice] = [(0, 0..<(top + middle))]
+        for (index, shift) in zip(1..<count, shifts) {
+            slices.append((index, (top + middle - shift)..<(top + middle)))
         }
 
         // Grouped into parts no taller than the limit. A part after the
@@ -218,24 +258,24 @@ enum ScrollStitcher {
         var groupHeight = 0
         for slice in slices {
             if !groups[groups.count - 1].isEmpty, groupHeight + slice.rows.count + top + bottom > maxHeight {
-                groups.append([(slice.image, 0..<top)])
+                groups.append([(slice.picture, 0..<top)])
                 groupHeight = top
             }
             groups[groups.count - 1].append(slice)
             groupHeight += slice.rows.count
         }
-        groups[groups.count - 1].append((images[images.count - 1], (height - bottom)..<height))
+        groups[groups.count - 1].append((count - 1, (height - bottom)..<height))
 
         var parts: [CGImage] = []
         for group in groups {
-            guard let part = draw(group) else { return nil }
+            guard let part = draw(group, picture: picture) else { return nil }
             parts.append(part)
         }
         return parts
     }
 
-    private static func draw(_ slices: [Slice]) -> CGImage? {
-        guard let first = slices.first?.image else { return nil }
+    private static func draw(_ slices: [Slice], picture: (Int) -> CGImage?) -> CGImage? {
+        guard let first = slices.first.flatMap({ picture($0.picture) }) else { return nil }
         let width = first.width
         let total = slices.reduce(0) { $0 + $1.rows.count }
         guard let context = CGContext(data: nil, width: width, height: total, bitsPerComponent: 8, bytesPerRow: 0,
@@ -243,9 +283,14 @@ enum ScrollStitcher {
                                           ?? CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         var y = total
+        var loaded: (index: Int, image: CGImage) = (slices[0].picture, first)
         for slice in slices where !slice.rows.isEmpty {
-            guard let cut = slice.image.cropping(to: CGRect(x: 0, y: slice.rows.lowerBound,
-                                                            width: width, height: slice.rows.count)) else { return nil }
+            if loaded.index != slice.picture {
+                guard let image = picture(slice.picture) else { return nil }
+                loaded = (slice.picture, image)
+            }
+            guard let cut = loaded.image.cropping(to: CGRect(x: 0, y: slice.rows.lowerBound,
+                                                             width: width, height: slice.rows.count)) else { return nil }
             y -= slice.rows.count
             context.draw(cut, in: CGRect(x: 0, y: y, width: width, height: slice.rows.count))
         }

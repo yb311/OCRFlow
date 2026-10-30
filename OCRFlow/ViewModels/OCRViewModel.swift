@@ -1353,40 +1353,43 @@ final class OCRViewModel {
     private func receivePages(_ pages: [URL], scrolled: Bool) async {
         guard let folder = pages.first?.deletingLastPathComponent() else { return }
         defer { try? FileManager.default.removeItem(at: folder) }
-        let images = pages.compactMap { PageImages.wholeImage(at: $0) }
-        let files = await captureFiles(for: images, as: scrolled ? .longImage : .document, named: nil)
+        let files = await captureFiles(from: pages, as: scrolled ? .longImage : .document, named: nil)
         guard !files.isEmpty else { return }
         showMainWindow?()
         addCaptures(files)
     }
 
-    /// Writes what was captured into the screenshots folder: one document,
-    /// one long picture (or a few, for a very long one) or a file each.
+    /// Puts what was captured — one picture a file — into the screenshots
+    /// folder: as one document, one long picture (or a few, for a very long
+    /// one) or a file each. The files given are left where they are.
     /// `name` heads the file names; by default they say what they are.
-    func captureFiles(for images: [CGImage], as output: Macro.Output, named name: String?) async -> [URL] {
-        guard !images.isEmpty else { return [] }
+    func captureFiles(from pages: [URL], as output: Macro.Output, named name: String?) async -> [URL] {
+        guard !pages.isEmpty else { return [] }
         let date = Self.captureDate()
-        func png(_ image: CGImage, _ label: String) -> URL? {
-            let url = newCaptureURL(named: label, extension: "png")
-            return PageByPageCapture.write(image, to: url) ? url : nil
+        func label(_ fallback: String) -> String { name.map { "\($0) \(date)" } ?? fallback }
+        func copy(_ page: URL, _ label: String) -> URL? {
+            let url = newCaptureURL(named: label, extension: page.pathExtension)
+            return (try? FileManager.default.copyItem(at: page, to: url)) == nil ? nil : url
         }
         switch output {
         case .images:
-            return images.compactMap { png($0, name.map { "\($0) \(date)" } ?? String(localized: "Screenshot \(date)")) }
-        case .longImage where images.count > 1:
-            let joined = await Task.detached { [images] in ScrollStitcher.stitch(images) }.value
+            return pages.compactMap { copy($0, label(String(localized: "Screenshot \(date)"))) }
+        case .longImage where pages.count > 1:
+            let joined = await Task.detached { [pages] in ScrollStitcher.stitch(pages) }.value
             if let joined {
-                return joined.compactMap { png($0, name.map { "\($0) \(date)" } ?? String(localized: "Long Screenshot \(date)")) }
+                return joined.compactMap { image in
+                    let url = newCaptureURL(named: label(String(localized: "Long Screenshot \(date)")), extension: "png")
+                    return PageByPageCapture.write(image, to: url) ? url : nil
+                }
             }
             // Not one scrolled view after all: pages, then.
-            return await captureFiles(for: images, as: .document, named: name)
+            return await captureFiles(from: pages, as: .document, named: name)
         case .document, .longImage:
-            if images.count == 1 {
-                return [png(images[0], name.map { "\($0) \(date)" } ?? String(localized: "Screenshot \(date)"))].compactMap { $0 }
+            if pages.count == 1 {
+                return [copy(pages[0], label(String(localized: "Screenshot \(date)")))].compactMap { $0 }
             }
-            let url = newCaptureURL(named: name.map { "\($0) \(date)" } ?? String(localized: "Pages \(date)"),
-                                    extension: "tiff")
-            return PageByPageCapture.assemble(images, into: url) ? [url] : []
+            let url = newCaptureURL(named: label(String(localized: "Pages \(date)")), extension: "tiff")
+            return PageByPageCapture.assemble(pages, into: url) ? [url] : []
         }
     }
 

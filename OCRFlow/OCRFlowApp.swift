@@ -204,6 +204,11 @@ struct OCRFlowApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(viewModel.exportableSelectedCount == 0)
+
+                Button("Export Original Files…") {
+                    viewModel.exportOriginals(ids: viewModel.selectedIDs)
+                }
+                .disabled(viewModel.selectedIDs.isEmpty)
             }
 
             // The app ships no help book, so the standard item would only say

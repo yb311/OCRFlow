@@ -170,9 +170,15 @@ final class MacroRecorder {
 
     private var monitor: Any?
     private var lastScroll: TimeInterval = 0
+    /// The press being left out, until its release.
+    private var skippingPress = false
+    /// The app in front when recording started. Read then, not at the
+    /// click: by the time a click is seen, its app has come forward.
+    private var frontAtStart: pid_t?
     private var lookups: [Task<Void, Never>] = []
 
     func start() {
+        frontAtStart = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let types: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .leftMouseDragged,
                                             .rightMouseDown, .rightMouseUp, .rightMouseDragged,
                                             .otherMouseDown, .otherMouseUp, .otherMouseDragged,
@@ -211,6 +217,18 @@ final class MacroRecorder {
                 : event.type == .rightMouseDown ? .right : .other
             input.kind = .mouseDown(button, clickCount: max(1, event.clickCount))
             let window = ScreenWindows.at(location)
+            // The first click into another app, before anything but
+            // captures, only brings it forward: OCRFlow was in front,
+            // recording having been started there. Repeating it would click
+            // the page each round, which many viewers take as a page turn;
+            // the app is brought forward anyway when the steps are done
+            // again.
+            let nothingDoneYet = inputs.allSatisfy { if case .capture = $0.kind { true } else { false } }
+            if nothingDoneYet, let window, window.pid != frontAtStart {
+                skippingPress = true
+                return
+            }
+            skippingPress = false
             input.window = window.map { $0.layer == 0 ? $0.place : WindowPlace.floating(of: $0) }
             actions += 1
             let index = inputs.count
@@ -221,8 +239,10 @@ final class MacroRecorder {
                 self.inputs[index].element = element
             })
         case .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+            guard !skippingPress else { return }
             input.kind = .mouseDragged
         case .leftMouseUp, .rightMouseUp, .otherMouseUp:
+            guard !skippingPress else { skippingPress = false; return }
             input.kind = .mouseUp
         case .scrollWheel:
             let dy = cgEvent.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
@@ -233,8 +253,12 @@ final class MacroRecorder {
             if !continues { actions += 1 }
             lastScroll = event.timestamp
             input.kind = .scroll(dx: dx, dy: dy, continues: continues)
-            input.window = ScreenWindows.ordinary(at: location)?.place
+            // Where a swipe starts is where it is done again; the rest of it
+            // only adds to the distance.
+            if !continues { input.window = ScreenWindows.ordinary(at: location)?.place }
         case .keyDown:
+            // The screenshot shortcut, pressed to capture here, is no step.
+            guard !GlobalHotKey.isOwn(keyCode: event.keyCode, flags: cgEvent.flags) else { return }
             // A shortcut by the key it is on, text by what it typed.
             let shortcut = cgEvent.flags.contains(.maskCommand) || cgEvent.flags.contains(.maskControl)
             input.kind = .key(code: event.keyCode,

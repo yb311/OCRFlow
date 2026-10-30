@@ -140,6 +140,13 @@ struct ContentView: View {
                     .disabled(vm.exportableSelectedCount == 0)
                 Button("Export All Results (\(vm.exportableCount) Files)…") { vm.exportResults() }
                     .disabled(vm.exportableCount == 0)
+                Divider()
+                // The pictures and documents themselves: a screenshot is
+                // often wanted as much as its text.
+                Button(vm.selectedIDs.isEmpty ? "Export All Original Files…" : "Export Original Files…") {
+                    vm.exportOriginals(ids: vm.selectedIDs.isEmpty ? Set(vm.items.map(\.id)) : vm.selectedIDs)
+                }
+                .disabled(vm.items.isEmpty)
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
             }
