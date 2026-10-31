@@ -8,9 +8,10 @@ import UniformTypeIdentifiers
 /// It is joined while it scrolls, from the frames of the screen as they
 /// change, the way a recording sees them: the user scrolls by hand at their
 /// own pace, or Auto Scroll scrolls for them, smoothly, as a trackpad would.
-/// The two are one: Auto Scroll only does the scrolling. What has been
-/// joined is shown beside it as it grows. Nothing about any app or site is
-/// known; it works from what the screen shows.
+/// The two are one: Auto Scroll only does the scrolling, and the moment the
+/// user moves the pointer or scrolls, it stops and they go on by hand. What
+/// has been joined is shown beside it as it grows, gliding up. Nothing about
+/// any app or site is known; it works from what the screen shows.
 @MainActor
 final class ScrollingCapture {
     /// However long the page, a run ends here, in pixels.
@@ -23,6 +24,7 @@ final class ScrollingCapture {
     private let state = ScrollRunState()
     private var panels: [NSPanel] = []
     private var escapeMonitor: Any?
+    private var takeoverMonitor: Any?
     private var finish: CaptureFinish?
     private let stitcher = LiveStitcher()
     private var stream: FrameStream?
@@ -48,13 +50,15 @@ final class ScrollingCapture {
             panels.forEach { $0.orderOut(nil) }
             panels = []
         }
-        guard await startStream(target, size: CGSize(width: first.width, height: first.height),
-                                excluding: panels.map { CGWindowID($0.windowNumber) }) else { return ([], .cancel) }
+        guard await startStream(target, size: CGSize(width: first.width, height: first.height))
+        else { return ([], .cancel) }
 
         // Scrolling, by hand or automatically, until the user says it is
         // done: at the end of the page nothing more comes in, and it waits.
         while finish == nil {
-            try? await Task.sleep(for: .milliseconds(100))
+            try? await Task.sleep(for: .milliseconds(50))
+            // The user took the pointer back.
+            if scroller?.isDone == true { stopAutomatic() }
             if grown > Self.heightLimit { finish = .copy }
         }
         stopAutomatic()
@@ -68,13 +72,13 @@ final class ScrollingCapture {
     /// picture, in parts when very long.
     func runAutomatically(_ target: CaptureTarget, size: CGSize, distance: CGFloat?) async -> [CGImage] {
         guard let frame = ScreenCapture.frame(of: target),
-              await startStream(target, size: size, excluding: []) else { return [] }
+              await startStream(target, size: size) else { return [] }
         watchForEscape()
         defer { stopWatchingForEscape() }
         // A moment for the first frame.
         try? await Task.sleep(for: .milliseconds(300))
         let scroller = SmoothScroller(at: Self.scrollPoint(in: frame), speed: Self.autoSpeed, distance: distance,
-                                      shouldWait: { [stream] in stream?.isBehind ?? false })
+                                      yields: false, isBehind: { [stream] in stream?.isBehind ?? false })
         self.scroller = scroller
         lastGrowth = .now
         scroller.start()
@@ -89,7 +93,7 @@ final class ScrollingCapture {
 
     // MARK: - Frames
 
-    private func startStream(_ target: CaptureTarget, size: CGSize, excluding: [CGWindowID]) async -> Bool {
+    private func startStream(_ target: CaptureTarget, size: CGSize) async -> Bool {
         let stitcher = self.stitcher
         let stream = FrameStream { [weak self] image in
             let outcome = stitcher.add(image)
@@ -105,7 +109,7 @@ final class ScrollingCapture {
             Task { @MainActor in self?.took(outcome, taken: taken, slice: slice, head: head) }
         }
         do {
-            try await stream.start(target, size: size, excluding: excluding)
+            try await stream.start(target, size: size)
         } catch {
             return false
         }
@@ -144,26 +148,40 @@ final class ScrollingCapture {
 
     // MARK: - Scrolling for the user
 
+    /// The pointer goes onto the area, where the wheel is sent, and stays
+    /// there while it scrolls. Moved, or a scroll of the user's own, and it
+    /// stops: the pointer and the scrolling are theirs again.
     private func toggleAutomatic(_ target: CaptureTarget, in frame: CGRect) {
         if state.automatic { return stopAutomatic() }
         let scroller = SmoothScroller(at: Self.scrollPoint(in: frame), speed: Self.autoSpeed, distance: nil,
-                                      shouldWait: { [stream] in stream?.isBehind ?? false })
+                                      yields: true, isBehind: { [stream] in stream?.isBehind ?? false })
         self.scroller = scroller
         lastGrowth = .now
         state.automatic = true
         scroller.start()
+        takeoverMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .rightMouseDown]) {
+            [weak self] event in
+            MainActor.assumeIsolated {
+                // Not its own steps, nor a swipe of the user's from before
+                // still coasting.
+                guard event.cgEvent?.getIntegerValueField(.eventSourceUserData) != StepPlayer.marker,
+                      event.momentumPhase.isEmpty else { return }
+                self?.stopAutomatic()
+            }
+        }
     }
 
     private func stopAutomatic() {
         scroller?.stop()
         scroller = nil
         state.automatic = false
+        if let takeoverMonitor { NSEvent.removeMonitor(takeoverMonitor) }
+        takeoverMonitor = nil
     }
 
-    /// Where to scroll: a quarter of the way down, clear of the Auto Scroll
-    /// button in the middle, which would otherwise take the wheel.
+    /// Where to scroll: the middle.
     private static func scrollPoint(in frame: CGRect) -> CGPoint {
-        CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.maxY + frame.height / 4)
+        CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.midY)
     }
 
     /// The pointer moved to `point`, then a scroll of `distance` points
@@ -240,19 +258,21 @@ final class ScrollingCapture {
             self?.finish = picked
         }, beside: area)
 
-        // In the middle of the area, the button that scrolls for the user.
-        let buttonHost = FirstMouseHostingView(rootView: AutoScrollButton(state: state))
-        let buttonSize = buttonHost.fittingSize
-        let button = CaptureMarks.panel(CGRect(x: area.midX - buttonSize.width / 2, y: area.midY - buttonSize.height / 2,
-                                               width: buttonSize.width, height: buttonSize.height))
-        button.contentView = buttonHost
-
-        // Beside it, on whichever side has more room, what has been joined.
+        // Beside it, on whichever side has more room, the button that
+        // scrolls for the user and under it what has been joined. Nothing is
+        // over the area: there the pointer and the wheel are the user's.
         let screen = CaptureMarks.screenFrame(for: area)
         let width = min(max(area.width * 0.6, 160), 320)
         let right = screen.maxX - area.maxX >= area.minX - screen.minX
         let x = right ? min(area.maxX + 12, screen.maxX - width) : max(area.minX - 12 - width, screen.minX)
-        let preview = CaptureMarks.panel(CGRect(x: x, y: area.minY, width: width, height: area.height))
+        let buttonHost = FirstMouseHostingView(rootView: AutoScrollButton(state: state))
+        let buttonHeight = buttonHost.fittingSize.height
+        // As wide as the column, so the longer "Stop Scrolling" fits too.
+        let button = CaptureMarks.panel(CGRect(x: x, y: area.maxY - buttonHeight, width: width, height: buttonHeight))
+        button.contentView = buttonHost
+        let previewHeight = max(area.height - buttonHeight - 8, 80)
+        let preview = CaptureMarks.panel(CGRect(x: x, y: area.maxY - buttonHeight - 8 - previewHeight,
+                                                width: width, height: previewHeight))
         preview.ignoresMouseEvents = true
         preview.contentView = NSHostingView(rootView: JoinedPreview(state: state))
 
@@ -278,88 +298,123 @@ final class ScrollingCapture {
     }
 }
 
-/// Scrolls smoothly: small steps sixty times a second, so the view glides
-/// rather than jumps. Sent from a timer of its own, so its pace does not
-/// depend on how busy the app is.
+/// Scrolls smoothly, the way a trackpad does: a step each time the screen
+/// is drawn, as far as the time since the last asks, easing in at the start
+/// — so the view glides rather than jumps. Sent from a thread of its own,
+/// so its pace does not depend on how busy the app is.
 ///
 /// The window server sends the wheel to whatever is under the pointer, so
-/// each step takes the pointer to what is scrolled and straight back to
-/// where the user has it — without the pause in the user's own mouse
-/// movements that follows an event sent this way by default. The pointer
-/// stays the user's, to use meanwhile. (Sent to the app directly, or marked
-/// as a trackpad gesture, the steps are ignored.)
-final class SmoothScroller: @unchecked Sendable {
+/// the pointer is put on what is scrolled when it starts, once, and left
+/// there — as scrolling capture tools do. (Sent to the app directly, or
+/// marked as a trackpad gesture, the steps are ignored; and a step sent
+/// somewhere else takes the pointer there with it.) `yields`: for the user,
+/// who may take over at any moment — the pointer moved, it stops, and the
+/// pointer is theirs. Otherwise, for a macro, the pointer is kept there
+/// until it is done, then put back where it was.
+final class SmoothScroller: NSObject, @unchecked Sendable {
     private let point: CGPoint
     /// Points a second.
     private let speed: CGFloat
     private let distance: CGFloat?
-    private let shouldWait: @Sendable () -> Bool
-    private let queue = DispatchQueue(label: "OCRFlow.scroll", qos: .userInteractive)
+    private let yields: Bool
+    private let isBehind: @Sendable () -> Bool
     private let source: CGEventSource?
-    private var timer: DispatchSourceTimer?
+    private var link: CADisplayLink?
+    private var last: CFTimeInterval?
+    /// Of `speed`, now.
+    private var pace: CGFloat = 0
+    /// How far it has scrolled, exactly, and in the whole points sent.
     private var travelled: CGFloat = 0
+    private var sent: CGFloat = 0
+    private var pointer: CGPoint?
     private let lock = NSLock()
+    private var stopping = false
     private var done = false
 
-    /// Done once `distance` points have been scrolled, when given.
+    /// Stopped: at the end of `distance`, when given; told to; or for the user.
     var isDone: Bool { lock.withLock { done } }
 
-    /// `shouldWait`: whether what follows the scrolling has fallen behind,
-    /// and the next step had better wait for it.
-    init(at point: CGPoint, speed: CGFloat, distance: CGFloat?, shouldWait: @escaping @Sendable () -> Bool) {
+    /// `point` is in event coordinates. `isBehind`: whether what follows the
+    /// scrolling has fallen behind, and it had better go slower for a while.
+    init(at point: CGPoint, speed: CGFloat, distance: CGFloat?, yields: Bool,
+         isBehind: @escaping @Sendable () -> Bool) {
         self.point = point
         self.speed = speed
         self.distance = distance
-        self.shouldWait = shouldWait
+        self.yields = yields
+        self.isBehind = isBehind
         source = CGEventSource(stateID: .combinedSessionState)
+        // The user's own mouse is not held up after the pointer is moved.
         source?.localEventsSuppressionInterval = 0
     }
 
-    func start() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        let interval = 1.0 / 60
-        timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(1))
-        timer.setEventHandler { [weak self] in self?.tick(interval) }
-        self.timer = timer
-        timer.resume()
+    @MainActor func start() {
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: point.x, y: top - point.y)) } ?? NSScreen.main
+        guard let link = screen?.displayLink(target: self, selector: #selector(step(_:))) else {
+            return lock.withLock { done = true }
+        }
+        pointer = CGEvent(source: nil)?.location
+        CGWarpMouseCursorPosition(point)
+        CGAssociateMouseAndMouseCursorPosition(1)
+        self.link = link
+        nonisolated(unsafe) let unsent = link
+        let thread = Thread {
+            unsent.add(to: .current, forMode: .default)
+            CFRunLoopRun()
+        }
+        thread.name = "OCRFlow.scroll"
+        thread.qualityOfService = .userInteractive
+        thread.start()
     }
 
+    /// Stops before the next step.
     func stop() {
-        queue.sync {
-            timer?.cancel()
-            timer = nil
-        }
+        lock.withLock { stopping = true }
     }
 
-    private func tick(_ interval: Double) {
-        guard !shouldWait() else { return }
-        // Whole points: what is sent is what is counted.
-        var step = (speed * CGFloat(interval)).rounded()
-        if let distance {
-            step = min(step, (distance - travelled).rounded())
-            if step < 0.5 {
-                lock.withLock { done = true }
-                timer?.cancel()
-                timer = nil
-                return
-            }
+    @objc private func step(_ link: CADisplayLink) {
+        guard !lock.withLock({ stopping }) else { return halt() }
+        let now = link.targetTimestamp
+        defer { last = now }
+        guard let last else { return }
+        if yields, let at = CGEvent(source: nil)?.location, hypot(at.x - point.x, at.y - point.y) > 3 {
+            return halt()
         }
-        send(step)
-        travelled += step
+        let interval = CGFloat(min(now - last, 0.05))
+        // Easing in, as a finger does; and easing off while the joining
+        // catches up, rather than stopping short.
+        pace += ((isBehind() ? 0.4 : 1) - pace) * min(1, interval / 0.2)
+        travelled += speed * pace * interval
+        if let distance { travelled = min(travelled, distance) }
+        // Whole points: what is sent is what is counted.
+        let whole = travelled.rounded(.down) - sent
+        if whole >= 1 {
+            send(whole)
+            sent += whole
+        }
+        if let distance, sent >= distance.rounded(.down) { halt() }
+    }
+
+    /// On the scrolling thread.
+    private func halt() {
+        link?.invalidate()
+        link = nil
+        if !yields, let pointer {
+            CGWarpMouseCursorPosition(pointer)
+            CGAssociateMouseAndMouseCursorPosition(1)
+        }
+        lock.withLock { done = true }
+        CFRunLoopStop(CFRunLoopGetCurrent())
     }
 
     private func send(_ step: CGFloat) {
         guard let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 1,
                                   wheel1: Int32(-step), wheel2: 0, wheel3: 0) else { return }
-        let user = CGEvent(source: nil)?.location
         event.location = point
         event.setIntegerValueField(.eventSourceUserData, value: StepPlayer.marker)
         if let now = CGEvent(source: nil)?.timestamp { event.timestamp = now }
         event.post(tap: .cghidEventTap)
-        if let user {
-            CGWarpMouseCursorPosition(user)
-            CGAssociateMouseAndMouseCursorPosition(1)
-        }
     }
 }
 
@@ -372,19 +427,53 @@ private final class ScrollRunState {
     var pages = 1
     /// OCRFlow scrolling, rather than the user.
     var automatic = false
-    /// What has been joined so far, small: the first frame, then each strip
-    /// that came into view, in order.
+    /// What has been joined, small: the first frame, then each strip that
+    /// came into view, in order — less what has gone far above what the
+    /// preview shows.
     var head: CGImage?
-    var strips: [CGImage] = []
+    private(set) var strips: [Strip] = []
+    /// Rows the strips have added, in all: how far the preview has moved.
+    private(set) var grown = 0
+    @ObservationIgnored private var count = 0
+    /// Strips at the end not yet made one.
+    @ObservationIgnored private var loose = 0
+
+    struct Strip: Identifiable {
+        let id: Int
+        let image: CGImage
+    }
+
+    /// Rows, at the preview's width, more than any preview shows.
+    private static let kept = 4000
 
     /// A strip more. Many small ones become one now and then, so there are
-    /// never many to lay out.
+    /// never many to lay out, and those far above the preview go.
     func grow(by strip: CGImage) {
-        strips.append(strip)
-        if strips.count > 48, let joined = LiveStitcher.stack(Array(strips.prefix(40))) {
-            strips = [joined] + strips.dropFirst(40)
+        add(strip)
+        grown += strip.height
+        loose += 1
+        if loose >= 24, let joined = LiveStitcher.stack(strips.suffix(loose).map(\.image)) {
+            strips.removeLast(loose)
+            add(joined)
+            loose = 0
+        }
+        var rows = 0
+        var first = strips.count
+        while first > 0, rows < Self.kept {
+            first -= 1
+            rows += strips[first].image.height
+        }
+        if first > 0 {
+            strips.removeFirst(first)
+            head = nil
         }
     }
+
+    private func add(_ image: CGImage) {
+        strips.append(Strip(id: count, image: image))
+        count += 1
+    }
+
     /// The last screenful would not join to the one before.
     var lost = false
 
@@ -414,19 +503,20 @@ private struct JoinedPreview: View {
     let state: ScrollRunState
 
     /// The newest part, at the bottom, as the page grows a strip at a time:
-    /// what was just scrolled to is what the user wants to see joined.
+    /// what was just scrolled to is what the user wants to see joined. It
+    /// glides up as it grows, as the page itself moves, rather than jumping
+    /// a strip at a time.
     var body: some View {
         VStack(spacing: 6) {
             GeometryReader { space in
+                let width = space.size.width
+                let grown = CGFloat(state.grown) * width / CGFloat(LiveStitcher.previewWidth)
                 VStack(spacing: 0) {
-                    ForEach(Array(([state.head].compactMap { $0 } + state.strips).enumerated()), id: \.offset) { _, strip in
-                        Image(decorative: strip, scale: 1)
-                            .resizable()
-                            .frame(width: space.size.width,
-                                   height: space.size.width * CGFloat(strip.height) / CGFloat(max(strip.width, 1)))
-                    }
+                    if let head = state.head { picture(head, width: width) }
+                    ForEach(state.strips) { picture($0.image, width: width) }
                 }
-                .frame(width: space.size.width, height: space.size.height, alignment: .bottom)
+                .animation(.smooth(duration: 0.3)) { $0.modifier(Glide(shown: grown, target: grown)) }
+                .frame(width: width, height: space.size.height, alignment: .bottom)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
@@ -439,5 +529,27 @@ private struct JoinedPreview: View {
                 .padding(.vertical, 3)
                 .background(.black.opacity(0.6), in: Capsule())
         }
+    }
+
+    private func picture(_ image: CGImage, width: CGFloat) -> some View {
+        Image(decorative: image, scale: 1)
+            .resizable()
+            .frame(width: width, height: width * CGFloat(image.height) / CGFloat(max(image.width, 1)))
+    }
+}
+
+/// Held back by however far it has yet to go: as `shown` is animated on to
+/// `target`, what was just added slides up into view.
+private struct Glide: ViewModifier, Animatable {
+    var shown: CGFloat
+    let target: CGFloat
+
+    nonisolated var animatableData: CGFloat {
+        get { shown }
+        set { shown = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.offset(y: target - shown)
     }
 }

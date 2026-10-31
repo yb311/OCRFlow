@@ -24,7 +24,8 @@ final class LiveStitcher: @unchecked Sendable {
 
     private var first: CGImage?
     private var firstGray: ScrollStitcher.Gray?
-    private var last: CGImage?
+    /// The bar at the bottom that stays put, as it was last.
+    private var foot: CGImage?
     private var lastGray: ScrollStitcher.Gray?
     private var lastShift: Int?
     /// The rows at the top and bottom that stay put, once something moved.
@@ -34,6 +35,9 @@ final class LiveStitcher: @unchecked Sendable {
     /// The same, small, for showing while it grows.
     private(set) var previewSlices: [CGImage] = []
     private var moving: [Bool] = []
+    /// Rows at the bottom see-through at the sides: a window's rounded
+    /// corners, which stay put as a bar at the bottom does.
+    private var corners = 0
     private(set) var grown = 0
     /// Frames taken in.
     private(set) var taken = 0
@@ -45,7 +49,7 @@ final class LiveStitcher: @unchecked Sendable {
         guard let first, let lastGray else {
             let copy = Self.copy(frame) ?? frame
             self.first = copy
-            last = copy
+            corners = Self.clearRowsAtBottom(frame)
             let gray = ScrollStitcher.Gray(copy)
             firstGray = gray
             lastGray = gray
@@ -56,7 +60,8 @@ final class LiveStitcher: @unchecked Sendable {
         guard frame.width == first.width, frame.height == first.height else { return .lost }
         let gray = ScrollStitcher.Gray(frame)
         let edges = edges ?? (ScrollStitcher.sameRows(lastGray, gray, from: 0, by: 1, upTo: height / 2),
-                              ScrollStitcher.sameRows(lastGray, gray, from: height - 1, by: -1, upTo: height / 2 - 1))
+                              max(corners, ScrollStitcher.sameRows(lastGray, gray, from: height - 1, by: -1,
+                                                                   upTo: height / 2 - 1)))
         // Close to the last distance first: cheap, and right nearly always.
         var shift: Int?
         if let lastShift {
@@ -77,7 +82,7 @@ final class LiveStitcher: @unchecked Sendable {
         if let small = Self.scaled(slice, toWidth: Self.previewWidth) { previewSlices.append(small) }
         grown += shift
         taken += 1
-        last = Self.copy(frame) ?? frame
+        if edges.bottom > 0 { foot = Self.copy(frame, rows: end..<height) }
         self.lastGray = gray
         lastShift = shift
         return .grew(by: shift)
@@ -95,13 +100,13 @@ final class LiveStitcher: @unchecked Sendable {
     /// when it is very long — without columns beside the scrolling part
     /// that stayed put.
     func finish(maxHeight: Int = ScrollStitcher.maxHeight) -> [CGImage] {
-        guard let first, let last else { return [] }
+        guard let first else { return [] }
         let edges = edges ?? (0, 0)
         let end = height - edges.bottom
         var pieces: [CGImage] = []
         if let head = Self.copy(first, rows: 0..<end) { pieces.append(head) }
         pieces += slices
-        if edges.bottom > 0, let foot = Self.copy(last, rows: end..<height) { pieces.append(foot) }
+        if edges.bottom > 0, let foot = foot ?? Self.copy(first, rows: end..<height) { pieces.append(foot) }
 
         let span = ScrollStitcher.columns(moving).flatMap { $0.count < width * 9 / 10 ? $0 : nil } ?? 0..<width
         // Into parts; each after the first starts with the header again.
@@ -120,6 +125,27 @@ final class LiveStitcher: @unchecked Sendable {
     }
 
     // MARK: - Pictures
+
+    /// How many rows at the bottom are see-through at either side. Joined
+    /// on from there, every strip would bring a window's rounded corners
+    /// with it, a dark notch down both sides.
+    static func clearRowsAtBottom(_ image: CGImage) -> Int {
+        let width = image.width, rows = min(64, image.height / 4)
+        guard rows > 0, let bottom = image.cropping(to: CGRect(x: 0, y: image.height - rows, width: width, height: rows))
+        else { return 0 }
+        guard let context = context(width: width, height: rows, like: image) else { return 0 }
+        context.draw(bottom, in: CGRect(x: 0, y: 0, width: width, height: rows))
+        guard let data = context.data?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+        // From the bottom up; the first row in memory is the top. Alpha is
+        // each pixel's last byte.
+        func alpha(_ x: Int, _ y: Int) -> UInt8 { data[y * context.bytesPerRow + x * 4 + 3] }
+        var count = 0
+        for y in (0..<rows).reversed() {
+            guard alpha(0, y) < 250 || alpha(width - 1, y) < 250 else { break }
+            count += 1
+        }
+        return count
+    }
 
     /// Its own pixels, apart from the frame they came from — whose buffer
     /// the capture wants back.

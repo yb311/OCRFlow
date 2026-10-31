@@ -193,6 +193,32 @@ struct MacroTests {
         #expect(differing == 0)
     }
 
+    /// A window's rounded corners, see-through, at the bottom of each frame:
+    /// at the bottom of the picture once, not brought along by every strip.
+    @Test func aWindowsRoundedCornersAreNotJoinedOnDownItsSides() throws {
+        let page = longPage()
+        let layout = Layout(footer: 0)
+        let stitcher = LiveStitcher()
+        let offsets = Array(stride(from: 0, through: 600, by: 20))
+        for offset in offsets {
+            let plain = frame(of: page, at: offset, layout)
+            let context = context(width: plain.width, height: plain.height)
+            context.draw(plain, in: CGRect(x: 0, y: 0, width: plain.width, height: plain.height))
+            context.clear(CGRect(x: 0, y: 0, width: 6, height: 10))
+            context.clear(CGRect(x: plain.width - 6, y: 0, width: 6, height: 10))
+            _ = stitcher.add(context.makeImage()!)
+        }
+        let long = try #require(stitcher.finish().first)
+        #expect(long.height == layout.header + offsets.last! + layout.middle)
+        // See-through only in the last ten rows.
+        let drawn = CGContext(data: nil, width: long.width, height: long.height, bitsPerComponent: 8, bytesPerRow: long.width * 4,
+                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        drawn.draw(long, in: CGRect(x: 0, y: 0, width: long.width, height: long.height))
+        let bytes = drawn.data!.assumingMemoryBound(to: UInt8.self)
+        let clear = (0..<long.height).filter { bytes[$0 * long.width * 4 + 3] < 250 }
+        #expect(clear == Array((long.height - 10)..<long.height))
+    }
+
     /// The same frame twice, a step back up, a jump too far: passed over,
     /// and joining goes on from the next that carries on.
     @Test func passesOverFramesThatDoNotCarryOn() throws {
