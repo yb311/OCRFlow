@@ -1,3 +1,4 @@
+import Accelerate
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -118,13 +119,19 @@ enum ScrollStitcher {
 
     // MARK: - Measuring
 
-    /// A picture in grey, one byte a pixel, and each row in brief: the mean
-    /// of each of a few dozen stretches across it.
+    /// A picture in grey, and each row in brief: the mean of each of a few
+    /// dozen stretches across it.
+    ///
+    /// The arithmetic is vectorised (Accelerate): a frame is compared with
+    /// the one before several times a second while a view scrolls, and
+    /// plain loops over every pixel are too slow for that, in a debug build
+    /// by far.
     struct Gray {
         static let blocks = 32
         let width: Int
         let height: Int
-        let pixels: [UInt8]
+        /// 0 to 255, a pixel each, row by row.
+        let values: [Float]
         /// `blocks` values a row.
         let rows: [Float]
         /// Whether each row has anything on it.
@@ -134,66 +141,70 @@ enum ScrollStitcher {
             let width = image.width, height = image.height
             self.width = width
             self.height = height
-            var pixels = [UInt8](repeating: 255, count: width * height)
-            pixels.withUnsafeMutableBytes { buffer in
-                let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                        bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
-                                        bitmapInfo: CGImageAlphaInfo.none.rawValue)
-                context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            func draw(width: Int) -> [UInt8] {
+                var bytes = [UInt8](repeating: 255, count: width * height)
+                bytes.withUnsafeMutableBytes { buffer in
+                    let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                            bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                                            bitmapInfo: CGImageAlphaInfo.none.rawValue)
+                    // Narrowed by Core Graphics: each of the few left is the
+                    // mean of its stretch.
+                    context?.interpolationQuality = .high
+                    context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+                }
+                return bytes
             }
-            let blocks = Self.blocks
-            var rows = [Float](repeating: 0, count: height * blocks)
-            var busy = [Bool](repeating: false, count: height)
-            pixels.withUnsafeBufferPointer { pixels in
-                for y in 0..<height {
-                    let row = y * width
-                    var low: UInt8 = 255, high: UInt8 = 0
-                    for block in 0..<blocks {
-                        let start = block * width / blocks
-                        let end = max(start + 1, min(width, (block + 1) * width / blocks))
-                        var sum = 0
-                        for x in start..<end {
-                            let value = pixels[row + x]
-                            sum += Int(value)
-                            low = min(low, value)
-                            high = max(high, value)
-                        }
-                        rows[y * blocks + block] = Float(sum) / Float(end - start)
-                    }
-                    busy[y] = high - low > 48
+            values = vDSP.integerToFloatingPoint(draw(width: width), floatingPointType: Float.self)
+            rows = vDSP.integerToFloatingPoint(draw(width: Self.blocks), floatingPointType: Float.self)
+            busy = values.withUnsafeBufferPointer { values in
+                (0..<height).map { y in
+                    let row = UnsafeBufferPointer(rebasing: values[(y * width)..<((y + 1) * width)])
+                    return vDSP.maximum(row) - vDSP.minimum(row) > 48
                 }
             }
-            self.pixels = pixels
-            self.rows = rows
-            self.busy = busy
         }
 
         /// How different row `y` here is from row `other` of `picture`: the
         /// mean difference of their stretches, 0 to 255.
         func roughDifference(row y: Int, from picture: Gray, row other: Int) -> Float {
-            var sum: Float = 0
-            let a = y * Self.blocks, b = other * Self.blocks
-            for block in 0..<Self.blocks { sum += abs(rows[a + block] - picture.rows[b + block]) }
-            return sum / Float(Self.blocks)
+            Self.meanDifference(rows, at: y * Self.blocks, picture.rows, at: other * Self.blocks, count: Self.blocks)
         }
 
         /// The same, pixel by pixel.
         func difference(row y: Int, from picture: Gray, row other: Int) -> Float {
-            var sum = 0
-            let a = y * width, b = other * picture.width
-            for x in 0..<width { sum += abs(Int(pixels[a + x]) - Int(picture.pixels[b + x])) }
-            return Float(sum) / Float(width)
+            Self.meanDifference(values, at: y * width, picture.values, at: other * picture.width, count: width)
+        }
+
+        private static func meanDifference(_ a: [Float], at i: Int, _ b: [Float], at j: Int, count: Int) -> Float {
+            a.withUnsafeBufferPointer { a in
+                b.withUnsafeBufferPointer { b in
+                    var result: Float = 0
+                    var difference = [Float](repeating: 0, count: count)
+                    vDSP_vsub(b.baseAddress! + j, 1, a.baseAddress! + i, 1, &difference, 1, vDSP_Length(count))
+                    vDSP_meamgv(difference, 1, &result, vDSP_Length(count))
+                    return result
+                }
+            }
         }
     }
 
     /// Marks the columns that differ between two pictures.
     static func markMovingColumns(from a: Gray, to b: Gray, in moving: inout [Bool]) {
-        let rows = Array(stride(from: 0, to: a.height, by: 4))
-        for x in 0..<min(moving.count, a.width) where !moving[x] {
-            var sum = 0
-            for y in rows { sum += abs(Int(a.pixels[y * a.width + x]) - Int(b.pixels[y * b.width + x])) }
-            if sum > rows.count * 3 / 2 { moving[x] = true }
+        let width = min(moving.count, a.width)
+        var sums = [Float](repeating: 0, count: width)
+        var difference = [Float](repeating: 0, count: width)
+        var samples = 0
+        a.values.withUnsafeBufferPointer { av in
+            b.values.withUnsafeBufferPointer { bv in
+                for y in stride(from: 0, to: a.height, by: 4) {
+                    vDSP_vsub(bv.baseAddress! + y * b.width, 1, av.baseAddress! + y * a.width, 1, &difference, 1, vDSP_Length(width))
+                    vDSP_vabs(difference, 1, &difference, 1, vDSP_Length(width))
+                    vDSP_vadd(sums, 1, difference, 1, &sums, 1, vDSP_Length(width))
+                    samples += 1
+                }
+            }
         }
+        for x in 0..<width where !moving[x] && sums[x] > Float(samples) * 1.5 { moving[x] = true }
     }
 
     /// The marked columns, first to last, with a little room either side.
@@ -224,10 +235,20 @@ enum ScrollStitcher {
     /// The rows they share must agree, and include enough with something on
     /// them that the match means something: blank against blank fits any
     /// distance.
-    static func shift(from a: Gray, to b: Gray, top: Int, bottom: Int, near expected: Int?) -> Int? {
+    ///
+    /// `within` narrows the search to distances near what is expected — a
+    /// view scrolled smoothly moves about as far from one frame to the next.
+    static func shift(from a: Gray, to b: Gray, top: Int, bottom: Int, near expected: Int?,
+                      within: ClosedRange<Int>? = nil) -> Int? {
         let middle = a.height - top - bottom
         let minOverlap = max(16, middle / 10)
         guard middle > minOverlap + 1 else { return nil }
+        var range = 1...(middle - minOverlap)
+        if let within {
+            let low = max(range.lowerBound, within.lowerBound), high = min(range.upperBound, within.upperBound)
+            guard low <= high else { return nil }
+            range = low...high
+        }
 
         // Not moved at all: scrolling by hand catches the same screenful
         // twice now and then.
@@ -236,7 +257,7 @@ enum ScrollStitcher {
 
         // Every distance, roughly: every third row of the overlap.
         var candidates: [(shift: Int, error: Float)] = []
-        for shift in 1...(middle - minOverlap) {
+        for shift in range {
             var sum: Float = 0, count = 0
             var y = 0
             while y < middle - shift {

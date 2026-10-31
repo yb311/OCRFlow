@@ -159,6 +159,67 @@ struct MacroTests {
         #expect(partly.parts.first?.height == layout.header + 600 + layout.middle + layout.footer)
     }
 
+    // MARK: - Joining as it scrolls
+
+    private func expectedLong(_ page: CGImage, to offset: Int, _ layout: Layout, frame: CGImage) -> CGImage {
+        let shown = offset + layout.middle
+        let expected = context(width: layout.width, height: layout.header + shown + layout.footer)
+        let top = frame.cropping(to: CGRect(x: 0, y: 0, width: layout.width, height: layout.header))!
+        expected.draw(top, in: CGRect(x: 0, y: shown + layout.footer, width: layout.width, height: layout.header))
+        let body = page.cropping(to: CGRect(x: 0, y: 0, width: layout.width, height: shown))!
+        expected.draw(body, in: CGRect(x: 0, y: layout.footer, width: layout.width, height: shown))
+        let bottom = frame.cropping(to: CGRect(x: 0, y: layout.height - layout.footer, width: layout.width, height: layout.footer))!
+        expected.draw(bottom, in: CGRect(x: 0, y: 0, width: layout.width, height: layout.footer))
+        return expected.makeImage()!
+    }
+
+    /// Frame after frame of a smooth scroll, a few rows apart: joined as they
+    /// come, exactly.
+    @Test func joinsASmoothScrollFrameByFrame() throws {
+        let page = longPage()
+        let layout = Layout()
+        let stitcher = LiveStitcher()
+        var offset = 0
+        var offsets: [Int] = []
+        while offset <= 1500 {
+            offsets.append(offset)
+            offset += 11 + offsets.count % 7
+        }
+        for offset in offsets { _ = stitcher.add(frame(of: page, at: offset, layout)) }
+        let long = try #require(stitcher.finish().first)
+        let expected = expectedLong(page, to: offsets.last!, layout, frame: frame(of: page, at: 0, layout))
+        #expect(long.height == expected.height)
+        let differing = zip(pixels(long), pixels(expected)).filter { abs(Int($0) - Int($1)) > 2 }.count
+        #expect(differing == 0)
+    }
+
+    /// The same frame twice, a step back up, a jump too far: passed over,
+    /// and joining goes on from the next that carries on.
+    @Test func passesOverFramesThatDoNotCarryOn() throws {
+        let page = longPage()
+        let layout = Layout()
+        let stitcher = LiveStitcher()
+        var outcomes: [LiveStitcher.Outcome] = []
+        for offset in [0, 40, 40, 80, 60, 900, 120, 160] {
+            outcomes.append(stitcher.add(frame(of: page, at: offset, layout)))
+        }
+        #expect(outcomes[2] == .unchanged)
+        #expect(outcomes[5] == .lost)
+        #expect(outcomes.last == .grew(by: 40))
+        let long = try #require(stitcher.finish().first)
+        #expect(long.height == layout.header + 160 + layout.middle + layout.footer)
+    }
+
+    /// A long picture and the same reaching further are the same; another
+    /// page is not.
+    @Test func samePictureReachingFurtherIsTheSame() {
+        let page = longPage(height: 3000)
+        let short = page.cropping(to: CGRect(x: 0, y: 0, width: 480, height: 1600))!
+        let longer = page.cropping(to: CGRect(x: 0, y: 0, width: 480, height: 2400))!
+        #expect(OCRViewModel.isSamePicture(short, longer))
+        #expect(!OCRViewModel.isSamePicture(short, longPage(height: 3000, seed: 7).cropping(to: CGRect(x: 0, y: 0, width: 480, height: 1600))!))
+    }
+
     @Test func slidesTurnedOneByOneAreNotJoined() {
         let layout = Layout()
         let frames = (1...4).map { frame(of: longPage(seed: $0), at: 0, layout) }

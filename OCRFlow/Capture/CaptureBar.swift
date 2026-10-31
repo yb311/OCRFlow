@@ -41,13 +41,15 @@ final class CaptureBar {
     private var monitors: [Any] = []
 
     private func show(around area: CGRect) {
-        let outline = CaptureMarks.outline(area, catchesClicks: true)
-        (outline.contentView as? OutlineView)?.onDoubleClick = { [weak self] in self?.finish(.copy) }
+        // As it looked while being chosen: the rest of the screen dimmed.
+        let shades = CaptureMarks.shades(around: area)
+        let catcher = CaptureMarks.outline(area, catchesClicks: true)
+        (catcher.contentView as? OutlineView)?.onDoubleClick = { [weak self] in self?.finish(.copy) }
         let size = CaptureMarks.sizeLabel(for: area)
         let bar = CaptureMarks.bar(CaptureActionsBar(items: [.recognize, .longCapture, .cancel, .save, .copy]) {
             [weak self] in self?.finish($0)
         }, beside: area)
-        panels = [outline, size, bar]
+        panels = shades + [catcher, size, bar]
         panels.forEach { $0.orderFrontRegardless() }
 
         // The keys come here without OCRFlow coming forward: the bar is a
@@ -105,10 +107,24 @@ enum CaptureMarks {
         return panel
     }
 
+    /// The rest of every screen dimmed around `area`, which stays bright,
+    /// with a line round it — as the screen looks while it is chosen. Clicks
+    /// and the wheel go through to what is beneath.
+    static func shades(around area: CGRect) -> [NSPanel] {
+        NSScreen.screens.map { screen in
+            let shade = panel(screen.frame)
+            shade.ignoresMouseEvents = true
+            let view = ShadeView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            view.cut = area.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY)
+            shade.contentView = view
+            return shade
+        }
+    }
+
     /// `catchesClicks` false lets everything inside reach the app beneath:
     /// to scroll it, say.
     static func outline(_ area: CGRect, catchesClicks: Bool) -> NSPanel {
-        let outline = panel(area.insetBy(dx: -2, dy: -2))
+        let outline = panel(area)
         outline.ignoresMouseEvents = !catchesClicks
         outline.contentView = OutlineView(frame: NSRect(origin: .zero, size: outline.frame.size), catchesClicks: catchesClicks)
         return outline
@@ -117,11 +133,11 @@ enum CaptureMarks {
     /// Above the top-left corner — or inside it, at the top of the screen.
     static func sizeLabel(for area: CGRect) -> NSPanel {
         let host = NSHostingView(rootView: Text(verbatim: "\(Int(area.width.rounded())) × \(Int(area.height.rounded()))")
-            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
             .foregroundStyle(.white)
-            .padding(.horizontal, 7)
+            .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 5)))
+            .background(.black.opacity(0.7), in: Capsule()))
         let size = host.fittingSize
         let screen = screenFrame(for: area)
         let y = area.maxY + 4 + size.height <= screen.maxY ? area.maxY + 4 : area.maxY - size.height - 4
@@ -172,15 +188,12 @@ final class OutlineView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func draw(_ dirtyRect: NSRect) {
+        // All but invisible, so the clicks land here; the line round it is
+        // the shade's.
         if catchesClicks {
-            // All but invisible inside, so the clicks land here.
             NSColor.black.withAlphaComponent(0.01).setFill()
             bounds.fill()
         }
-        NSColor.controlAccentColor.setStroke()
-        let edge = NSBezierPath(rect: bounds.insetBy(dx: 1, dy: 1))
-        edge.lineWidth = 2
-        edge.stroke()
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -252,5 +265,34 @@ struct CaptureActionsBar: View {
         case .done: "Done"
         case .cancel: "Cancel (Esc or right-click)"
         }
+    }
+}
+
+/// Dims all but the area, and draws a line round it.
+private final class ShadeView: NSView {
+    var cut: CGRect = .zero
+
+    override func draw(_ dirtyRect: NSRect) {
+        CaptureShade.draw(in: bounds, around: cut)
+    }
+}
+
+/// The look of what is chosen, the same while choosing and after: the rest
+/// dimmed, a light line with a dark one outside it, visible on any
+/// background.
+enum CaptureShade {
+    static func draw(in bounds: CGRect, around cut: CGRect) {
+        let shade = NSBezierPath(rect: bounds)
+        if cut.intersects(bounds) { shade.append(NSBezierPath(rect: cut)) }
+        shade.windingRule = .evenOdd
+        NSColor.black.withAlphaComponent(0.4).setFill()
+        shade.fill()
+        guard cut.intersects(bounds) else { return }
+        NSColor.black.withAlphaComponent(0.35).setStroke()
+        NSBezierPath(rect: cut.insetBy(dx: -0.5, dy: -0.5)).stroke()
+        let inner = NSBezierPath(rect: cut.insetBy(dx: 0.5, dy: 0.5))
+        inner.lineWidth = 1
+        NSColor.white.setStroke()
+        inner.stroke()
     }
 }

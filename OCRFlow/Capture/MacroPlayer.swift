@@ -183,11 +183,10 @@ final class MacroPlayer {
             await settle(target, waitForChange: false)
             if let distance = area.scrollDistance {
                 // Scrolled on as far as when recorded, and joined.
-                guard let first = try? await ScreenCapture.grab(target) else { return nil }
-                let pages = await ScrollingCapture().runAutomatically(target, first: first, distance: distance)
-                defer { pages.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
-                guard pages.count > 1 else { return first }
-                return await Task.detached(operation: { [pages] in ScrollStitcher.stitch(pages)?.first }).value ?? first
+                guard let first = try? await ScreenCapture.grab(target, like: area.frameSize) else { return nil }
+                let parts = await ScrollingCapture().runAutomatically(target, size: CGSize(width: first.width, height: first.height),
+                                                                      distance: distance)
+                return parts.first ?? first
             }
             guard let image = try? await ScreenCapture.grab(target, like: sizes[step.id]) else { return nil }
             if sizes[step.id] == nil { sizes[step.id] = CGSize(width: image.width, height: image.height) }

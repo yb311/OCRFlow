@@ -67,27 +67,19 @@ final class MacroRecording {
         if scrolling {
             recorder.isPaused = true
             defer { recorder.isPaused = false }
-            let (pages, finish) = await ScrollingCapture().run(chosen.target, first: chosen.image, finishes: [.cancel, .done])
-            guard finish != .cancel, let long = await join(pages) else { return }
+            let capture = ScrollingCapture()
+            let (parts, finish) = await capture.run(chosen.target, first: chosen.image, finishes: [.cancel, .done])
+            guard finish != .cancel, let long = parts.first else { return }
             image = long
-            // How far it was scrolled, in points: what it grew by.
+            area.frameSize = CGSize(width: chosen.image.width, height: chosen.image.height)
+            // How far it was scrolled, in points.
             if let frame = ScreenCapture.frame(of: chosen.target), frame.height > 0 {
                 let pixelsPerPoint = CGFloat(chosen.image.height) / frame.height
-                area.scrollDistance = Double(CGFloat(long.height - chosen.image.height) / pixelsPerPoint)
+                area.scrollDistance = Double(CGFloat(capture.grown) / pixelsPerPoint)
             }
         }
         recorder.addCapture(area, in: step.window)
         taken.append(image)
-    }
-
-    /// The screenfuls joined into one picture, the first part of a very long
-    /// one. Nil when they would not join.
-    private func join(_ pages: [URL]) async -> CGImage? {
-        guard let folder = pages.first?.deletingLastPathComponent() else { return nil }
-        defer { try? FileManager.default.removeItem(at: folder) }
-        return await Task.detached(operation: { [pages] in
-            pages.count > 1 ? ScrollStitcher.stitch(pages)?.first : PageImages.wholeImage(at: pages[0])
-        }).value
     }
 
     /// A step that takes the same again: the same window, or the same part

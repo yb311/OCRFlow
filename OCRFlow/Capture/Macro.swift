@@ -133,6 +133,9 @@ struct CaptureArea: Codable, Hashable, Sendable {
     /// Scrolled on this far, in points, and joined into one long picture —
     /// as far as the user scrolled while recording. Nil: as it is.
     var scrollDistance: Double?
+    /// The size of what was scrolled, in pixels, as recorded: its pictures
+    /// keep it when run again, to match what was taken while recording.
+    var frameSize: CGSize?
 }
 
 /// A control, told apart the way the Accessibility interface describes it.

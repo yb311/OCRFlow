@@ -67,8 +67,8 @@ extension OCRViewModel {
             var recorded = macros.recordedCaptures(of: macro)
             if !recorded.isEmpty {
                 if let last = recorded.last, let first = runs.first?.first,
-                   let a = PageImages.wholeImage(at: last).flatMap({ PageFingerprint($0) }),
-                   let b = PageImages.wholeImage(at: first).flatMap({ PageFingerprint($0) }), a.isSamePage(as: b) {
+                   let a = PageImages.wholeImage(at: last), let b = PageImages.wholeImage(at: first),
+                   Self.isSamePicture(a, b) {
                     recorded.removeLast()
                 }
                 if runs.isEmpty { runs = [recorded] } else { runs[0] = recorded + runs[0] }
@@ -114,5 +114,18 @@ extension OCRViewModel {
                   let index = macros.macros.firstIndex(where: { $0.id == id }) else { return }
             macros.macros[index].steps.append(step)
         }
+    }
+
+    /// The same picture, give or take how far a long one reaches: their
+    /// tops are compared, a screenful no taller than they are wide, strictly
+    /// — two slides of one deck differ by a word.
+    nonisolated static func isSamePicture(_ a: CGImage, _ b: CGImage) -> Bool {
+        guard a.width == b.width else { return false }
+        let height = min(a.height, b.height, a.width)
+        func top(_ image: CGImage) -> PageFingerprint? {
+            image.cropping(to: CGRect(x: 0, y: 0, width: image.width, height: height)).flatMap { PageFingerprint($0) }
+        }
+        guard let x = top(a), let y = top(b) else { return false }
+        return x.isSamePage(as: y)
     }
 }

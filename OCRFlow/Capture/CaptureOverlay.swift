@@ -268,34 +268,14 @@ private final class OverlayMarks: NSView {
         let origin = window.frame.origin
         func local(_ rect: CGRect) -> CGRect { rect.offsetBy(dx: -origin.x, dy: -origin.y) }
 
-        if let selection = overlay.selection {
-            let cut = local(selection)
-            // Everything outside the selection is dimmed, on every screen.
-            let shade = NSBezierPath(rect: bounds)
-            if cut.intersects(bounds) { shade.append(NSBezierPath(rect: cut)) }
-            shade.windingRule = .evenOdd
-            NSColor.black.withAlphaComponent(0.4).setFill()
-            shade.fill()
-            guard cut.intersects(bounds) else { return }
-            outline(cut, color: .white)
-            label(for: selection, below: cut)
-        } else if let highlight = overlay.highlight {
-            let rect = local(highlight)
-            guard rect.intersects(bounds) else { return }
-            NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
-            rect.fill()
-            outline(rect, color: .controlAccentColor)
-        }
-    }
-
-    /// A light line with a dark one outside it, visible on any background.
-    private func outline(_ rect: CGRect, color: NSColor) {
-        let inner = NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5))
-        inner.lineWidth = 1
-        NSColor.black.withAlphaComponent(0.35).setStroke()
-        NSBezierPath(rect: rect.insetBy(dx: -0.5, dy: -0.5)).stroke()
-        color.setStroke()
-        inner.stroke()
+        // What a release would take — the area dragged out, or the window
+        // under the pointer — stands out bright; everything else, on every
+        // screen, is dimmed.
+        guard let chosen = overlay.selection ?? overlay.highlight else { return }
+        let cut = local(chosen)
+        CaptureShade.draw(in: bounds, around: cut)
+        guard cut.intersects(bounds) else { return }
+        label(for: chosen, below: cut)
     }
 
     /// The size, under the selection's bottom-right corner — or inside it

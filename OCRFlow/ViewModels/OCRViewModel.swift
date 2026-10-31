@@ -1288,9 +1288,8 @@ final class OCRViewModel {
             var images = [taken.image]
             var finish = await CaptureBar.choose(around: area)
             if finish == .longCapture {
-                let (pages, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
-                guard let joined = await join(pages) else { return }
-                images = joined
+                let (parts, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
+                if !parts.isEmpty { images = parts }
                 finish = picked
             }
             switch finish {
@@ -1300,23 +1299,6 @@ final class OCRViewModel {
             case .cancel, .longCapture, .done: break
             }
         }
-    }
-
-    /// Screenfuls scrolled through, joined: the long picture, or a few for a
-    /// very long one. Nil when there were none, or when they would not join
-    /// — the user has been told.
-    func join(_ pages: [URL]) async -> [CGImage]? {
-        guard let folder = pages.first?.deletingLastPathComponent() else { return nil }
-        defer { try? FileManager.default.removeItem(at: folder) }
-        guard pages.count > 1 else { return PageImages.wholeImage(at: pages[0]).map { [$0] } }
-        if let joined = await Task.detached(operation: { [pages] in ScrollStitcher.stitch(pages) }).value { return joined }
-        OwnWindows.whileModal {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "The long screenshot could not be joined")
-            alert.informativeText = String(localized: "Each screenful has to overlap the one before. Scroll a little slower, in one direction, or use Auto Scroll.")
-            alert.runModal()
-        }
-        return nil
     }
 
     /// Into the list, and read.

@@ -3,154 +3,166 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Takes something too long for the screen — a web page, a document, a
-/// chat — scrolled through, capturing as it goes, to be joined into one long
-/// picture.
+/// chat — scrolled through, into one long picture.
 ///
-/// The user scrolls it, at their own pace, to wherever they want it to end,
-/// or has OCRFlow scroll it a screenful at a time. What has been joined so
-/// far is shown beside it as it grows. Nothing about any app or site is
-/// known: it works from what the screen shows.
+/// It is joined while it scrolls, from the frames of the screen as they
+/// change, the way a recording sees them: the user scrolls by hand at their
+/// own pace, or Auto Scroll scrolls for them, smoothly, as a trackpad would.
+/// The two are one: Auto Scroll only does the scrolling. What has been
+/// joined is shown beside it as it grows. Nothing about any app or site is
+/// known; it works from what the screen shows.
 @MainActor
 final class ScrollingCapture {
-    /// However long the page, a run ends here.
-    static let pageLimit = 300
+    /// However long the page, a run ends here, in pixels.
+    static let heightLimit = 120_000
+    /// Auto Scroll's pace, in points a second.
+    static let autoSpeed: CGFloat = 700
+    /// No new rows for this long while a macro scrolls: the end.
+    static let endAfter: Duration = .milliseconds(1200)
 
     private let state = ScrollRunState()
     private var panels: [NSPanel] = []
-    private var stopRequested = false
     private var escapeMonitor: Any?
     private var finish: CaptureFinish?
-    private let folder = URL.temporaryDirectory
-        .appending(path: "OCRFlow Pages \(UUID().uuidString)", directoryHint: .isDirectory)
-    private var pages: [URL] = []
-    private var joining = false
+    private let stitcher = LiveStitcher()
+    private var stream: FrameStream?
+    private var scroller: SmoothScroller?
+    private var lastGrowth = ContinuousClock.now
+    private var lostFrames = 0
+    /// How far it has been scrolled, in pixels of the picture.
+    private(set) var grown = 0
 
-    /// Takes `target` scrolled through, from `first` — a picture of it as it
-    /// is now — until the user picks one of `finishes` from the bar. The
-    /// pictures, in order, to be joined, and what was picked; nothing when
+    /// Takes `target` scrolled through — `first` is a picture of it as it is
+    /// now — until the user picks one of `finishes` from the bar. The long
+    /// picture, in parts when very long, and what was picked; nothing when
     /// cancelled.
     func run(_ target: CaptureTarget, first: CGImage,
-             finishes: [CaptureFinish] = [.cancel, .recognize, .save, .copy]) async -> (pages: [URL], finish: CaptureFinish) {
-        guard InputControl.isAllowed(), let firstPrint = await Self.look(at: target),
-              let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        // Every picture the size of the first, to be joined.
-        let size = CGSize(width: first.width, height: first.height)
-        // Taken again: the first was taken while choosing, its window in the
-        // background, and a background window's title bar is lighter than
-        // in the rest.
-        keep((try? await ScreenCapture.grab(target, like: size)) ?? first)
-        let steps = Self.scrollSteps(by: -(frame.height * 0.7).rounded(), at: Self.eventPoint(frame))
-
-        state.preview = first
-        state.onAutomatic = { [state] in state.automatic.toggle() }
+             finishes: [CaptureFinish] = [.cancel, .recognize, .save, .copy]) async -> (parts: [CGImage], finish: CaptureFinish) {
+        guard InputControl.isAllowed(), let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
+        state.head = LiveStitcher.scaled(first, toWidth: LiveStitcher.previewWidth)
+        state.onAutomatic = { [weak self] in self?.toggleAutomatic(target, in: frame) }
         showPanels(around: frame, finishes: finishes)
         watchForEscape()
+        defer {
+            stopWatchingForEscape()
+            panels.forEach { $0.orderOut(nil) }
+            panels = []
+        }
+        guard await startStream(target, size: CGSize(width: first.width, height: first.height),
+                                excluding: panels.map { CGWindowID($0.windowNumber) }) else { return ([], .cancel) }
 
-        var last = firstPrint
-        var missed = 0
-        while finish == nil, pages.count < Self.pageLimit {
-            if state.automatic {
-                await StepPlayer.play(steps, offset: .zero) { [weak self] in self?.finish != nil }
-                guard let page = await nextPage(of: target, after: last, size: size) else {
-                    // The end: the user picks what to do with it.
-                    state.automatic = false
-                    continue
-                }
-                keep(page.image)
-                last = page.print
-                continue
-            }
-            // By hand: whatever the user has scrolled to, as often as it
-            // changes, so neighbours overlap however fast they go.
-            try? await Task.sleep(for: .milliseconds(150))
-            guard let look = await Self.look(at: target) else {
-                // The window closed: nothing left to scroll.
-                missed += 1
-                if missed > 10 { finish = .cancel }
-                continue
-            }
-            missed = 0
-            guard !look.isSamePage(as: last), let image = try? await ScreenCapture.grab(target, like: size),
-                  // A window being resized or minimized is no screenful.
-                  abs(CGFloat(image.width) - size.width) <= 4, abs(CGFloat(image.height) - size.height) <= 4 else { continue }
-            keep(image)
-            last = look
+        // Scrolling, by hand or automatically, until the user says it is
+        // done: at the end of the page nothing more comes in, and it waits.
+        while finish == nil {
+            try? await Task.sleep(for: .milliseconds(100))
+            if grown > Self.heightLimit { finish = .copy }
         }
-        stopWatchingForEscape()
-        panels.forEach { $0.orderOut(nil) }
-        panels = []
-        let finish = finish ?? .copy
-        guard finish != .cancel else {
-            try? FileManager.default.removeItem(at: folder)
-            return ([], .cancel)
-        }
-        return (pages, finish)
+        stopAutomatic()
+        let parts = await finishStream()
+        guard let finish, finish != .cancel else { return ([], .cancel) }
+        return (parts, finish)
     }
 
-    /// Scrolls `target` on from `first` by `distance` points — to the end,
-    /// without one — a screenful at a time, with nothing on screen: for a
-    /// macro being run. The pictures, in order, to be joined.
-    func runAutomatically(_ target: CaptureTarget, first: CGImage, distance: CGFloat?) async -> [URL] {
-        guard let firstPrint = await Self.look(at: target), let frame = ScreenCapture.frame(of: target) else { return [] }
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        keep(first)
-        let size = CGSize(width: first.width, height: first.height)
-        let screenful = (frame.height * 0.7).rounded()
-        var remaining = distance ?? .infinity
-        var last = firstPrint
+    /// Scrolls `target` on by `distance` points — to the end, without one —
+    /// smoothly, with nothing on screen: for a macro being run. The long
+    /// picture, in parts when very long.
+    func runAutomatically(_ target: CaptureTarget, size: CGSize, distance: CGFloat?) async -> [CGImage] {
+        guard let frame = ScreenCapture.frame(of: target),
+              await startStream(target, size: size, excluding: []) else { return [] }
         watchForEscape()
         defer { stopWatchingForEscape() }
-        while !stopRequested, remaining > 0.5, pages.count < Self.pageLimit {
-            let step = min(screenful, remaining)
-            remaining -= step
-            await StepPlayer.play(Self.scrollSteps(by: -step, at: Self.eventPoint(frame)), offset: .zero) { [weak self] in
-                self?.stopRequested ?? true
-            }
-            guard let page = await nextPage(of: target, after: last, size: size) else { break }
-            keep(page.image)
-            last = page.print
+        // A moment for the first frame.
+        try? await Task.sleep(for: .milliseconds(300))
+        let scroller = SmoothScroller(at: Self.scrollPoint(in: frame), speed: Self.autoSpeed, distance: distance,
+                                      shouldWait: { [stream] in stream?.isBehind ?? false })
+        self.scroller = scroller
+        lastGrowth = .now
+        scroller.start()
+        while finish == nil, !scroller.isDone, ContinuousClock.now - lastGrowth < Self.endAfter {
+            try? await Task.sleep(for: .milliseconds(100))
         }
-        return pages
+        stopAutomatic()
+        // The last frames, as the view comes to rest.
+        try? await Task.sleep(for: .milliseconds(400))
+        return await finishStream()
     }
 
-    private func keep(_ image: CGImage) {
-        let url = folder.appending(path: String(format: "%04d.png", pages.count + 1))
-        guard Self.write(image, to: url) else { return }
-        pages.append(url)
-        state.pages = pages.count
-        if pages.count > 1 { joinForPreview() }
+    // MARK: - Frames
+
+    private func startStream(_ target: CaptureTarget, size: CGSize, excluding: [CGWindowID]) async -> Bool {
+        let stitcher = self.stitcher
+        let stream = FrameStream { [weak self] image in
+            let outcome = stitcher.add(image)
+            let taken = stitcher.taken
+            // What came into view, small, for the preview to grow by; and,
+            // the first time, the head it grows under, now that the bar at
+            // the bottom that stays put is known.
+            var slice: CGImage?, head: CGImage?
+            if case .grew(let rows) = outcome, rows > 0 {
+                slice = stitcher.previewSlices.last
+                if stitcher.previewSlices.count == 1 { head = stitcher.previewHead() }
+            }
+            Task { @MainActor in self?.took(outcome, taken: taken, slice: slice, head: head) }
+        }
+        do {
+            try await stream.start(target, size: size, excluding: excluding)
+        } catch {
+            return false
+        }
+        self.stream = stream
+        lastGrowth = .now
+        return true
     }
 
-    /// What has been joined so far, shown as it grows — and word when the
-    /// newest screenful would not join, while there is time to scroll back.
-    private func joinForPreview() {
-        guard !joining else { return }
-        joining = true
-        let pages = self.pages
-        Task {
-            let joined = await Task.detached {
-                ScrollStitcher.join(count: pages.count) { index in
-                    CGImageSourceCreateWithURL(pages[index] as CFURL, nil)
-                        .flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
-                }
-            }.value
-            joining = false
-            if let joined {
-                state.preview = joined.parts.first
-                // The newest left out: scrolled too far at once.
-                state.lost = !joined.usesLast
-            } else {
-                state.lost = true
-            }
-            // More may have come in meanwhile.
-            if self.pages.count != pages.count, finish == nil { joinForPreview() }
+    private func took(_ outcome: LiveStitcher.Outcome, taken: Int, slice: CGImage?, head: CGImage?) {
+        state.pages = taken
+        if let head { state.head = head }
+        if let slice { state.grow(by: slice) }
+        switch outcome {
+        case .grew(let rows):
+            grown += rows
+            if rows > 0 { lastGrowth = .now }
+            lostFrames = 0
+            state.lost = false
+        case .unchanged:
+            break
+        case .lost:
+            // A frame or two now and then is nothing; a run of them is the
+            // view gone ahead of the join.
+            lostFrames += 1
+            if lostFrames >= 3 { state.lost = true }
         }
+    }
+
+    private func finishStream() async -> [CGImage] {
+        guard let stream else { return [] }
+        await stream.stop()
+        self.stream = nil
+        let stitcher = self.stitcher
+        return await Task.detached { stitcher.finish() }.value
+    }
+
+    // MARK: - Scrolling for the user
+
+    private func toggleAutomatic(_ target: CaptureTarget, in frame: CGRect) {
+        if state.automatic { return stopAutomatic() }
+        let scroller = SmoothScroller(at: Self.scrollPoint(in: frame), speed: Self.autoSpeed, distance: nil,
+                                      shouldWait: { [stream] in stream?.isBehind ?? false })
+        self.scroller = scroller
+        lastGrowth = .now
+        state.automatic = true
+        scroller.start()
+    }
+
+    private func stopAutomatic() {
+        scroller?.stop()
+        scroller = nil
+        state.automatic = false
     }
 
     /// Where to scroll: a quarter of the way down, clear of the Auto Scroll
     /// button in the middle, which would otherwise take the wheel.
-    private static func eventPoint(_ frame: CGRect) -> CGPoint {
+    private static func scrollPoint(in frame: CGRect) -> CGPoint {
         CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.maxY + frame.height / 4)
     }
 
@@ -182,39 +194,6 @@ final class ScrollingCapture {
     static func look(at target: CaptureTarget) async -> PageFingerprint? {
         guard let image = try? await ScreenCapture.grab(target, maxWidth: 640) else { return nil }
         return PageFingerprint(image)
-    }
-
-    /// Waits for the target to show something new, then for it to finish
-    /// drawing, and takes it, with the look it settled on. Nil when nothing
-    /// changes — the last page — or the run was stopped.
-    private func nextPage(of target: CaptureTarget, after last: PageFingerprint,
-                          size: CGSize?) async -> (image: CGImage, print: PageFingerprint)? {
-        func look() async -> PageFingerprint? { await Self.look(at: target) }
-
-        // A page that loads takes a moment to start changing.
-        var current: PageFingerprint?
-        let changeBy = Date().addingTimeInterval(6)
-        while !stopRequested, Date() < changeBy {
-            guard let print = await look() else { return nil }
-            if !print.isSamePage(as: last) {
-                current = print
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(200))
-        }
-        guard var current else { return nil }
-
-        // Settled once two looks in a row agree: slides fade in, pages load
-        // their pictures, scrolling glides to a stop.
-        let settleBy = Date().addingTimeInterval(8)
-        while !stopRequested, Date() < settleBy {
-            try? await Task.sleep(for: .milliseconds(250))
-            guard let print = await look() else { return nil }
-            if print.isSamePage(as: current) { break }
-            current = print
-        }
-        guard !stopRequested, let image = try? await ScreenCapture.grab(target, like: size) else { return nil }
-        return (image, current)
     }
 
     // MARK: - Files
@@ -254,11 +233,11 @@ final class ScrollingCapture {
     // MARK: - On screen
 
     private func showPanels(around area: CGRect, finishes: [CaptureFinish]) {
-        let outline = CaptureMarks.outline(area, catchesClicks: false)
+        // As while choosing: the rest dimmed. The wheel goes through.
+        let shades = CaptureMarks.shades(around: area)
         let size = CaptureMarks.sizeLabel(for: area)
         let bar = CaptureMarks.bar(CaptureActionsBar(items: finishes) { [weak self] picked in
             self?.finish = picked
-            self?.stopRequested = true
         }, beside: area)
 
         // In the middle of the area, the button that scrolls for the user.
@@ -277,7 +256,7 @@ final class ScrollingCapture {
         preview.ignoresMouseEvents = true
         preview.contentView = NSHostingView(rootView: JoinedPreview(state: state))
 
-        panels = [outline, size, preview, button, bar]
+        panels = shades + [size, preview, button, bar]
         panels.forEach { $0.orderFrontRegardless() }
     }
 
@@ -288,7 +267,6 @@ final class ScrollingCapture {
             MainActor.assumeIsolated {
                 guard event.keyCode == 53,
                       event.cgEvent?.getIntegerValueField(.eventSourceUserData) != StepPlayer.marker else { return }
-                self?.stopRequested = true
                 if self?.finish == nil { self?.finish = .cancel }
             }
         }
@@ -297,6 +275,91 @@ final class ScrollingCapture {
     private func stopWatchingForEscape() {
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         escapeMonitor = nil
+    }
+}
+
+/// Scrolls smoothly: small steps sixty times a second, so the view glides
+/// rather than jumps. Sent from a timer of its own, so its pace does not
+/// depend on how busy the app is.
+///
+/// The window server sends the wheel to whatever is under the pointer, so
+/// each step takes the pointer to what is scrolled and straight back to
+/// where the user has it — without the pause in the user's own mouse
+/// movements that follows an event sent this way by default. The pointer
+/// stays the user's, to use meanwhile. (Sent to the app directly, or marked
+/// as a trackpad gesture, the steps are ignored.)
+final class SmoothScroller: @unchecked Sendable {
+    private let point: CGPoint
+    /// Points a second.
+    private let speed: CGFloat
+    private let distance: CGFloat?
+    private let shouldWait: @Sendable () -> Bool
+    private let queue = DispatchQueue(label: "OCRFlow.scroll", qos: .userInteractive)
+    private let source: CGEventSource?
+    private var timer: DispatchSourceTimer?
+    private var travelled: CGFloat = 0
+    private let lock = NSLock()
+    private var done = false
+
+    /// Done once `distance` points have been scrolled, when given.
+    var isDone: Bool { lock.withLock { done } }
+
+    /// `shouldWait`: whether what follows the scrolling has fallen behind,
+    /// and the next step had better wait for it.
+    init(at point: CGPoint, speed: CGFloat, distance: CGFloat?, shouldWait: @escaping @Sendable () -> Bool) {
+        self.point = point
+        self.speed = speed
+        self.distance = distance
+        self.shouldWait = shouldWait
+        source = CGEventSource(stateID: .combinedSessionState)
+        source?.localEventsSuppressionInterval = 0
+    }
+
+    func start() {
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        let interval = 1.0 / 60
+        timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(1))
+        timer.setEventHandler { [weak self] in self?.tick(interval) }
+        self.timer = timer
+        timer.resume()
+    }
+
+    func stop() {
+        queue.sync {
+            timer?.cancel()
+            timer = nil
+        }
+    }
+
+    private func tick(_ interval: Double) {
+        guard !shouldWait() else { return }
+        // Whole points: what is sent is what is counted.
+        var step = (speed * CGFloat(interval)).rounded()
+        if let distance {
+            step = min(step, (distance - travelled).rounded())
+            if step < 0.5 {
+                lock.withLock { done = true }
+                timer?.cancel()
+                timer = nil
+                return
+            }
+        }
+        send(step)
+        travelled += step
+    }
+
+    private func send(_ step: CGFloat) {
+        guard let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 1,
+                                  wheel1: Int32(-step), wheel2: 0, wheel3: 0) else { return }
+        let user = CGEvent(source: nil)?.location
+        event.location = point
+        event.setIntegerValueField(.eventSourceUserData, value: StepPlayer.marker)
+        if let now = CGEvent(source: nil)?.timestamp { event.timestamp = now }
+        event.post(tap: .cghidEventTap)
+        if let user {
+            CGWarpMouseCursorPosition(user)
+            CGAssociateMouseAndMouseCursorPosition(1)
+        }
     }
 }
 
@@ -309,8 +372,19 @@ private final class ScrollRunState {
     var pages = 1
     /// OCRFlow scrolling, rather than the user.
     var automatic = false
-    /// What has been joined so far.
-    var preview: CGImage?
+    /// What has been joined so far, small: the first frame, then each strip
+    /// that came into view, in order.
+    var head: CGImage?
+    var strips: [CGImage] = []
+
+    /// A strip more. Many small ones become one now and then, so there are
+    /// never many to lay out.
+    func grow(by strip: CGImage) {
+        strips.append(strip)
+        if strips.count > 48, let joined = LiveStitcher.stack(Array(strips.prefix(40))) {
+            strips = [joined] + strips.dropFirst(40)
+        }
+    }
     /// The last screenful would not join to the one before.
     var lost = false
 
@@ -339,21 +413,23 @@ private struct AutoScrollButton: View {
 private struct JoinedPreview: View {
     let state: ScrollRunState
 
-    /// The newest part, at the bottom, as the page grows: what was just
-    /// scrolled to is what the user wants to see joined.
+    /// The newest part, at the bottom, as the page grows a strip at a time:
+    /// what was just scrolled to is what the user wants to see joined.
     var body: some View {
         VStack(spacing: 6) {
             GeometryReader { space in
-                if let preview = state.preview {
-                    let height = space.size.width * CGFloat(preview.height) / CGFloat(max(preview.width, 1))
-                    Image(decorative: preview, scale: 1)
-                        .resizable()
-                        .frame(width: space.size.width, height: height)
-                        .frame(width: space.size.width, height: space.size.height, alignment: .bottom)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
+                VStack(spacing: 0) {
+                    ForEach(Array(([state.head].compactMap { $0 } + state.strips).enumerated()), id: \.offset) { _, strip in
+                        Image(decorative: strip, scale: 1)
+                            .resizable()
+                            .frame(width: space.size.width,
+                                   height: space.size.width * CGFloat(strip.height) / CGFloat(max(strip.width, 1)))
+                    }
                 }
+                .frame(width: space.size.width, height: space.size.height, alignment: .bottom)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
             }
             Text(state.lost ? "Too fast: scroll back a little, then on more slowly"
                             : "\(state.pages) captured")

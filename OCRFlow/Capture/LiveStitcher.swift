@@ -1,0 +1,162 @@
+import CoreGraphics
+import Foundation
+
+/// Joins a view into one long picture as it scrolls, frame by frame, while
+/// the frames come in.
+///
+/// Each frame is matched only against the last one taken in, and only the
+/// rows that came into view are kept — copied out, so the frames themselves
+/// can go: what is held is about the size of the finished picture. Frames
+/// that do not carry on from the last — scrolled back, or too far at once —
+/// are passed over until one does.
+///
+/// Not tied to any thread; used from one queue at a time.
+final class LiveStitcher: @unchecked Sendable {
+    enum Outcome: Equatable {
+        case grew(by: Int)
+        case unchanged
+        /// Does not carry on from the last taken in.
+        case lost
+    }
+
+    /// Width of the picture shown while it grows.
+    static let previewWidth = 240
+
+    private var first: CGImage?
+    private var firstGray: ScrollStitcher.Gray?
+    private var last: CGImage?
+    private var lastGray: ScrollStitcher.Gray?
+    private var lastShift: Int?
+    /// The rows at the top and bottom that stay put, once something moved.
+    private var edges: (top: Int, bottom: Int)?
+    /// What came into view, in order: rows copied out of the frames.
+    private var slices: [CGImage] = []
+    /// The same, small, for showing while it grows.
+    private(set) var previewSlices: [CGImage] = []
+    private var moving: [Bool] = []
+    private(set) var grown = 0
+    /// Frames taken in.
+    private(set) var taken = 0
+
+    var width: Int { first?.width ?? 0 }
+    var height: Int { first?.height ?? 0 }
+
+    func add(_ frame: CGImage) -> Outcome {
+        guard let first, let lastGray else {
+            let copy = Self.copy(frame) ?? frame
+            self.first = copy
+            last = copy
+            let gray = ScrollStitcher.Gray(copy)
+            firstGray = gray
+            lastGray = gray
+            moving = Array(repeating: false, count: copy.width)
+            taken = 1
+            return .grew(by: 0)
+        }
+        guard frame.width == first.width, frame.height == first.height else { return .lost }
+        let gray = ScrollStitcher.Gray(frame)
+        let edges = edges ?? (ScrollStitcher.sameRows(lastGray, gray, from: 0, by: 1, upTo: height / 2),
+                              ScrollStitcher.sameRows(lastGray, gray, from: height - 1, by: -1, upTo: height / 2 - 1))
+        // Close to the last distance first: cheap, and right nearly always.
+        var shift: Int?
+        if let lastShift {
+            shift = ScrollStitcher.shift(from: lastGray, to: gray, top: edges.top, bottom: edges.bottom, near: lastShift,
+                                         within: max(1, lastShift - 48)...(lastShift + 48))
+        }
+        if shift == nil {
+            shift = ScrollStitcher.shift(from: lastGray, to: gray, top: edges.top, bottom: edges.bottom, near: lastShift)
+        }
+        guard let shift else { return .lost }
+        guard shift > 0 else { return .unchanged }
+
+        if self.edges == nil { self.edges = edges }
+        ScrollStitcher.markMovingColumns(from: lastGray, to: gray, in: &moving)
+        let end = height - edges.bottom
+        guard let slice = Self.copy(frame, rows: (end - shift)..<end) else { return .lost }
+        slices.append(slice)
+        if let small = Self.scaled(slice, toWidth: Self.previewWidth) { previewSlices.append(small) }
+        grown += shift
+        taken += 1
+        last = Self.copy(frame) ?? frame
+        self.lastGray = gray
+        lastShift = shift
+        return .grew(by: shift)
+    }
+
+    /// The first frame, small, down to the bottom bar that stays put — what
+    /// the rest is shown joined under.
+    func previewHead() -> CGImage? {
+        guard let first else { return nil }
+        let end = height - (edges?.bottom ?? 0)
+        return Self.copy(first, rows: 0..<end).flatMap { Self.scaled($0, toWidth: Self.previewWidth) }
+    }
+
+    /// The finished picture — in parts, each no taller than `maxHeight`,
+    /// when it is very long — without columns beside the scrolling part
+    /// that stayed put.
+    func finish(maxHeight: Int = ScrollStitcher.maxHeight) -> [CGImage] {
+        guard let first, let last else { return [] }
+        let edges = edges ?? (0, 0)
+        let end = height - edges.bottom
+        var pieces: [CGImage] = []
+        if let head = Self.copy(first, rows: 0..<end) { pieces.append(head) }
+        pieces += slices
+        if edges.bottom > 0, let foot = Self.copy(last, rows: end..<height) { pieces.append(foot) }
+
+        let span = ScrollStitcher.columns(moving).flatMap { $0.count < width * 9 / 10 ? $0 : nil } ?? 0..<width
+        // Into parts; each after the first starts with the header again.
+        var parts: [[CGImage]] = [[]]
+        var partHeight = 0
+        let header = edges.top > 0 ? Self.copy(first, rows: 0..<edges.top) : nil
+        for piece in pieces {
+            if partHeight > 0, partHeight + piece.height > maxHeight {
+                parts.append(header.map { [$0] } ?? [])
+                partHeight = header?.height ?? 0
+            }
+            parts[parts.count - 1].append(piece)
+            partHeight += piece.height
+        }
+        return parts.compactMap { Self.stack($0, columns: span) }
+    }
+
+    // MARK: - Pictures
+
+    /// Its own pixels, apart from the frame they came from — whose buffer
+    /// the capture wants back.
+    static func copy(_ image: CGImage, rows: Range<Int>? = nil) -> CGImage? {
+        let rows = rows ?? 0..<image.height
+        guard !rows.isEmpty, let context = context(width: image.width, height: rows.count, like: image) else { return nil }
+        // Drawn so that `rows` fill the context.
+        context.draw(image, in: CGRect(x: 0, y: rows.upperBound - image.height, width: image.width, height: image.height))
+        return context.makeImage()
+    }
+
+    static func scaled(_ image: CGImage, toWidth width: Int) -> CGImage? {
+        let height = max(1, Int((Double(image.height) * Double(width) / Double(image.width)).rounded()))
+        guard let context = context(width: width, height: height, like: image) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    /// One under another, top first, cut to `columns`.
+    static func stack(_ images: [CGImage], columns: Range<Int>? = nil) -> CGImage? {
+        guard let first = images.first else { return nil }
+        let columns = columns ?? 0..<first.width
+        let total = images.reduce(0) { $0 + $1.height }
+        guard let context = context(width: columns.count, height: total, like: first) else { return nil }
+        var y = total
+        for image in images {
+            y -= image.height
+            context.draw(image, in: CGRect(x: -columns.lowerBound, y: y, width: image.width, height: image.height))
+        }
+        return context.makeImage()
+    }
+
+    private static func context(width: Int, height: Int, like image: CGImage) -> CGContext? {
+        CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                  space: image.colorSpace.flatMap { $0.model == .rgb ? $0 : nil }
+                      ?? CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    }
+}

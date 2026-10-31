@@ -241,25 +241,18 @@ final class LiveCaptureTests: XCTestCase {
         try assertSlides(pages, from: 2)
     }
 
-    /// Scrolled from top to bottom a screenful at a time, and joined: every
-    /// line once, none missing.
+    /// Auto Scroll from top to bottom, joined as it goes: every line once,
+    /// none missing.
     func testScrollsALongPageAndJoinsItIntoOnePicture() async throws {
         slides?.process.terminate()
         let slides = try await launch(helper, scrolling: true)
         self.slides = slides
         let target = CaptureTarget.window(slides.window)
         let first = try await ScreenCapture.grab(target)
-        let files = await ScrollingCapture().runAutomatically(target, first: first, distance: nil)
-        defer { files.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
-        let pages = files.compactMap { PageImages.wholeImage(at: $0) }
-        XCTAssertGreaterThan(pages.count, 4)
-        if ScrollStitcher.stitch(pages) == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
-            for (index, page) in pages.enumerated() {
-                _ = ScrollingCapture.write(page, to: URL(fileURLWithPath: dump).appending(path: "scroll-\(index).png"))
-            }
-        }
-        let joined = try XCTUnwrap(ScrollStitcher.stitch(pages))
+        let joined = await ScrollingCapture().runAutomatically(target, size: CGSize(width: first.width, height: first.height),
+                                                               distance: nil)
         XCTAssertEqual(joined.count, 1)
+        XCTAssertGreaterThan(try XCTUnwrap(joined.first).height, first.height * 5)
 
         // Read as a long screenshot is: in pages.
         let url = URL.temporaryDirectory.appending(path: "long-\(UUID().uuidString).png")
@@ -596,7 +589,12 @@ extension LiveCaptureTests {
         for _ in 0..<100 where vm.items.count == before.count { try await Task.sleep(for: .milliseconds(100)) }
         let added = vm.items.filter { !before.contains($0.id) }
         // The recorded picture and the run's are the same: one is kept.
-        XCTAssertEqual(added.count, 1)
+        XCTAssertEqual(added.count, 1, "\(added.compactMap { PageImages.wholeImage(at: $0.url) }.map { "\($0.width)×\($0.height)" })")
+        if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
+            for (index, item) in added.enumerated() {
+                try? FileManager.default.copyItem(at: item.url, to: URL(fileURLWithPath: dump).appending(path: "added-\(index).png"))
+            }
+        }
         let image = try XCTUnwrap(PageImages.wholeImage(at: try XCTUnwrap(added.first).url))
         let pixelsPerPoint = CGFloat(image.width) / frame.width
         XCTAssertEqual(CGFloat(image.height), (frame.height + 1500) * pixelsPerPoint, accuracy: 80 * pixelsPerPoint)
@@ -625,17 +623,9 @@ extension LiveCaptureTests {
         }
         try await Task.sleep(for: .milliseconds(1500))
         try clickBar(25)   // ✓
-        let (files, finish) = await session.value
-        defer { files.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
+        let (parts, finish) = await session.value
         XCTAssertEqual(finish, .copy)
-        XCTAssertGreaterThan(files.count, 2)
-        let joined = ScrollStitcher.stitch(files)
-        if joined == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
-            for (index, file) in files.enumerated() {
-                try? FileManager.default.copyItem(at: file, to: URL(fileURLWithPath: dump).appending(path: "hand-\(index).png"))
-            }
-        }
-        let long = try XCTUnwrap(joined?.first)
+        let long = try XCTUnwrap(parts.first)
         let pixelsPerPoint = CGFloat(first.width) / frame.width
         XCTAssertEqual(CGFloat(long.height), (frame.height + 1500) * pixelsPerPoint, accuracy: 80 * pixelsPerPoint)
     }
