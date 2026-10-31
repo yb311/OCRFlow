@@ -141,36 +141,74 @@ enum ScrollStitcher {
             let width = image.width, height = image.height
             self.width = width
             self.height = height
-            func draw(width: Int) -> [UInt8] {
-                var bytes = [UInt8](repeating: 255, count: width * height)
-                bytes.withUnsafeMutableBytes { buffer in
-                    let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                            bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
-                                            bitmapInfo: CGImageAlphaInfo.none.rawValue)
-                    // Narrowed by Core Graphics: each of the few left is the
-                    // mean of its stretch.
-                    context?.interpolationQuality = .high
-                    context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            let bytes = Self.lightness(of: image)
+            let values = vDSP.integerToFloatingPoint(bytes, floatingPointType: Float.self)
+            self.values = values
+            // Each of the stretches, the mean of its pixels.
+            var rows = [Float](repeating: 0, count: height * Self.blocks)
+            var busy = [Bool](repeating: false, count: height)
+            let stretches = (0...Self.blocks).map { $0 * width / Self.blocks }
+            values.withUnsafeBufferPointer { values in
+                rows.withUnsafeMutableBufferPointer { rows in
+                    for y in 0..<height {
+                        let row = values.baseAddress! + y * width
+                        for block in 0..<Self.blocks {
+                            let start = min(stretches[block], width - 1)
+                            let count = max(1, stretches[block + 1] - stretches[block])
+                            vDSP_meanv(row + start, 1, rows.baseAddress! + y * Self.blocks + block, vDSP_Length(count))
+                        }
+                        var lowest: Float = 0, highest: Float = 0
+                        vDSP_minv(row, 1, &lowest, vDSP_Length(width))
+                        vDSP_maxv(row, 1, &highest, vDSP_Length(width))
+                        busy[y] = highest - lowest > 48
+                    }
+                }
+            }
+            self.rows = rows
+            self.busy = busy
+        }
+
+        /// How light each pixel is, 0 to 255, row by row — straight from the
+        /// picture's own bytes when they are the usual four to a pixel, a
+        /// frame's way: drawing every frame in grey takes far longer.
+        private static func lightness(of image: CGImage) -> [UInt8] {
+            let width = image.width, height = image.height
+            var bytes = [UInt8](repeating: 255, count: width * height)
+            let alpha = image.alphaInfo
+            let first = [.premultipliedFirst, .first, .noneSkipFirst].contains(alpha)
+            let little = image.bitmapInfo.contains(.byteOrder32Little)
+            // R, G and B by how bright each looks, in the order they lie.
+            let weights: [Int16] = switch (first, little) {
+            case (true, true): [29, 150, 77, 0]     // B G R A
+            case (true, false): [0, 77, 150, 29]    // A R G B
+            case (false, true): [0, 29, 150, 77]    // A B G R
+            case (false, false): [77, 150, 29, 0]   // R G B A
+            }
+            if image.bitsPerPixel == 32, image.bitsPerComponent == 8, alpha != .none, alpha != .alphaOnly,
+               image.colorSpace?.model == .rgb, let data = image.dataProvider?.data,
+               CFDataGetLength(data) >= image.bytesPerRow * height {
+                bytes.withUnsafeMutableBytes { output in
+                    var source = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: CFDataGetBytePtr(data)),
+                                               height: vImagePixelCount(height), width: vImagePixelCount(width),
+                                               rowBytes: image.bytesPerRow)
+                    var destination = vImage_Buffer(data: output.baseAddress, height: vImagePixelCount(height),
+                                                    width: vImagePixelCount(width), rowBytes: width)
+                    _ = vImageMatrixMultiply_ARGB8888ToPlanar8(&source, &destination, weights, 256, nil, 0,
+                                                               vImage_Flags(kvImageNoFlags))
                 }
                 return bytes
             }
-            values = vDSP.integerToFloatingPoint(draw(width: width), floatingPointType: Float.self)
-            rows = vDSP.integerToFloatingPoint(draw(width: Self.blocks), floatingPointType: Float.self)
-            busy = values.withUnsafeBufferPointer { values in
-                (0..<height).map { y in
-                    let row = UnsafeBufferPointer(rebasing: values[(y * width)..<((y + 1) * width)])
-                    return vDSP.maximum(row) - vDSP.minimum(row) > 48
-                }
+            bytes.withUnsafeMutableBytes { buffer in
+                let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                        bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                                        bitmapInfo: CGImageAlphaInfo.none.rawValue)
+                context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             }
+            return bytes
         }
 
         /// How different row `y` here is from row `other` of `picture`: the
-        /// mean difference of their stretches, 0 to 255.
-        func roughDifference(row y: Int, from picture: Gray, row other: Int) -> Float {
-            Self.meanDifference(rows, at: y * Self.blocks, picture.rows, at: other * Self.blocks, count: Self.blocks)
-        }
-
-        /// The same, pixel by pixel.
+        /// mean difference of their pixels, 0 to 255.
         func difference(row y: Int, from picture: Gray, row other: Int) -> Float {
             Self.meanDifference(values, at: y * width, picture.values, at: other * picture.width, count: width)
         }
@@ -178,12 +216,18 @@ enum ScrollStitcher {
         private static func meanDifference(_ a: [Float], at i: Int, _ b: [Float], at j: Int, count: Int) -> Float {
             a.withUnsafeBufferPointer { a in
                 b.withUnsafeBufferPointer { b in
-                    var result: Float = 0
-                    var difference = [Float](repeating: 0, count: count)
-                    vDSP_vsub(b.baseAddress! + j, 1, a.baseAddress! + i, 1, &difference, 1, vDSP_Length(count))
-                    vDSP_meamgv(difference, 1, &result, vDSP_Length(count))
-                    return result
+                    Self.meanDifference(a.baseAddress! + i, b.baseAddress! + j, count: count)
                 }
+            }
+        }
+
+        /// The mean of how far apart `count` values are, from `a` and `b` on.
+        static func meanDifference(_ a: UnsafePointer<Float>, _ b: UnsafePointer<Float>, count: Int) -> Float {
+            withUnsafeTemporaryAllocation(of: Float.self, capacity: count) { difference in
+                var result: Float = 0
+                vDSP_vsub(b, 1, a, 1, difference.baseAddress!, 1, vDSP_Length(count))
+                vDSP_meamgv(difference.baseAddress!, 1, &result, vDSP_Length(count))
+                return result
             }
         }
     }
@@ -255,17 +299,15 @@ enum ScrollStitcher {
         let unmoved = (top..<(top + middle)).filter { a.difference(row: $0, from: b, row: $0) > 12 }.count
         if unmoved * 20 <= middle { return 0 }
 
-        // Every distance, roughly: every third row of the overlap.
-        var candidates: [(shift: Int, error: Float)] = []
-        for shift in range {
-            var sum: Float = 0, count = 0
-            var y = 0
-            while y < middle - shift {
-                sum += a.roughDifference(row: top + shift + y, from: b, row: top + y)
-                count += 1
-                y += 3
+        // Every distance, roughly: the overlap's stretches, all at once.
+        let candidates: [(shift: Int, error: Float)] = a.rows.withUnsafeBufferPointer { ar in
+            b.rows.withUnsafeBufferPointer { br in
+                range.map { shift in
+                    (shift, Gray.meanDifference(ar.baseAddress! + (top + shift) * Gray.blocks,
+                                                br.baseAddress! + top * Gray.blocks,
+                                                count: (middle - shift) * Gray.blocks))
+                }
             }
-            candidates.append((shift, sum / Float(count)))
         }
         // Whether the best is good enough is for the exact comparison below:
         // over a short overlap, one line a title bar draws under itself

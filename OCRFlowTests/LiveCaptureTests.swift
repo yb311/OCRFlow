@@ -416,6 +416,15 @@ extension LiveCaptureTests {
         click(CGPoint(x: bar.frame.maxX - fromRight, y: top - bar.frame.midY))
     }
 
+    /// Auto Scroll, beside the area, over what has been joined.
+    private func clickAutoScroll() throws {
+        let button = try XCTUnwrap(NSApp.windows.first {
+            $0.isVisible && ($0.contentView.map { String(describing: type(of: $0)) } ?? "").contains("AutoScrollButton")
+        })
+        let top = NSScreen.screens[0].frame.maxY
+        click(CGPoint(x: button.frame.midX, y: top - button.frame.midY))
+    }
+
     /// A screenshot is no longer read straight away: the bar asks, and copy
     /// puts it on the clipboard as it was.
     func testTheBarCopiesAScreenshot() async throws {
@@ -493,8 +502,7 @@ extension LiveCaptureTests {
         try await Task.sleep(for: .milliseconds(1000))
         try clickBar(144)
         try await Task.sleep(for: .milliseconds(1500))
-        // Auto Scroll, in the middle of the area.
-        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        try clickAutoScroll()
         for _ in 0..<60 { try await Task.sleep(for: .milliseconds(500)) }
         try clickBar(25)
         // Joining takes a while in a debug build.
@@ -628,6 +636,100 @@ extension LiveCaptureTests {
         let long = try XCTUnwrap(parts.first)
         let pixelsPerPoint = CGFloat(first.width) / frame.width
         XCTAssertEqual(CGFloat(long.height), (frame.height + 1500) * pixelsPerPoint, accuracy: 80 * pixelsPerPoint)
+    }
+
+    /// Auto Scroll over an area rather than a window. Nothing of OCRFlow's
+    /// is in the picture, even a window of its own over the area; the steps
+    /// come evenly, with the screen, and the preview grows with nearly every
+    /// frame; and once the user moves the pointer it stops and leaves the
+    /// pointer where they put it.
+    func testAutoScrollsAnAreaAndGivesThePointerBack() async throws {
+        slides?.process.terminate()
+        let slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        // The page, below the window's title bar, in event coordinates.
+        let area = CGRect(x: frame.minX + 10, y: top - frame.maxY + 60, width: frame.width - 40, height: frame.height - 80)
+        let target = try XCTUnwrap(ScreenWindows.target(for: area), "\(frame) → \(area)")
+        NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(400))
+        let first = try await ScreenCapture.grab(target)
+        // One of OCRFlow's own, over the area: as the Auto Scroll button once was.
+        let block = NSPanel(contentRect: CGRect(x: area.midX - 100, y: top - area.midY - 150, width: 200, height: 60),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        block.level = .screenSaver
+        block.backgroundColor = .black
+        block.ignoresMouseEvents = true
+        block.orderFrontRegardless()
+        defer { block.orderOut(nil) }
+        let capture = ScrollingCapture()
+        let session = Task { await capture.run(target, first: first) }
+        try await Task.sleep(for: .milliseconds(1000))
+
+        final class Steps: @unchecked Sendable { var times: [TimeInterval] = [] }
+        let steps = Steps()
+        let monitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { event in
+            if event.cgEvent?.getIntegerValueField(.eventSourceUserData) == StepPlayer.marker {
+                steps.times.append(event.timestamp)
+            }
+        }
+        defer { monitor.map(NSEvent.removeMonitor) }
+        try clickAutoScroll()
+        try await Task.sleep(for: .milliseconds(1000))
+        // Past easing in.
+        steps.times.removeAll()
+        // How often the preview grows.
+        var updates = 0, last = capture.grown
+        let sampling = ContinuousClock.now
+        while ContinuousClock.now - sampling < .seconds(2) {
+            try await Task.sleep(for: .milliseconds(4))
+            if capture.grown != last { updates += 1; last = capture.grown }
+        }
+        let parked = try XCTUnwrap(CGEvent(source: nil)?.location)
+        XCTAssertEqual(parked.x, area.midX, accuracy: 2)
+        XCTAssertEqual(parked.y, area.midY, accuracy: 2)
+        XCTAssertGreaterThan(capture.grown, 1000)
+
+        // The user moves the pointer: it stops, and the pointer is theirs.
+        let away = CGPoint(x: area.midX + 80, y: area.midY + 50)
+        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: away, mouseButton: .left)?
+            .post(tap: .cghidEventTap)
+        try await Task.sleep(for: .milliseconds(700))
+        let stopped = capture.grown
+        let sent = steps.times.count
+        try await Task.sleep(for: .milliseconds(800))
+        XCTAssertEqual(steps.times.count, sent, "still scrolling")
+        XCTAssertEqual(capture.grown, stopped)
+        let now = try XCTUnwrap(CGEvent(source: nil)?.location)
+        XCTAssertEqual(now.x, away.x, accuracy: 1)
+        XCTAssertEqual(now.y, away.y, accuracy: 1)
+
+        let intervals = zip(steps.times.dropFirst(), steps.times).map { ($0 - $1) * 1000 }.sorted()
+        let refresh = NSScreen.screens.first { $0.frame.contains(CGPoint(x: area.midX, y: top - area.midY)) }?
+            .maximumFramesPerSecond ?? 60
+        print("LIVE steps \(steps.times.count), every \(intervals[intervals.count / 2]) ms median, "
+              + "p95 \(intervals[intervals.count * 95 / 100]) ms, max \(intervals.last!) ms; screen \(refresh) Hz; "
+              + "preview grew \(Double(updates) / 2) times a second")
+        XCTAssertGreaterThan(steps.times.count, 60)
+        // Each frame joins on; with a window of OCRFlow's in them, few would.
+        XCTAssertGreaterThan(updates, 60)
+        XCTAssertLessThan(intervals[intervals.count * 95 / 100], 1500 / Double(refresh))
+
+        try clickBar(25)   // ✓
+        let (parts, finish) = await session.value
+        XCTAssertEqual(finish, .copy)
+        let long = try XCTUnwrap(parts.first)
+        XCTAssertGreaterThan(long.height, first.height * 2)
+        if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
+            _ = ScrollingCapture.write(long, to: URL(fileURLWithPath: dump).appending(path: "area.png"))
+            _ = ScrollingCapture.write(first, to: URL(fileURLWithPath: dump).appending(path: "area-first.png"))
+        }
+        // Not a row of the black panel in it.
+        let gray = ScrollStitcher.Gray(long)
+        let middle = (gray.width / 2 - 60)..<(gray.width / 2 + 60)
+        let dark = (0..<gray.height).filter { y in middle.allSatisfy { gray.values[y * gray.width + $0] < 40 } }
+        XCTAssertTrue(dark.isEmpty, "OCRFlow's own window in the picture, rows \(dark.first ?? 0)…")
     }
 
     /// Pointing at the floating button opens out Queue Screenshots and Record

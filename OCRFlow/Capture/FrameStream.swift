@@ -27,10 +27,15 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
         self.onFrame = onFrame
     }
 
-    /// `size` is the picture's in pixels, as the first one taken; `excluding`
-    /// OCRFlow's own windows over a region.
-    func start(_ target: CaptureTarget, size: CGSize, excluding windowIDs: [CGWindowID]) async throws {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    /// `size` is the picture's in pixels, as the first one taken.
+    ///
+    /// Over a region, none of OCRFlow's own windows is in the frames — not
+    /// only those there when it starts but any shown later, a tooltip say:
+    /// they are left out as one app's, not window by window. (Asked for
+    /// what is on screen only, ScreenCaptureKit leaves out OCRFlow's panels
+    /// over other apps, and OCRFlow with them: nothing would be left out.)
+    func start(_ target: CaptureTarget, size: CGSize) async throws {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         let filter: SCContentFilter
         let configuration = SCStreamConfiguration()
         switch target {
@@ -38,7 +43,11 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
             guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
                 throw ScreenGrabber.Failure.gone
             }
-            filter = SCContentFilter(display: display, excludingWindows: content.windows.filter { windowIDs.contains($0.windowID) })
+            let own = content.applications.filter { $0.processID == getpid() }
+            filter = own.isEmpty
+                ? SCContentFilter(display: display,
+                                  excludingWindows: content.windows.filter { $0.owningApplication?.processID == getpid() })
+                : SCContentFilter(display: display, excludingApplications: own, exceptingWindows: [])
             configuration.sourceRect = rect
         case let .window(windowID):
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
@@ -51,7 +60,9 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
         configuration.height = Int(size.height)
         configuration.showsCursor = false
         configuration.pixelFormat = kCVPixelFormatType_32BGRA
-        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        // As often as the screen changes: the more often, the less moves
+        // between two frames, and the sooner the preview grows.
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         configuration.queueDepth = 4
         let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
