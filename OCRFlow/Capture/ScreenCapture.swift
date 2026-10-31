@@ -11,14 +11,14 @@ enum ScreenCapture {
     static func choose(lingering: Bool = false) async -> (image: CGImage, target: CaptureTarget)? {
         guard isAllowed() else { return nil }
         do {
-            let shots = try await ScreenGrabber.displays(excluding: ownHelperWindows)
+            let shots = try await screens()
             switch await CaptureOverlay.choose(from: shots, lingering: lingering) {
             case nil:
                 return nil
             case let .region(target, image):
                 return (image, target)
             case let .window(id):
-                return (try await ScreenGrabber.capture(.window(id), excluding: []), .window(id))
+                return (try await ScreenGrabber.capture(.window(id)), .window(id))
             }
         } catch {
             report(error)
@@ -26,17 +26,23 @@ enum ScreenCapture {
         }
     }
 
+    /// Every display as it is now, to choose from.
+    static func screens() async throws -> [CGDirectDisplayID: CGImage] {
+        try await ScreenGrabber.displays(keeping: ownOrdinaryWindows)
+    }
+
     /// The place as it is now, with no flash and no message if it fails.
     /// `like` keeps the size of an earlier picture of the same place, for
     /// pictures to be joined.
     static func grab(_ target: CaptureTarget, maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
-        try await ScreenGrabber.capture(target, excluding: ownHelperWindows, maxWidth: maxWidth, like: earlier)
+        try await ScreenGrabber.capture(target, keeping: ownOrdinaryWindows, maxWidth: maxWidth, like: earlier)
     }
 
-    /// The floating button and anything else of the app's that floats over
-    /// other windows is never in the picture.
-    private static var ownHelperWindows: [CGWindowID] {
-        NSApp.windows.filter { $0 is NSPanel && $0.isVisible }.map { CGWindowID($0.windowNumber) }
+    /// The app's own ordinary windows — the main window, the settings — are
+    /// in the picture like any other app's; the floating button and anything
+    /// else of the app's that floats over other windows never is.
+    private static var ownOrdinaryWindows: [CGWindowID] {
+        NSApp.windows.filter { !($0 is NSPanel) && $0.isVisible }.map { CGWindowID($0.windowNumber) }
     }
 
     // MARK: - Permission
