@@ -6483,6 +6483,16 @@
         }
       }
     },
+    "Record Actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制操作"
+          }
+        }
+      }
+    },
     "Record Actions…" : {
       "localizations" : {
         "zh-Hans" : {

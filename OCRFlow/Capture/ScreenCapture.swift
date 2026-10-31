@@ -5,13 +5,13 @@ import AppKit
 enum ScreenCapture {
     /// Holds the screen still and lets the user choose a part of it or a
     /// window. Nil when cancelled, or when it could not be taken — the user
-    /// has been told why. `returnFocus` puts the app that was in front back
-    /// in front afterwards, for the user to carry on in.
-    static func choose(returnFocus: Bool = false) async -> (image: CGImage, target: CaptureTarget)? {
+    /// has been told why. The app that was in front is in front again
+    /// afterwards.
+    static func choose() async -> (image: CGImage, target: CaptureTarget)? {
         guard isAllowed() else { return nil }
         do {
             let shots = try await ScreenGrabber.displays(excluding: ownHelperWindows)
-            switch await CaptureOverlay.choose(from: shots, returnFocus: returnFocus) {
+            switch await CaptureOverlay.choose(from: shots) {
             case nil:
                 return nil
             case let .region(target, image):
@@ -60,13 +60,12 @@ enum ScreenCapture {
     }
 
     private static func askForPermission() {
-        NSApp.activate()
         let alert = NSAlert()
         alert.messageText = String(localized: "OCRFlow needs permission to record the screen")
         alert.informativeText = String(localized: "Turn on OCRFlow in Privacy & Security → Screen & System Audio Recording, then reopen it. Screenshots are read on this Mac and never leave it.")
         alert.addButton(withTitle: String(localized: "Open System Settings"))
         alert.addButton(withTitle: String(localized: "Cancel"))
-        if alert.runModal() == .alertFirstButtonReturn,
+        if OwnWindows.whileModal({ alert.runModal() }) == .alertFirstButtonReturn,
            let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
         }
@@ -74,11 +73,10 @@ enum ScreenCapture {
 
     private static func report(_ error: Error) {
         if case ScreenGrabber.Failure.notAllowed = error { return askForPermission() }
-        NSApp.activate()
         let alert = NSAlert()
         alert.messageText = String(localized: "The screen could not be captured")
         alert.informativeText = error.localizedDescription
-        alert.runModal()
+        OwnWindows.whileModal { _ = alert.runModal() }
     }
 
     // MARK: - Flash

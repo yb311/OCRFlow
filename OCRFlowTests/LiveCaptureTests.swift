@@ -444,6 +444,47 @@ extension LiveCaptureTests {
         XCTAssertTrue(vm.items.isEmpty, "not read unless asked")
     }
 
+    /// Taking a screenshot over another app leaves OCRFlow's own windows
+    /// where they were — behind it — and that app in front.
+    ///
+    /// It cannot catch everything: activation is cooperative, and the system
+    /// may refuse a test host the activation the app gets from a shortcut,
+    /// which is what brought the main window forward.
+    func testAScreenshotLeavesOCRFlowsWindowsBehind() async throws {
+        let slides = try XCTUnwrap(slides)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        // OCRFlow's main window, under the slides.
+        let own = NSWindow(contentRect: frame.insetBy(dx: 60, dy: 60), styleMask: [.titled], backing: .buffered, defer: false)
+        own.isReleasedWhenClosed = false
+        // Main, as the real one is: activating an app brings its main window
+        // forward.
+        own.makeKeyAndOrderFront(nil)
+        own.makeMain()
+        defer { own.orderOut(nil) }
+        NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(600))
+        func ownIsBehind() -> Bool {
+            let order = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? [])
+                .compactMap { $0[kCGWindowNumber as String] as? Int }
+            guard let mine = order.firstIndex(of: own.windowNumber),
+                  let theirs = order.firstIndex(of: Int(slides.window)) else { return false }
+            return mine > theirs
+        }
+        XCTAssertTrue(ownIsBehind(), "set up wrong")
+
+        let vm = try model()
+        vm.captureScreenshot()
+        try await Task.sleep(for: .milliseconds(1200))
+        click(CGPoint(x: frame.minX + 30, y: top - frame.maxY + 60))   // the slides, clear of OCRFlow's window
+        try await Task.sleep(for: .milliseconds(1000))
+        XCTAssertTrue(ownIsBehind(), "came forward with the bar")
+        try clickBar(25)
+        try await Task.sleep(for: .milliseconds(800))
+        XCTAssertTrue(ownIsBehind(), "came forward after copying")
+        XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, slides.process.processIdentifier)
+    }
+
     /// Long screenshot from the bar: Auto Scroll to the end, then copy.
     func testTheBarTakesALongScreenshot() async throws {
         slides?.process.terminate()
@@ -606,7 +647,12 @@ extension LiveCaptureTests {
         let floating = FloatingCaptureButton(model: vm)
         defer { floating.close() }
         try await Task.sleep(for: .milliseconds(300))
-        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width == FloatingCaptureButton.side })
+        // The frontmost: earlier tests' models may have floating buttons of
+        // their own in the same place, when the setting is on.
+        let front = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? [])
+            .compactMap { $0[kCGWindowNumber as String] as? Int }
+        let buttons = NSApp.windows.filter { $0 is NSPanel && $0.isVisible && $0.frame.width == FloatingCaptureButton.side }
+        let panel = try XCTUnwrap(front.lazy.compactMap { number in buttons.first { $0.windowNumber == number } }.first)
         let resting = panel.frame
         let top = NSScreen.screens[0].frame.maxY
         func move(to point: CGPoint) {
@@ -618,7 +664,18 @@ extension LiveCaptureTests {
         move(to: CGPoint(x: resting.midX, y: top - resting.midY))
         try await Task.sleep(for: .milliseconds(600))
         XCTAssertEqual(panel.frame.height, FloatingCaptureButton.side + FloatingCaptureButton.extrasHeight)
-        move(to: CGPoint(x: resting.midX - 300, y: top - resting.midY))
+        // Onto the first of the others, where its name shows.
+        let opened = panel.frame
+        let downward = opened.minY < resting.minY
+        let firstY = resting.midY + (downward ? -1 : 1) * ((FloatingCaptureButton.diameter + FloatingCaptureButton.extraDiameter) / 2 + FloatingCaptureButton.gap)
+        move(to: CGPoint(x: resting.midX, y: top - firstY))
+        try await Task.sleep(for: .milliseconds(500))
+        if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
+            let picture = try await ScreenGrabber.capture(.window(CGWindowID(panel.windowNumber)), excluding: [])
+            _ = ScrollingCapture.write(picture, to: URL(fileURLWithPath: dump).appending(path: "floating.png"))
+        }
+        XCTAssertEqual(panel.frame, opened, "still open over one of the others")
+        move(to: CGPoint(x: resting.midX - 400, y: top - resting.midY))
         try await Task.sleep(for: .milliseconds(900))
         XCTAssertEqual(panel.frame, resting)
     }

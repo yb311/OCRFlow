@@ -34,9 +34,12 @@ final class ScrollingCapture {
         guard InputControl.isAllowed(), let firstPrint = await Self.look(at: target),
               let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        keep(first)
         // Every picture the size of the first, to be joined.
         let size = CGSize(width: first.width, height: first.height)
+        // Taken again: the first was taken while choosing, its window in the
+        // background, and a background window's title bar is lighter than
+        // in the rest.
+        keep((try? await ScreenCapture.grab(target, like: size)) ?? first)
         let steps = Self.scrollSteps(by: -(frame.height * 0.7).rounded(), at: Self.eventPoint(frame))
 
         state.preview = first
@@ -119,18 +122,24 @@ final class ScrollingCapture {
         if pages.count > 1 { joinForPreview() }
     }
 
-    /// What has been joined so far, shown as it grows — or word that the
-    /// last screenful would not join, while there is time to scroll back.
+    /// What has been joined so far, shown as it grows — and word when the
+    /// newest screenful would not join, while there is time to scroll back.
     private func joinForPreview() {
         guard !joining else { return }
         joining = true
         let pages = self.pages
         Task {
-            let joined = await Task.detached { ScrollStitcher.stitch(pages) }.value
+            let joined = await Task.detached {
+                ScrollStitcher.join(count: pages.count) { index in
+                    CGImageSourceCreateWithURL(pages[index] as CFURL, nil)
+                        .flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+                }
+            }.value
             joining = false
-            if let first = joined?.first {
-                state.preview = first
-                state.lost = false
+            if let joined {
+                state.preview = joined.parts.first
+                // The newest left out: scrolled too far at once.
+                state.lost = !joined.usesLast
             } else {
                 state.lost = true
             }

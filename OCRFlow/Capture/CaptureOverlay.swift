@@ -17,9 +17,8 @@ final class CaptureOverlay {
     }
 
     /// Nil when the user cancels.
-    static func choose(from shots: [CGDirectDisplayID: CGImage], returnFocus: Bool = false) async -> Choice? {
+    static func choose(from shots: [CGDirectDisplayID: CGImage]) async -> Choice? {
         let overlay = CaptureOverlay(shots: shots)
-        overlay.returnFocus = returnFocus
         current = overlay
         return await withCheckedContinuation { continuation in
             overlay.continuation = continuation
@@ -41,10 +40,9 @@ final class CaptureOverlay {
     private let windows: [Spot]
     private var panels: [OverlayWindow] = []
     private var continuation: CheckedContinuation<Choice?, Never>?
+    /// Given back its place once the choice is made: what comes next — the
+    /// bar of buttons, a long screenshot, a recording — happens there.
     private var previousApp: NSRunningApplication?
-    /// Give the app that was in front back its place even when something
-    /// was chosen.
-    private var returnFocus = false
 
     /// Where a drag started, and the screen it is kept to.
     private var dragStart: (point: NSPoint, screen: NSScreen)?
@@ -87,13 +85,18 @@ final class CaptureOverlay {
         }
         guard !panels.isEmpty else { return finish(nil) }
 
-        // In front, so the keyboard reaches the overlay and the pointer is a
-        // crosshair. Given back if nothing is taken.
+        // Key, so the keyboard reaches the overlay; and OCRFlow asked to come
+        // in front, for the pointer to be a crosshair, which an app in the
+        // background cannot set. The overlay is made the main window first,
+        // since activating an app brings its main window forward — OCRFlow's
+        // own, over what the user is about to capture, were it left to be.
         let front = NSWorkspace.shared.frontmostApplication
         if front != .current { previousApp = front }
-        NSApp.activate()
         let pointer = NSEvent.mouseLocation
-        (panels.first { NSMouseInRect(pointer, $0.frame, false) } ?? panels[0]).makeKey()
+        let first = panels.first { NSMouseInRect(pointer, $0.frame, false) } ?? panels[0]
+        first.makeKeyAndOrderFront(nil)
+        first.makeMain()
+        NSApp.activate()
         NSCursor.crosshair.push()
         pointerMoved(to: pointer)
     }
@@ -102,9 +105,9 @@ final class CaptureOverlay {
         guard let continuation else { return }
         self.continuation = nil
         NSCursor.pop()
+        previousApp?.activate()
         for panel in panels { panel.orderOut(nil) }
         panels.removeAll()
-        if choice == nil || returnFocus { previousApp?.activate() }
         Self.current = nil
         continuation.resume(returning: choice)
     }
@@ -185,13 +188,17 @@ final class CaptureOverlay {
 
 // MARK: - One screen
 
-private final class OverlayWindow: NSWindow {
+/// A panel that takes the keyboard without needing OCRFlow to be the active
+/// app: activation is only asked for, and may be refused — Escape and the
+/// rest must reach the overlay either way.
+private final class OverlayWindow: NSPanel {
     let marks: OverlayMarks
 
     init(screen: NSScreen, shot: CGImage, overlay: CaptureOverlay) {
         marks = OverlayMarks(overlay: overlay)
-        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         setFrame(screen.frame, display: false)
+        hidesOnDeactivate = false
         // Above the menu bar, the Dock and menus.
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -214,6 +221,7 @@ private final class OverlayWindow: NSWindow {
     }
 
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 /// Draws the highlight or the selection over the held picture, and takes the

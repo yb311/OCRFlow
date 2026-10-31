@@ -41,8 +41,7 @@ extension OCRViewModel {
         isCapturing = true
         runningMacroID = id
         // OCRFlow's own windows out of the way of the clicks.
-        let shown = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }
-        shown.forEach { $0.orderOut(nil) }
+        let own = OwnWindows.tuck()
         Task {
             let player = MacroPlayer()
             // The run's captures keep the size of those taken while recording,
@@ -60,7 +59,7 @@ extension OCRViewModel {
             defer { try? FileManager.default.removeItem(at: player.folder) }
             isCapturing = false
             runningMacroID = nil
-            shown.forEach { $0.orderFront(nil) }
+            own.restore()
 
             // What was captured while recording comes first: the run started
             // where the recording left off. Unless the run began by taking
@@ -109,7 +108,7 @@ extension OCRViewModel {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
-            let chosen = await ScreenCapture.choose(returnFocus: true)
+            let chosen = await ScreenCapture.choose()
             isCapturing = false
             guard let chosen, let step = MacroRecording.captureStep(for: chosen.target),
                   let index = macros.macros.firstIndex(where: { $0.id == id }) else { return }

@@ -1297,7 +1297,7 @@ final class OCRViewModel {
             case .recognize: recognizeCaptures(images)
             case .copy: copyCaptures(images)
             case .save: saveCaptures(images)
-            case .cancel, .longCapture: break
+            case .cancel, .longCapture, .done: break
             }
         }
     }
@@ -1310,11 +1310,12 @@ final class OCRViewModel {
         defer { try? FileManager.default.removeItem(at: folder) }
         guard pages.count > 1 else { return PageImages.wholeImage(at: pages[0]).map { [$0] } }
         if let joined = await Task.detached(operation: { [pages] in ScrollStitcher.stitch(pages) }).value { return joined }
-        NSApp.activate()
-        let alert = NSAlert()
-        alert.messageText = String(localized: "The long screenshot could not be joined")
-        alert.informativeText = String(localized: "Each screenful has to overlap the one before. Scroll a little slower, in one direction, or use Auto Scroll.")
-        alert.runModal()
+        OwnWindows.whileModal {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "The long screenshot could not be joined")
+            alert.informativeText = String(localized: "Each screenful has to overlap the one before. Scroll a little slower, in one direction, or use Auto Scroll.")
+            alert.runModal()
+        }
         return nil
     }
 
@@ -1351,12 +1352,11 @@ final class OCRViewModel {
     /// Where the user says, now. A very long picture in parts goes beside
     /// the first, numbered.
     private func saveCaptures(_ images: [CGImage]) {
-        NSApp.activate()
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = String(localized: "Screenshot \(Self.captureDate())") + ".png"
         panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard OwnWindows.whileModal({ panel.runModal() }) == .OK, let url = panel.url else { return }
         let stem = url.deletingPathExtension().lastPathComponent
         var saved: [URL] = []
         for (index, image) in images.enumerated() {

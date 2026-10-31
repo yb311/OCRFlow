@@ -5,8 +5,9 @@ import SwiftUI
 /// and over full-screen apps. A click captures, a drag moves it, and it
 /// settles against the nearer side of the screen when let go.
 ///
-/// With the pointer over it, two more open out below it — above it, near
-/// the bottom of the screen: a queue of screenshots, and recording.
+/// With the pointer over it, two more open out of it, below it — above it,
+/// near the bottom of the screen: a queue of screenshots, and recording.
+/// Each says what it is beside it while the pointer is on it.
 ///
 /// It never takes focus: clicking it leaves the app in front where it was, so
 /// what is about to be captured is not disturbed.
@@ -20,18 +21,21 @@ final class FloatingCaptureButton {
     /// Between the circle and the edge of the screen it rests against.
     static let edgeGap: CGFloat = 6
 
-    /// The smaller buttons that open out, and the room they take.
-    static let extraDiameter: CGFloat = 40
-    static let extraSpacing: CGFloat = 8
-    static var extrasHeight: CGFloat { (extraDiameter + extraSpacing) * 2 }
+    /// Those that open out are a little smaller, and clearly apart.
+    static let extraDiameter: CGFloat = 42
+    static let gap: CGFloat = 12
+    static var extrasHeight: CGFloat { (extraDiameter + gap) * 2 }
+    /// Room beside the buttons for what they are called.
+    static let labelRoom: CGFloat = 132
 
     private let panel: NSPanel
     private let state: FloatingButtonState
     private let button: FloatingButtonView
     private let extras: FirstMouseHostingView<FloatingExtras>
     private var screenObserver: NSObjectProtocol?
-    private var expanded = false
-    private var collapseTask: Task<Void, Never>?
+    private var watchTask: Task<Void, Never>?
+    /// Where the main button rests, whatever the panel's size.
+    private var resting: NSRect = .zero
 
     init(model: OCRViewModel) {
         state = FloatingButtonState(model: model)
@@ -47,11 +51,11 @@ final class FloatingCaptureButton {
         // Drawn by the face, so it can deepen while dragging.
         panel.hasShadow = false
         panel.isExcludedFromWindowsMenu = true
-        panel.animationBehavior = .utilityWindow
+        panel.animationBehavior = .none
 
         button = FloatingButtonView(state: state)
         extras = FirstMouseHostingView(rootView: FloatingExtras(
-            upward: false,
+            state: state,
             queue: { [weak model] in model?.queueScreenshots() },
             record: { [weak model] in model?.recordMacro() }))
         extras.isHidden = true
@@ -60,13 +64,16 @@ final class FloatingCaptureButton {
         container.addSubview(button)
         panel.contentView = container
 
-        button.onClick = { [weak model] in model?.captureScreenshot() }
+        button.onClick = { [weak self, weak model] in
+            self?.collapse()
+            model?.captureScreenshot()
+        }
         button.onDrop = { [weak self] in self?.settle() }
         button.onDragStart = { [weak self] in self?.collapse() }
         button.onHover = { [weak self] in self?.expand() }
         button.makeMenu = { [weak model] in model.map(Self.menu(model:)) }
 
-        layout(at: frame(for: Parking.saved))
+        rest(at: frame(for: Parking.saved))
 
         panel.orderFrontRegardless()
 
@@ -77,47 +84,84 @@ final class FloatingCaptureButton {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.expanded = false
-                self.layout(at: self.frame(for: Parking.saved))
+                self.collapse()
+                self.rest(at: self.frame(for: Parking.saved))
             }
         }
     }
 
     func close() {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        watchTask?.cancel()
         panel.orderOut(nil)
     }
 
     // MARK: - Opening out
 
     private func expand() {
-        guard !expanded, !state.dragging else { return }
-        expanded = true
-        layout(at: restingFrame(from: panel.frame))
-        closeOnceLeft()
+        guard !state.expanded, !state.dragging else { return }
+        let screen = (NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        state.upward = resting.minY - Self.extrasHeight < screen.minY
+        state.trailing = resting.midX > screen.midX
+        layOut(open: true)
+        // Laid out, then shown opening: the buttons spring out of the main one.
+        state.expanded = true
+        watchPointer()
     }
 
     private func collapse() {
-        collapseTask?.cancel()
-        guard expanded else { return }
-        let resting = restingFrame(from: panel.frame)
-        expanded = false
-        layout(at: resting)
+        watchTask?.cancel()
+        guard state.expanded else { return }
+        state.expanded = false
+        state.hoveredExtra = nil
+        layOut(open: false)
     }
 
-    /// Closes once the pointer has left them all. Watched rather than told:
-    /// growing the panel under the pointer can report it leaving when it
-    /// has not. A moment's grace, so crossing the gap between two buttons,
-    /// or overshooting a little, does not close them.
-    private func closeOnceLeft() {
-        collapseTask?.cancel()
-        collapseTask = Task { [weak self] in
+    /// Rests the main button at `frame`.
+    private func rest(at frame: NSRect) {
+        resting = frame
+        layOut(open: state.expanded)
+    }
+
+    /// The panel around the main button: just the button, or, `open`, with
+    /// the others and room for their names on the side away from the edge.
+    private func layOut(open: Bool) {
+        guard open else {
+            extras.isHidden = true
+            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
+            panel.setFrame(resting, display: true)
+            return
+        }
+        let width = Self.side + Self.labelRoom
+        let height = Self.side + Self.extrasHeight
+        let x = state.trailing ? resting.minX - Self.labelRoom : resting.minX
+        let y = state.upward ? resting.minY : resting.minY - Self.extrasHeight
+        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
+        button.frame = NSRect(x: state.trailing ? Self.labelRoom : 0, y: state.upward ? 0 : Self.extrasHeight,
+                              width: Self.side, height: Self.side)
+        extras.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        extras.isHidden = false
+    }
+
+    /// Which button the pointer is on, for its name, and closing once it has
+    /// left them all. Watched rather than told: growing the panel under the
+    /// pointer can report it leaving when it has not, and the views of a
+    /// panel of an app in the background are not reliably told of hovering.
+    /// A moment's grace, so crossing a gap, or overshooting a little, does
+    /// not close them.
+    private func watchPointer() {
+        watchTask?.cancel()
+        watchTask = Task { [weak self] in
             var away = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(150))
-                guard let self, self.expanded else { return }
-                away = self.panel.frame.insetBy(dx: -4, dy: -4).contains(NSEvent.mouseLocation) ? 0 : away + 1
-                if away >= 3 {
+                try? await Task.sleep(for: .milliseconds(80))
+                guard let self, self.state.expanded else { return }
+                let pointer = NSEvent.mouseLocation
+                let circles = self.circles()
+                self.state.hoveredExtra = circles.dropFirst().firstIndex { $0.insetBy(dx: -3, dy: -3).contains(pointer) }
+                    .map { $0 - 1 }
+                away = circles.contains { $0.insetBy(dx: -10, dy: -10).contains(pointer) } ? 0 : away + 1
+                if away >= 5 {
                     self.collapse()
                     return
                 }
@@ -125,43 +169,16 @@ final class FloatingCaptureButton {
         }
     }
 
-    /// Puts the main button at `resting`, with the others opened out below
-    /// it or, without the room, above it.
-    private func layout(at resting: NSRect) {
-        guard expanded else {
-            extras.isHidden = true
-            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
-            panel.setFrame(resting, display: true)
-            return
+    /// The circles on screen: the main one, then the others, nearest first.
+    private func circles() -> [NSRect] {
+        let main = resting.insetBy(dx: Self.padding, dy: Self.padding)
+        let first = (Self.diameter + Self.extraDiameter) / 2 + Self.gap
+        return [main] + (0..<2).map { index in
+            let distance = first + CGFloat(index) * (Self.extraDiameter + Self.gap)
+            let centerY = main.midY + (state.upward ? distance : -distance)
+            return NSRect(x: main.midX - Self.extraDiameter / 2, y: centerY - Self.extraDiameter / 2,
+                          width: Self.extraDiameter, height: Self.extraDiameter)
         }
-        let upward = opensUpward(resting)
-        extras.rootView = FloatingExtras(upward: upward, queue: extras.rootView.queue, record: extras.rootView.record)
-        extras.isHidden = false
-        let height = Self.side + Self.extrasHeight
-        if upward {
-            panel.setFrame(NSRect(x: resting.minX, y: resting.minY, width: Self.side, height: height), display: true)
-            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
-            extras.frame = NSRect(x: 0, y: Self.side - Self.padding, width: Self.side, height: Self.extrasHeight)
-        } else {
-            panel.setFrame(NSRect(x: resting.minX, y: resting.minY - Self.extrasHeight, width: Self.side, height: height),
-                           display: true)
-            button.frame = NSRect(x: 0, y: Self.extrasHeight, width: Self.side, height: Self.side)
-            extras.frame = NSRect(x: 0, y: Self.padding, width: Self.side, height: Self.extrasHeight)
-        }
-    }
-
-    /// Where the main button is, whatever the panel's size now.
-    private func restingFrame(from current: NSRect) -> NSRect {
-        guard current.height > Self.side else { return current }
-        // Opened downward, the button is at the top of the panel.
-        let upward = button.frame.minY == 0
-        return NSRect(x: current.minX, y: upward ? current.minY : current.maxY - Self.side,
-                      width: Self.side, height: Self.side)
-    }
-
-    private func opensUpward(_ resting: NSRect) -> Bool {
-        let screen = NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]
-        return resting.minY - Self.extrasHeight < screen.visibleFrame.minY
     }
 
     // MARK: - Where it rests
@@ -210,10 +227,11 @@ final class FloatingCaptureButton {
                               height: travel > 0 ? min(max(bottom / travel, 0), 1) : 0.5,
                               display: screen.displayID)
         parking.save()
+        resting = frame(for: parking)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(frame(for: parking), display: true)
+            panel.animator().setFrame(resting, display: true)
         }
     }
 
@@ -285,6 +303,14 @@ private final class MenuAction: NSObject {
 @MainActor
 @Observable
 private final class FloatingButtonState {
+    /// The others open out of it.
+    var expanded = false
+    /// Opening out above it, near the bottom of the screen.
+    var upward = false
+    /// At the right edge of the screen: names show to its left.
+    var trailing = true
+    /// The one among the others the pointer is on: 0 queue, 1 recording.
+    var hoveredExtra: Int?
     var hovered = false
     var pressed = false
     var dragging = false
@@ -468,39 +494,99 @@ private struct FloatingButtonFace: View {
     }
 }
 
-/// The buttons that open out: a queue of screenshots, then recording —
-/// recording furthest from the main button either way.
+/// What opens out of the main button: the queue, then recording — recording
+/// furthest from it either way — each named beside it under the pointer.
+/// The main button is drawn by its own view, over the room left for it here;
+/// its name shows here too.
 struct FloatingExtras: View {
-    let upward: Bool
+    fileprivate let state: FloatingButtonState
     let queue: () -> Void
     let record: () -> Void
 
     var body: some View {
-        VStack(spacing: FloatingCaptureButton.extraSpacing) {
-            if upward {
-                circle("record.circle", "Record Actions…", tint: .red, action: record)
-                circle("square.stack.3d.down.right", "Queue Screenshots", tint: .accentColor, action: queue)
+        VStack(spacing: FloatingCaptureButton.gap) {
+            if state.upward {
+                extra(1)
+                extra(0)
+                mainRow
             } else {
-                circle("square.stack.3d.down.right", "Queue Screenshots", tint: .accentColor, action: queue)
-                circle("record.circle", "Record Actions…", tint: .red, action: record)
+                mainRow
+                extra(0)
+                extra(1)
             }
         }
-        .frame(width: FloatingCaptureButton.side)
+        .padding(.vertical, FloatingCaptureButton.padding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func circle(_ symbol: String, _ help: LocalizedStringKey, tint: Color,
-                        action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: FloatingCaptureButton.extraDiameter, height: FloatingCaptureButton.extraDiameter)
-                .background(Circle().fill(.regularMaterial).shadow(color: .black.opacity(0.22), radius: 2.5, y: 1))
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
-                .contentShape(Circle())
+    /// The main button's place, and its name while the pointer is on it.
+    private var mainRow: some View {
+        row("Capture Screenshot", named: state.expanded && state.hovered && state.hoveredExtra == nil) {
+            Color.clear.frame(width: FloatingCaptureButton.diameter, height: FloatingCaptureButton.diameter)
         }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(Text(help))
+    }
+
+    private func extra(_ index: Int) -> some View {
+        let isQueue = index == 0
+        let hovered = state.hoveredExtra == index
+        let name: LocalizedStringKey = isQueue ? "Queue Screenshots" : "Record Actions"
+        // Plain like the main button until pointed at; then the colour of
+        // what it does.
+        let tint: Color = isQueue ? .accentColor : .red
+        return row(name, named: hovered) {
+            Button(action: isQueue ? queue : record) {
+                Image(systemName: isQueue ? "square.on.square.dashed" : "record.circle")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(hovered ? Color.white : Color.primary.opacity(0.75))
+                    .frame(width: FloatingCaptureButton.extraDiameter, height: FloatingCaptureButton.extraDiameter)
+                    .background {
+                        Circle()
+                            .fill(hovered ? AnyShapeStyle(tint) : AnyShapeStyle(.regularMaterial))
+                            .shadow(color: .black.opacity(0.2), radius: 2.5, y: 1)
+                    }
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(hovered ? 0 : 0.12), lineWidth: 0.5))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .scaleEffect(hovered ? 1.06 : 1)
+            .animation(.snappy(duration: 0.15), value: hovered)
+            .accessibilityLabel(Text(name))
+        }
+        // Springing out of the main button as it opens.
+        .offset(y: state.expanded ? 0 : (state.upward ? 1 : -1) * CGFloat(index + 1) * 36)
+        .scaleEffect(state.expanded ? 1 : 0.6)
+        .opacity(state.expanded ? 1 : 0)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78).delay(Double(index) * 0.03), value: state.expanded)
+    }
+
+    /// A button in the column against the screen's edge, its name on the
+    /// inner side.
+    private func row(_ name: LocalizedStringKey, named: Bool, @ViewBuilder circle: () -> some View) -> some View {
+        HStack(spacing: 6) {
+            if state.trailing {
+                Spacer(minLength: 0)
+                label(name, shown: named)
+            }
+            circle()
+                .frame(width: FloatingCaptureButton.side)
+            if !state.trailing {
+                label(name, shown: named)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func label(_ name: LocalizedStringKey, shown: Bool) -> some View {
+        Text(name)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .opacity(shown ? 1 : 0)
+            .offset(x: shown ? 0 : (state.trailing ? 6 : -6))
+            .animation(.easeOut(duration: 0.12), value: shown)
     }
 }

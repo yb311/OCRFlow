@@ -34,14 +34,13 @@ enum ResultChoice {
 
     /// A folder for saving into, chosen now. Nil when cancelled.
     static func chooseFolder(_ message: String) -> URL? {
-        NSApp.activate()
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.message = message
         panel.prompt = String(localized: "Save Here")
-        return panel.runModal() == .OK ? panel.url : nil
+        return OwnWindows.whileModal { panel.runModal() } == .OK ? panel.url : nil
     }
 }
 

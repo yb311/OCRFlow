@@ -8,6 +8,8 @@ enum CaptureFinish: Sendable {
     case longCapture
     case save
     case copy
+    /// Keep it as it is: a long screenshot that is a step of a recording.
+    case done
     case cancel
 }
 
@@ -48,9 +50,11 @@ final class CaptureBar {
         panels = [outline, size, bar]
         panels.forEach { $0.orderFrontRegardless() }
 
-        NSApp.activate()
+        // The keys come here without OCRFlow coming forward: the bar is a
+        // panel that takes the keyboard while another app stays active, as
+        // Spotlight does.
         bar.makeKey()
-        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .rightMouseDown]) { [weak self] event in
+        let local = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .rightMouseDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .rightMouseDown {
                 self.finish(.cancel)
@@ -64,7 +68,8 @@ final class CaptureBar {
             default: return event
             }
             return nil
-        } as Any)
+        }
+        if let local { monitors.append(local) }
         // A right-click anywhere else lets it go too.
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.finish(.cancel) }
@@ -87,7 +92,7 @@ final class CaptureBar {
 @MainActor
 enum CaptureMarks {
     static func panel(_ frame: CGRect, key: Bool = false) -> NSPanel {
-        let panel = key ? KeyPanel(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        let panel = key ? KeyPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             : NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
@@ -149,7 +154,7 @@ enum CaptureMarks {
     }
 }
 
-/// A borderless panel that can take the keyboard.
+/// A panel that can take the keyboard without making OCRFlow the active app.
 final class KeyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
@@ -224,7 +229,7 @@ struct CaptureActionsBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(item == .copy ? Color.accentColor : .primary)
+        .foregroundStyle(item == .copy || item == .done ? Color.accentColor : .primary)
         .help(help(item))
     }
 
@@ -233,7 +238,7 @@ struct CaptureActionsBar: View {
         case .recognize: "text.viewfinder"
         case .longCapture: "arrow.up.and.down.square"
         case .save: "square.and.arrow.down"
-        case .copy: "checkmark"
+        case .copy, .done: "checkmark"
         case .cancel: "xmark"
         }
     }
@@ -244,6 +249,7 @@ struct CaptureActionsBar: View {
         case .longCapture: "Long screenshot: scroll on from here"
         case .save: "Save… (Space)"
         case .copy: "Copy to the clipboard (Return)"
+        case .done: "Done"
         case .cancel: "Cancel (Esc or right-click)"
         }
     }

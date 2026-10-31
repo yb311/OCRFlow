@@ -141,6 +141,24 @@ struct MacroTests {
         #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
     }
 
+    /// Scrolled too far at once, then back a little: the screenful that does
+    /// not join is left out, and joining goes on from the next that does.
+    @Test func aScreenfulThatDoesNotJoinIsLeftOut() throws {
+        let page = longPage()
+        let layout = Layout()
+        let offsets = [0, 300, 600, 1500, 800, 1100]
+        let frames = offsets.map { frame(of: page, at: $0, layout) }
+        let joined = try #require(ScrollStitcher.join(count: frames.count) { frames[$0] })
+        #expect(joined.usesLast)
+        #expect(joined.parts.first?.height == layout.header + 1100 + layout.middle + layout.footer)
+
+        // The last too far: left out, and said so.
+        let stranded = [0, 300, 600, 1500].map { frame(of: page, at: $0, layout) }
+        let partly = try #require(ScrollStitcher.join(count: stranded.count) { stranded[$0] })
+        #expect(!partly.usesLast)
+        #expect(partly.parts.first?.height == layout.header + 600 + layout.middle + layout.footer)
+    }
+
     @Test func slidesTurnedOneByOneAreNotJoined() {
         let layout = Layout()
         let frames = (1...4).map { frame(of: longPage(seed: $0), at: 0, layout) }

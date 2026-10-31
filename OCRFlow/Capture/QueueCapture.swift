@@ -42,7 +42,10 @@ final class QueueCapture {
     private func end() {
         guard let continuation else { return }
         self.continuation = nil
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         tap = nil
         source = nil

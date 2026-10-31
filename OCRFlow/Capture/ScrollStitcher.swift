@@ -35,50 +35,63 @@ enum ScrollStitcher {
     /// several times over: hundreds of screenfuls do not fit in memory at
     /// once.
     static func stitch(count: Int, maxHeight: Int = maxHeight, picture: (Int) -> CGImage?) -> [CGImage]? {
-        guard count > 1 else { return nil }
-        var sizes: [(width: Int, height: Int)] = []
-        for index in 0..<count {
-            guard let image = picture(index) else { return nil }
-            sizes.append((image.width, image.height))
-        }
-        guard let width = sizes.map(\.width).min(), let height = sizes.map(\.height).min(),
-              sizes.allSatisfy({ $0.width - width <= 4 && $0.height - height <= 4 }) else { return nil }
+        join(count: count, maxHeight: maxHeight, picture: picture)?.parts
+    }
 
-        // A pixel or two of difference, from rounding, is cut off; so is a
-        // sidebar that stays put.
+    /// The long picture, and whether the last of the pictures is in it.
+    ///
+    /// A picture that does not carry on from the last one taken in — scrolled
+    /// too far at once, or caught as its window changed size — is left out,
+    /// and joining goes on from the next that does: scrolling back a little
+    /// mends a gap. Nil when none carries on from the first.
+    static func join(count: Int, maxHeight: Int = maxHeight,
+                     picture: (Int) -> CGImage?) -> (parts: [CGImage], usesLast: Bool)? {
+        guard count > 1, let base = picture(0) else { return nil }
+        let width = base.width, height = base.height
+        // Only those the size of the first; a pixel or two off, from
+        // rounding, is cut off.
+        var candidates: [Int] = [0]
+        for index in 1..<count {
+            guard let image = picture(index), image.width >= width, image.height >= height,
+                  image.width - width <= 4, image.height - height <= 4 else { continue }
+            candidates.append(index)
+        }
+        guard candidates.count > 1 else { return nil }
+
+        // So is a sidebar that stays put.
         var cut = CGRect(x: 0, y: 0, width: width, height: height)
         func frame(_ index: Int) -> CGImage? {
             guard let image = picture(index) else { return nil }
             return image.width == Int(cut.width) && image.height == Int(cut.height) && cut.minX == 0
                 ? image : image.cropping(to: cut)
         }
-        /// Each pair of neighbours in turn, in grey.
-        func pairs(_ body: (Gray, Gray) -> Bool) -> Bool {
-            guard let first = frame(0) else { return false }
+        /// Each pair of neighbours among the candidates in turn, in grey.
+        func pairs(_ body: (Gray, Gray) -> Void) -> Bool {
+            guard let first = frame(candidates[0]) else { return false }
             var previous = Gray(first)
-            for index in 1..<count {
+            for index in candidates.dropFirst() {
                 guard let image = frame(index) else { return false }
                 let next = Gray(image)
-                guard body(previous, next) else { return false }
+                body(previous, next)
                 previous = next
             }
             return true
         }
 
         var moving = [Bool](repeating: false, count: width)
-        guard pairs({ markMovingColumns(from: $0, to: $1, in: &moving); return true }) else { return nil }
+        guard pairs({ markMovingColumns(from: $0, to: $1, in: &moving) }) else { return nil }
         if let span = columns(moving), span.count < width * 9 / 10 {
             cut = CGRect(x: span.lowerBound, y: 0, width: span.count, height: height)
         }
 
         // The edges every pair shares — but one: the first picture is
         // usually taken while choosing what to capture, its window in the
-        // background, and a background window's title bar is lighter.
+        // background, and a background window's title bar is lighter. Pairs
+        // that do not join still share the bars that stay put.
         var tops: [Int] = [], bottoms: [Int] = []
         guard pairs({ a, b in
             tops.append(sameRows(a, b, from: 0, by: 1, upTo: height / 2))
             bottoms.append(sameRows(a, b, from: height - 1, by: -1, upTo: height / 2 - 1))
-            return true
         }) else { return nil }
         func shared(_ counts: [Int]) -> Int {
             let sorted = counts.sorted()
@@ -86,14 +99,21 @@ enum ScrollStitcher {
         }
         let top = shared(tops), bottom = shared(bottoms)
 
-        var shifts: [Int] = []
-        guard pairs({ a, b in
-            guard let shift = shift(from: a, to: b, top: top, bottom: bottom, near: shifts.last) else { return false }
-            shifts.append(shift)
-            return true
-        }) else { return nil }
-        return compose(count: count, shifts: shifts, height: height, top: top, bottom: bottom,
-                       maxHeight: maxHeight, picture: frame)
+        // Each against the last taken in.
+        guard let first = frame(candidates[0]) else { return nil }
+        var last = Gray(first)
+        var taken: [(index: Int, shift: Int)] = [(candidates[0], 0)]
+        for index in candidates.dropFirst() {
+            guard let image = frame(index) else { return nil }
+            let next = Gray(image)
+            guard let shift = shift(from: last, to: next, top: top, bottom: bottom, near: taken.last?.shift) else { continue }
+            taken.append((index, shift))
+            last = next
+        }
+        guard taken.count > 1,
+              let parts = compose(taken: taken, height: height, top: top, bottom: bottom,
+                                  maxHeight: maxHeight, picture: frame) else { return nil }
+        return (parts, taken.last?.index == count - 1)
     }
 
     // MARK: - Measuring
@@ -255,13 +275,15 @@ enum ScrollStitcher {
     /// Rows of one of the pictures.
     private typealias Slice = (picture: Int, rows: Range<Int>)
 
-    private static func compose(count: Int, shifts: [Int], height: Int, top: Int, bottom: Int, maxHeight: Int,
+    /// `taken`: the pictures joined, each with how far it moved on from the
+    /// one before.
+    private static func compose(taken: [(index: Int, shift: Int)], height: Int, top: Int, bottom: Int, maxHeight: Int,
                                 picture: (Int) -> CGImage?) -> [CGImage]? {
         let middle = height - top - bottom
         // What each picture adds: all of the first above the footer, then
         // only what came into view at the bottom.
-        var slices: [Slice] = [(0, 0..<(top + middle))]
-        for (index, shift) in zip(1..<count, shifts) {
+        var slices: [Slice] = [(taken[0].index, 0..<(top + middle))]
+        for (index, shift) in taken.dropFirst() {
             slices.append((index, (top + middle - shift)..<(top + middle)))
         }
 
@@ -277,7 +299,7 @@ enum ScrollStitcher {
             groups[groups.count - 1].append(slice)
             groupHeight += slice.rows.count
         }
-        groups[groups.count - 1].append((count - 1, (height - bottom)..<height))
+        groups[groups.count - 1].append((taken[taken.count - 1].index, (height - bottom)..<height))
 
         var parts: [CGImage] = []
         for group in groups {

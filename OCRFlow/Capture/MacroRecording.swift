@@ -60,14 +60,14 @@ final class MacroRecording {
         guard !state.isChoosing else { return }
         state.isChoosing = true
         defer { state.isChoosing = false }
-        guard let chosen = await ScreenCapture.choose(returnFocus: true),
+        guard let chosen = await ScreenCapture.choose(),
               let step = Self.captureStep(for: chosen.target),
               case var .capture(area) = step.action else { return }
         var image = chosen.image
         if scrolling {
             recorder.isPaused = true
             defer { recorder.isPaused = false }
-            let (pages, finish) = await ScrollingCapture().run(chosen.target, first: chosen.image, finishes: [.cancel, .copy])
+            let (pages, finish) = await ScrollingCapture().run(chosen.target, first: chosen.image, finishes: [.cancel, .done])
             guard finish != .cancel, let long = await join(pages) else { return }
             image = long
             // How far it was scrolled, in points: what it grew by.

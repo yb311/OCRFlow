@@ -45,10 +45,12 @@ final class DockIcon {
 
     /// A minimised window counts: with no Dock icon there would be nowhere to
     /// bring it back from. Panels — the floating button, open and save
-    /// dialogs — do not, nor do the helper windows SwiftUI keeps off screen.
+    /// dialogs — do not, nor do the helper windows SwiftUI keeps off screen,
+    /// nor the screen held still for a screenshot, which sits above
+    /// everything rather than among other windows.
     private var hasOpenWindow: Bool {
         NSApp.windows.contains { window in
-            guard !(window is NSPanel), window.canBecomeMain else { return false }
+            guard !(window is NSPanel), window.canBecomeMain, window.level == .normal else { return false }
             if window.isMiniaturized { return true }
             return window.isVisible && NSScreen.screens.contains { $0.frame.intersects(window.frame) }
         }
