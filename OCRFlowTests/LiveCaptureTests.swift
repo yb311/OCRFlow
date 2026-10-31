@@ -99,7 +99,7 @@ final class LiveCaptureTests: XCTestCase {
 
     func testCapturesTheScreenAndOneWindow() async throws {
         let slides = try XCTUnwrap(slides)
-        let shots = try await ScreenGrabber.displays(excluding: [])
+        let shots = try await ScreenGrabber.displays(keeping: [])
         XCTAssertEqual(shots.count, NSScreen.screens.count)
         for screen in NSScreen.screens {
             let shot = try XCTUnwrap(shots[try XCTUnwrap(screen.displayID)])
@@ -118,6 +118,78 @@ final class LiveCaptureTests: XCTestCase {
         let region = try await ScreenCapture.grab(.region(display: main, rect: title))
         XCTAssertEqual(region.width, Int(400 * NSScreen.screens[0].backingScaleFactor))
         XCTAssertTrue(try text(in: region).contains("Page 1"))
+    }
+
+    /// Nothing of OCRFlow's that floats over the screen is in a screenshot —
+    /// not in the held screen the user chooses from, nor in an area taken
+    /// again, for the queue or a macro — even shown just before it is taken;
+    /// OCRFlow's ordinary windows are.
+    func testOCRFlowsPanelsAreNeverInAScreenshot() async throws {
+        let slides = try XCTUnwrap(slides)
+        let screen = NSScreen.screens[0]
+        let main = try XCTUnwrap(screen.displayID)
+        let top = screen.frame.maxY
+        // The slide's title, in event coordinates.
+        let title = CGRect(x: slides.frame.minX, y: slides.frame.minY + 28, width: 400, height: 120)
+        NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(600))
+        let clean = try await ScreenCapture.grab(.region(display: main, rect: title))
+        XCTAssertTrue(try text(in: clean).contains("Page 1"))
+
+        // The screen dimmed around somewhere else, as around an area being
+        // taken, shown in the same turn as the picture is taken: then
+        // ScreenCaptureKit does not yet list it as on screen.
+        var shown: [NSPanel] = []
+        defer { shown.forEach { $0.orderOut(nil) } }
+        func dim() {
+            let elsewhere = CGRect(x: title.maxX + 40, y: top - title.maxY, width: 40, height: 40)
+            let shades = CaptureMarks.shades(around: elsewhere)
+            shades.forEach { $0.orderFrontRegardless() }
+            shown += shades
+        }
+        dim()
+        let again = try await ScreenCapture.grab(.region(display: main, rect: title))
+        dim()
+        let shots = try await ScreenCapture.screens()
+        let scale = screen.backingScaleFactor
+        let held = try XCTUnwrap(shots[main]?.cropping(to: CGRect(x: title.minX * scale, y: title.minY * scale,
+                                                                  width: title.width * scale, height: title.height * scale)))
+        if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"].map({ URL(fileURLWithPath: $0) }) {
+            for (name, picture) in [("clean", clean), ("again", again), ("held", held)] {
+                _ = ScrollingCapture.write(picture, to: dump.appending(path: "\(name).png"))
+            }
+        }
+        XCTAssertLessThan(try brightness(of: clean) - brightness(of: again), 0.02, "taken again, dimmed")
+        XCTAssertLessThan(try brightness(of: clean) - brightness(of: held), 0.02, "held, dimmed")
+
+        // A window of OCRFlow's own, in front (with Stage Manager, in place
+        // of the slides).
+        let place = title.offsetBy(dx: 0, dy: 200)
+        let own = NSWindow(contentRect: CGRect(x: place.minX, y: top - place.maxY, width: place.width, height: place.height),
+                           styleMask: [.borderless], backing: .buffered, defer: false)
+        own.isReleasedWhenClosed = false
+        own.backgroundColor = .white
+        let label = NSTextField(labelWithString: "Kept 42")
+        label.font = .systemFont(ofSize: 48)
+        label.textColor = .black
+        label.frame = CGRect(x: 20, y: 30, width: 360, height: 60)
+        own.contentView?.addSubview(label)
+        own.orderFrontRegardless()
+        defer { own.orderOut(nil) }
+        try await Task.sleep(for: .milliseconds(600))
+        let kept = try await ScreenCapture.grab(.region(display: main, rect: place))
+        let keptText = try text(in: kept)
+        XCTAssertTrue(keptText.contains("Kept 42"), "OCRFlow's window: \(keptText)")
+    }
+
+    /// From 0, black, to 1, white: the mean of a small grey copy.
+    private func brightness(of image: CGImage) throws -> Double {
+        let (width, height) = (64, 24)
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                                              space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return Double(pixels.reduce(0) { $0 + Int($1) }) / Double(pixels.count * 255)
     }
 
     // MARK: - Choosing
@@ -661,7 +733,7 @@ extension LiveCaptureTests {
         move(to: CGPoint(x: resting.midX, y: top - firstY))
         try await Task.sleep(for: .milliseconds(500))
         if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
-            let picture = try await ScreenGrabber.capture(.window(CGWindowID(panel.windowNumber)), excluding: [])
+            let picture = try await ScreenGrabber.capture(.window(CGWindowID(panel.windowNumber)))
             _ = ScrollingCapture.write(picture, to: URL(fileURLWithPath: dump).appending(path: "floating.png"))
         }
         XCTAssertEqual(panel.frame, opened, "still open over one of the others")

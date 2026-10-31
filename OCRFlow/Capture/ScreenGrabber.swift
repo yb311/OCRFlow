@@ -22,15 +22,13 @@ enum ScreenGrabber {
         case gone
     }
 
-    /// Every display as it is now, at full resolution, without the given
-    /// windows and without the pointer.
-    static func displays(excluding windowIDs: [CGWindowID]) async throws -> [CGDirectDisplayID: CGImage] {
+    /// Every display as it is now, at full resolution, without the pointer
+    /// and without OCRFlow's own windows other than `kept`.
+    static func displays(keeping kept: [CGWindowID]) async throws -> [CGDirectDisplayID: CGImage] {
         let content = try await shareableContent()
-        let excluded = content.windows.filter { windowIDs.contains($0.windowID) }
         var shots: [CGDirectDisplayID: CGImage] = [:]
         for display in content.displays {
-            let filter = SCContentFilter(display: display, excludingWindows: excluded)
-            shots[display.displayID] = try await image(of: filter, rect: nil)
+            shots[display.displayID] = try await image(of: filter(display, in: content, keeping: kept), rect: nil)
         }
         return shots
     }
@@ -38,8 +36,9 @@ enum ScreenGrabber {
     /// The same place again, as it is now. `maxWidth` makes a smaller
     /// picture, for looking at rather than keeping. `like` is an earlier
     /// picture of the same place, whose size this one keeps if it is within
-    /// a pixel or two of it.
-    static func capture(_ target: CaptureTarget, excluding windowIDs: [CGWindowID],
+    /// a pixel or two of it. Over a region, OCRFlow's own windows other than
+    /// `kept` are left out, as from `displays(keeping:)`.
+    static func capture(_ target: CaptureTarget, keeping kept: [CGWindowID] = [],
                         maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
         let content = try await shareableContent()
         switch target {
@@ -47,9 +46,8 @@ enum ScreenGrabber {
             guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
                 throw Failure.gone
             }
-            let excluded = content.windows.filter { windowIDs.contains($0.windowID) }
-            let filter = SCContentFilter(display: display, excludingWindows: excluded)
-            return try await image(of: filter, rect: rect, maxWidth: maxWidth, like: earlier)
+            return try await image(of: filter(display, in: content, keeping: kept), rect: rect,
+                                   maxWidth: maxWidth, like: earlier)
         case let .window(windowID):
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
                 throw Failure.gone
@@ -61,9 +59,25 @@ enum ScreenGrabber {
         }
     }
 
+    /// The display without OCRFlow's windows other than `kept`: left out as
+    /// one app's, so that any shown as the picture is taken are too.
+    private static func filter(_ display: SCDisplay, in content: SCShareableContent,
+                               keeping kept: [CGWindowID]) -> SCContentFilter {
+        let own = content.windows.filter { $0.owningApplication?.processID == getpid() }
+        let app = content.applications.filter { $0.processID == getpid() }
+        return app.isEmpty
+            ? SCContentFilter(display: display, excludingWindows: own.filter { !kept.contains($0.windowID) })
+            : SCContentFilter(display: display, excludingApplications: app,
+                              exceptingWindows: own.filter { kept.contains($0.windowID) })
+    }
+
+    /// Every window, not only those on screen: asked for those on screen
+    /// only, ScreenCaptureKit leaves out OCRFlow's windows shown a moment
+    /// before — the dimming round an area, say — and OCRFlow with them, so
+    /// nothing of OCRFlow's would be left out of the picture.
     private static func shareableContent() async throws -> SCShareableContent {
         do {
-            return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         } catch let error as NSError where error.domain == SCStreamErrorDomain
                     && error.code == SCStreamError.Code.userDeclined.rawValue {
             throw Failure.notAllowed
