@@ -25,28 +25,6 @@ enum ScreenCapture {
         }
     }
 
-    enum Retake {
-        case taken(CGImage)
-        /// The window has closed, or the display is gone.
-        case gone
-        case failed
-    }
-
-    /// The same place again, as it is now, without asking.
-    static func retake(_ target: CaptureTarget) async -> Retake {
-        guard isAllowed() else { return .failed }
-        do {
-            let image = try await ScreenGrabber.capture(target, excluding: ownHelperWindows)
-            flash(target)
-            return .taken(image)
-        } catch ScreenGrabber.Failure.gone {
-            return .gone
-        } catch {
-            report(error)
-            return .failed
-        }
-    }
-
     /// The place as it is now, with no flash and no message if it fails.
     /// `like` keeps the size of an earlier picture of the same place, for
     /// pictures to be joined.
@@ -107,7 +85,7 @@ enum ScreenCapture {
 
     /// A brief flash over what was taken: a capture made without the
     /// crosshair otherwise gives no sign that it happened.
-    private static func flash(_ target: CaptureTarget) {
+    static func flash(_ target: CaptureTarget) {
         guard let rect = frame(of: target) else { return }
         let panel = NSPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .screenSaver

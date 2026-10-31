@@ -204,8 +204,12 @@ final class MacroRecorder {
         onChange()
     }
 
+    /// Not watching for a while: the user scrolls for a long screenshot,
+    /// which is a step of its own, not a scroll.
+    var isPaused = false
+
     private func record(_ event: NSEvent) {
-        guard let cgEvent = event.cgEvent,
+        guard !isPaused, let cgEvent = event.cgEvent,
               cgEvent.getIntegerValueField(.eventSourceUserData) != StepPlayer.marker else { return }
         let location = cgEvent.location
         let modifiers = cgEvent.flags.intersection([.maskShift, .maskControl, .maskAlternate, .maskCommand]).rawValue

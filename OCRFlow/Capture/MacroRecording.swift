@@ -27,6 +27,7 @@ final class MacroRecording {
         })
         recorder.onChange = { [state, recorder] in state.actions = recorder.actions }
         state.onCapture = { [weak self] in Task { await self?.captureHere() } }
+        state.onLongCapture = { [weak self] in Task { await self?.captureHere(scrolling: true) } }
         recorder.start()
         let done = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             var answered = false
@@ -41,6 +42,7 @@ final class MacroRecording {
         state.onDone = {}
         state.onCancel = {}
         state.onCapture = {}
+        state.onLongCapture = {}
         let steps = await recorder.stop()
         panel?.orderOut(nil)
         panel = nil
@@ -52,15 +54,40 @@ final class MacroRecording {
     }
 
     /// The user chooses an area or a window, and taking it becomes a step.
-    func captureHere() async {
+    /// `scrolling`: then scrolls on from there — by hand or automatically —
+    /// to wherever they want it to end, and the step scrolls as far.
+    func captureHere(scrolling: Bool = false) async {
         guard !state.isChoosing else { return }
         state.isChoosing = true
         defer { state.isChoosing = false }
         guard let chosen = await ScreenCapture.choose(returnFocus: true),
               let step = Self.captureStep(for: chosen.target),
-              case let .capture(area) = step.action else { return }
+              case var .capture(area) = step.action else { return }
+        var image = chosen.image
+        if scrolling {
+            recorder.isPaused = true
+            defer { recorder.isPaused = false }
+            let (pages, finish) = await ScrollingCapture().run(chosen.target, first: chosen.image, finishes: [.cancel, .copy])
+            guard finish != .cancel, let long = await join(pages) else { return }
+            image = long
+            // How far it was scrolled, in points: what it grew by.
+            if let frame = ScreenCapture.frame(of: chosen.target), frame.height > 0 {
+                let pixelsPerPoint = CGFloat(chosen.image.height) / frame.height
+                area.scrollDistance = Double(CGFloat(long.height - chosen.image.height) / pixelsPerPoint)
+            }
+        }
         recorder.addCapture(area, in: step.window)
-        taken.append(chosen.image)
+        taken.append(image)
+    }
+
+    /// The screenfuls joined into one picture, the first part of a very long
+    /// one. Nil when they would not join.
+    private func join(_ pages: [URL]) async -> CGImage? {
+        guard let folder = pages.first?.deletingLastPathComponent() else { return nil }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        return await Task.detached(operation: { [pages] in
+            pages.count > 1 ? ScrollStitcher.stitch(pages)?.first : PageImages.wholeImage(at: pages[0])
+        }).value
     }
 
     /// A step that takes the same again: the same window, or the same part
@@ -95,6 +122,7 @@ final class MacroRecordState {
     @ObservationIgnored var onDone: () -> Void = {}
     @ObservationIgnored var onCancel: () -> Void = {}
     @ObservationIgnored var onCapture: () -> Void = {}
+    @ObservationIgnored var onLongCapture: () -> Void = {}
 }
 
 struct MacroRecordView: View {
@@ -108,7 +136,7 @@ struct MacroRecordView: View {
                 Image(systemName: "record.circle").foregroundStyle(.red)
             }
             .font(.headline)
-            Text("Do what you want repeated, the way you normally would. To keep what is on screen at a point, click Capture Here — or use the screenshot shortcut.")
+            Text("Do what you want repeated, the way you normally would. To keep what is on screen at a point, click Capture Here — or use the screenshot shortcut. Long Screenshot Here scrolls on as far as you take it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -122,7 +150,14 @@ struct MacroRecordView: View {
                 } label: {
                     Label("Capture Here", systemImage: "viewfinder")
                 }
-                .disabled(state.isChoosing)
+                Button {
+                    state.onLongCapture()
+                } label: {
+                    Label("Long Screenshot Here", systemImage: "arrow.up.and.down.square")
+                }
+            }
+            .disabled(state.isChoosing)
+            HStack {
                 Spacer()
                 Button("Cancel") { state.onCancel() }
                 Button("Done") { state.onDone() }

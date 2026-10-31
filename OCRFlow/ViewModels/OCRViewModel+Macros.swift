@@ -75,14 +75,31 @@ extension OCRViewModel {
                 if runs.isEmpty { runs = [recorded] } else { runs[0] = recorded + runs[0] }
             }
 
+            let count = runs.reduce(0) { $0 + $1.count }
+            guard count > 0 else {
+                macros.discardRecordedCaptures(of: macro)
+                return
+            }
+            // What becomes of them, asked now: it depends on what was taken.
+            let choice = await ResultChoice.ask(String(localized: "“\(macro.name)” took \(count) screenshots"),
+                                                options: [.recognize, .save, .discard])
+            var folder: URL?
+            if choice == .save {
+                folder = ResultChoice.chooseFolder(String(localized: "Choose where to save the screenshots"))
+                if folder == nil { return }
+            }
             var files: [URL] = []
-            for pages in runs where !pages.isEmpty {
-                files += await captureFiles(from: pages, as: macro.output, named: macro.name)
+            if choice != .discard {
+                for pages in runs where !pages.isEmpty {
+                    files += await captureFiles(from: pages, as: macro.output, named: macro.name, into: folder)
+                }
             }
             macros.discardRecordedCaptures(of: macro)
-            guard !files.isEmpty else { return }
-            showMainWindow?()
-            addCaptures(files)
+            if folder != nil {
+                if !files.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(files) }
+            } else {
+                deliver(files)
+            }
         }
     }
 

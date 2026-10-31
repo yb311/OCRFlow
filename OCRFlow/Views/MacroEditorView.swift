@@ -132,7 +132,7 @@ private struct MacroDetailView: View {
                     Text("One long picture").tag(Macro.Output.longImage)
                     Text("Separate pictures").tag(Macro.Output.images)
                 }
-                Text("They are read straight away. Export them from the list as a searchable PDF, Word or Markdown.")
+                Text("When a run ends, you choose whether they are recognized, only saved, or discarded.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -288,9 +288,11 @@ enum MacroStepDescription {
             return scroll.dx < 0 ? String(localized: "Scroll right \(Int(-scroll.dx)) pt")
                 : String(localized: "Scroll left \(Int(scroll.dx)) pt")
         case let .capture(area):
-            guard let rect = area.rect else { return String(localized: "Capture the window") }
             // Sizes and positions as plain numbers: 1120, not 1,120.
-            return String(localized: "Capture an area of \(String(Int(rect.width))) × \(String(Int(rect.height)))")
+            let what = area.rect.map { String(localized: "Capture an area of \(String(Int($0.width))) × \(String(Int($0.height)))") }
+                ?? String(localized: "Capture the window")
+            guard let distance = area.scrollDistance else { return what }
+            return String(localized: "\(what), scrolled on \(String(Int(distance))) pt into one long picture")
         case let .wait(seconds):
             return String(localized: "Wait \(seconds.formatted(.number.precision(.fractionLength(0...1)))) s")
         }

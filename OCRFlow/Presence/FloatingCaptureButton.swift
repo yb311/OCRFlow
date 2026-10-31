@@ -5,6 +5,9 @@ import SwiftUI
 /// and over full-screen apps. A click captures, a drag moves it, and it
 /// settles against the nearer side of the screen when let go.
 ///
+/// With the pointer over it, two more open out below it — above it, near
+/// the bottom of the screen: a queue of screenshots, and recording.
+///
 /// It never takes focus: clicking it leaves the app in front where it was, so
 /// what is about to be captured is not disturbed.
 @MainActor
@@ -17,9 +20,18 @@ final class FloatingCaptureButton {
     /// Between the circle and the edge of the screen it rests against.
     static let edgeGap: CGFloat = 6
 
+    /// The smaller buttons that open out, and the room they take.
+    static let extraDiameter: CGFloat = 40
+    static let extraSpacing: CGFloat = 8
+    static var extrasHeight: CGFloat { (extraDiameter + extraSpacing) * 2 }
+
     private let panel: NSPanel
     private let state: FloatingButtonState
+    private let button: FloatingButtonView
+    private let extras: FirstMouseHostingView<FloatingExtras>
     private var screenObserver: NSObjectProtocol?
+    private var expanded = false
+    private var collapseTask: Task<Void, Never>?
 
     init(model: OCRViewModel) {
         state = FloatingButtonState(model: model)
@@ -37,13 +49,24 @@ final class FloatingCaptureButton {
         panel.isExcludedFromWindowsMenu = true
         panel.animationBehavior = .utilityWindow
 
-        let view = FloatingButtonView(state: state)
-        view.onClick = { [weak model] in model?.captureScreenshot() }
-        view.onDrop = { [weak self] in self?.settle() }
-        view.makeMenu = { [weak model] in model.map(Self.menu(model:)) }
-        panel.contentView = view
+        button = FloatingButtonView(state: state)
+        extras = FirstMouseHostingView(rootView: FloatingExtras(
+            upward: false,
+            queue: { [weak model] in model?.queueScreenshots() },
+            record: { [weak model] in model?.recordMacro() }))
+        extras.isHidden = true
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: Self.side, height: Self.side))
+        container.addSubview(extras)
+        container.addSubview(button)
+        panel.contentView = container
 
-        panel.setFrame(frame(for: Parking.saved), display: false)
+        button.onClick = { [weak model] in model?.captureScreenshot() }
+        button.onDrop = { [weak self] in self?.settle() }
+        button.onDragStart = { [weak self] in self?.collapse() }
+        button.onHover = { [weak self] in self?.expand() }
+        button.makeMenu = { [weak model] in model.map(Self.menu(model:)) }
+
+        layout(at: frame(for: Parking.saved))
 
         panel.orderFrontRegardless()
 
@@ -54,7 +77,8 @@ final class FloatingCaptureButton {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.panel.setFrame(self.frame(for: Parking.saved), display: true)
+                self.expanded = false
+                self.layout(at: self.frame(for: Parking.saved))
             }
         }
     }
@@ -62,6 +86,82 @@ final class FloatingCaptureButton {
     func close() {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         panel.orderOut(nil)
+    }
+
+    // MARK: - Opening out
+
+    private func expand() {
+        guard !expanded, !state.dragging else { return }
+        expanded = true
+        layout(at: restingFrame(from: panel.frame))
+        closeOnceLeft()
+    }
+
+    private func collapse() {
+        collapseTask?.cancel()
+        guard expanded else { return }
+        let resting = restingFrame(from: panel.frame)
+        expanded = false
+        layout(at: resting)
+    }
+
+    /// Closes once the pointer has left them all. Watched rather than told:
+    /// growing the panel under the pointer can report it leaving when it
+    /// has not. A moment's grace, so crossing the gap between two buttons,
+    /// or overshooting a little, does not close them.
+    private func closeOnceLeft() {
+        collapseTask?.cancel()
+        collapseTask = Task { [weak self] in
+            var away = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard let self, self.expanded else { return }
+                away = self.panel.frame.insetBy(dx: -4, dy: -4).contains(NSEvent.mouseLocation) ? 0 : away + 1
+                if away >= 3 {
+                    self.collapse()
+                    return
+                }
+            }
+        }
+    }
+
+    /// Puts the main button at `resting`, with the others opened out below
+    /// it or, without the room, above it.
+    private func layout(at resting: NSRect) {
+        guard expanded else {
+            extras.isHidden = true
+            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
+            panel.setFrame(resting, display: true)
+            return
+        }
+        let upward = opensUpward(resting)
+        extras.rootView = FloatingExtras(upward: upward, queue: extras.rootView.queue, record: extras.rootView.record)
+        extras.isHidden = false
+        let height = Self.side + Self.extrasHeight
+        if upward {
+            panel.setFrame(NSRect(x: resting.minX, y: resting.minY, width: Self.side, height: height), display: true)
+            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
+            extras.frame = NSRect(x: 0, y: Self.side - Self.padding, width: Self.side, height: Self.extrasHeight)
+        } else {
+            panel.setFrame(NSRect(x: resting.minX, y: resting.minY - Self.extrasHeight, width: Self.side, height: height),
+                           display: true)
+            button.frame = NSRect(x: 0, y: Self.extrasHeight, width: Self.side, height: Self.side)
+            extras.frame = NSRect(x: 0, y: Self.padding, width: Self.side, height: Self.extrasHeight)
+        }
+    }
+
+    /// Where the main button is, whatever the panel's size now.
+    private func restingFrame(from current: NSRect) -> NSRect {
+        guard current.height > Self.side else { return current }
+        // Opened downward, the button is at the top of the panel.
+        let upward = button.frame.minY == 0
+        return NSRect(x: current.minX, y: upward ? current.minY : current.maxY - Self.side,
+                      width: Self.side, height: Self.side)
+    }
+
+    private func opensUpward(_ resting: NSRect) -> Bool {
+        let screen = NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]
+        return resting.minY - Self.extrasHeight < screen.visibleFrame.minY
     }
 
     // MARK: - Where it rests
@@ -125,13 +225,8 @@ final class FloatingCaptureButton {
         menu.addItem(MenuAction.item(String(localized: "Capture Screenshot")) { [weak model] in
             model?.captureScreenshot()
         })
-        let again = MenuAction.item(String(localized: "Capture Same Area Again")) { [weak model] in
-            model?.captureSameAreaAgain()
-        }
-        again.isEnabled = model.lastCaptureTarget != nil
-        menu.addItem(again)
-        menu.addItem(MenuAction.item(String(localized: "Scrolling Capture…")) { [weak model] in
-            model?.captureScrolling()
+        menu.addItem(MenuAction.item(String(localized: "Queue Screenshots")) { [weak model] in
+            model?.queueScreenshots()
         })
         menu.addItem(.separator())
         menu.addItem(MenuAction.item(String(localized: "Record Actions…")) { [weak model] in
@@ -149,6 +244,9 @@ final class FloatingCaptureButton {
             run.submenu = list
             menu.addItem(run)
         }
+        menu.addItem(MenuAction.item(String(localized: "Recorded Actions…")) { [weak model] in
+            model?.showMacros?()
+        })
         menu.addItem(.separator())
         menu.addItem(MenuAction.item(String(localized: "Open OCRFlow")) { [weak model] in
             model?.showMainWindow?()
@@ -210,6 +308,8 @@ private final class FloatingButtonState {
 private final class FloatingButtonView: NSView {
     var onClick: () -> Void = {}
     var onDrop: () -> Void = {}
+    var onDragStart: () -> Void = {}
+    var onHover: () -> Void = {}
     /// Made on each right-click, so what it offers is current.
     var makeMenu: () -> NSMenu? = { nil }
 
@@ -259,6 +359,7 @@ private final class FloatingButtonView: NSView {
         restTask?.cancel()
         state.resting = false
         state.hovered = true
+        onHover()
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -284,11 +385,15 @@ private final class FloatingButtonView: NSView {
         // A hand that wobbles during a click is not a drag.
         if !dragging {
             guard hypot(dx, dy) > 3 else { return }
+            onDragStart()
+            // Collapsing moved the window; the drag goes on from there.
+            self.dragStart = (dragStart.pointer, window.frame.origin)
             dragging = true
             state.pressed = false
             state.dragging = true
         }
-        window.setFrameOrigin(NSPoint(x: dragStart.origin.x + dx, y: dragStart.origin.y + dy))
+        guard let origin = self.dragStart?.origin else { return }
+        window.setFrameOrigin(NSPoint(x: origin.x + dx, y: origin.y + dy))
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -339,7 +444,7 @@ private struct FloatingButtonFace: View {
                         radius: state.dragging ? 5 : 2.5, y: state.dragging ? 2.5 : 1)
             Circle()
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
-            Image(systemName: "text.viewfinder")
+            Image(systemName: "viewfinder")
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
             if let progress = state.progress {
@@ -360,5 +465,42 @@ private struct FloatingButtonFace: View {
         .animation(.easeInOut(duration: 0.4), value: state.resting)
         .frame(width: FloatingCaptureButton.side, height: FloatingCaptureButton.side)
         .accessibilityHidden(true)
+    }
+}
+
+/// The buttons that open out: a queue of screenshots, then recording —
+/// recording furthest from the main button either way.
+struct FloatingExtras: View {
+    let upward: Bool
+    let queue: () -> Void
+    let record: () -> Void
+
+    var body: some View {
+        VStack(spacing: FloatingCaptureButton.extraSpacing) {
+            if upward {
+                circle("record.circle", "Record Actions…", tint: .red, action: record)
+                circle("square.stack.3d.down.right", "Queue Screenshots", tint: .accentColor, action: queue)
+            } else {
+                circle("square.stack.3d.down.right", "Queue Screenshots", tint: .accentColor, action: queue)
+                circle("record.circle", "Record Actions…", tint: .red, action: record)
+            }
+        }
+        .frame(width: FloatingCaptureButton.side)
+    }
+
+    private func circle(_ symbol: String, _ help: LocalizedStringKey, tint: Color,
+                        action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: FloatingCaptureButton.extraDiameter, height: FloatingCaptureButton.extraDiameter)
+                .background(Circle().fill(.regularMaterial).shadow(color: .black.opacity(0.22), radius: 2.5, y: 1))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(Text(help))
     }
 }

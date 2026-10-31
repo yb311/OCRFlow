@@ -43,9 +43,25 @@ enum HUDPanel {
         panel.orderFrontRegardless()
         return panel
     }
+
+    /// A word that something happened — copied, saved — gone again in a
+    /// moment.
+    static func toast(_ text: String) {
+        let panel = show(Label(text, systemImage: "checkmark.circle.fill").font(.callout), avoiding: nil)
+        panel.ignoresMouseEvents = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.25
+                panel.animator().alphaValue = 0
+            }, completionHandler: nil)
+            try? await Task.sleep(for: .seconds(0.3))
+            panel.orderOut(nil)
+        }
+    }
 }
 
 /// The panel never becomes key, so the first click on a button has to count.
-private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

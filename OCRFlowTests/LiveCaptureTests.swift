@@ -181,6 +181,9 @@ final class LiveCaptureTests: XCTestCase {
     /// show it, and runs it until the last page.
     private func recordAndRun(turn: () async throws -> Void,
                               beforeRunning: () async throws -> Void = {}) async throws -> (steps: [MacroStep], pages: [CGImage]) {
+        // The slides in front, as the user would have them.
+        NSRunningApplication(processIdentifier: try XCTUnwrap(slides).process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(400))
         let recorder = MacroRecorder()
         recorder.start()
         recorder.addCapture(CaptureArea(rect: nil), in: try place())
@@ -246,18 +249,9 @@ final class LiveCaptureTests: XCTestCase {
         self.slides = slides
         let target = CaptureTarget.window(slides.window)
         let first = try await ScreenCapture.grab(target)
-        let look = await ScrollingCapture.look(at: target)
-        let firstLook = try XCTUnwrap(look)
-        let frame = try XCTUnwrap(ScreenCapture.frame(of: target))
-        let top = NSScreen.screens[0].frame.maxY
-        let steps = ScrollingCapture.scrollSteps(by: -(frame.height * 0.7).rounded(),
-                                                  at: CGPoint(x: frame.midX, y: top - frame.midY))
-        var pages = [first]
-        await ScrollingCapture().turnPages(with: steps, of: target, first: firstLook,
-                                           size: CGSize(width: first.width, height: first.height)) { image in
-            pages.append(image)
-            return pages.count
-        }
+        let files = await ScrollingCapture().runAutomatically(target, first: first, distance: nil)
+        defer { files.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
+        let pages = files.compactMap { PageImages.wholeImage(at: $0) }
         XCTAssertGreaterThan(pages.count, 4)
         if ScrollStitcher.stitch(pages) == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
             for (index, page) in pages.enumerated() {
@@ -383,9 +377,12 @@ extension LiveCaptureTests {
 
         let before = Set(vm.items.map(\.id))
         vm.runMacro(id: macro.id)
-        for _ in 0..<600 where vm.isCapturing || vm.items.count == before.count {
-            try await Task.sleep(for: .milliseconds(100))
-        }
+        for _ in 0..<600 where vm.isCapturing { try await Task.sleep(for: .milliseconds(100)) }
+        // Asked what becomes of them: recognized, the first choice.
+        try await Task.sleep(for: .milliseconds(500))
+        let choice = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width > 300 })
+        click(CGPoint(x: choice.frame.midX, y: top - (choice.frame.maxY - 14 - 22 - 10 - 11)))
+        for _ in 0..<100 where vm.items.count == before.count { try await Task.sleep(for: .milliseconds(100)) }
         let added = vm.items.filter { !before.contains($0.id) }
         XCTAssertEqual(added.count, 1)
         let document = try XCTUnwrap(added.first).url
@@ -408,6 +405,230 @@ extension LiveCaptureTests {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
         XCTAssertEqual(pictures.count, 5)
         try assertSlides(pictures.compactMap { PageImages.wholeImage(at: $0) })
+    }
+}
+
+extension LiveCaptureTests {
+    /// The bar of buttons on screen.
+    private func bar() throws -> NSPanel {
+        try XCTUnwrap(NSApp.windows.first { $0 is KeyPanel && $0.isVisible } as? NSPanel)
+    }
+
+    /// A button of the bar, by how far its centre is from the bar's right
+    /// edge: copy 25, save 61, cancel 97; past the divider, long screenshot
+    /// 144.
+    private func clickBar(_ fromRight: CGFloat) throws {
+        let bar = try bar()
+        let top = NSScreen.screens[0].frame.maxY
+        click(CGPoint(x: bar.frame.maxX - fromRight, y: top - bar.frame.midY))
+    }
+
+    /// A screenshot is no longer read straight away: the bar asks, and copy
+    /// puts it on the clipboard as it was.
+    func testTheBarCopiesAScreenshot() async throws {
+        let slides = try XCTUnwrap(slides)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        NSPasteboard.general.clearContents()
+        let vm = try model()
+        vm.captureScreenshot()
+        try await Task.sleep(for: .milliseconds(1200))
+        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        try await Task.sleep(for: .milliseconds(1000))
+        try clickBar(25)
+        try await Task.sleep(for: .milliseconds(800))
+        XCTAssertFalse(vm.isCapturing)
+        let data = try XCTUnwrap(NSPasteboard.general.data(forType: .png))
+        let image = try XCTUnwrap(NSBitmapImageRep(data: data)?.cgImage)
+        XCTAssertTrue(try text(in: image).contains("Page 1"))
+        XCTAssertTrue(vm.items.isEmpty, "not read unless asked")
+    }
+
+    /// Long screenshot from the bar: Auto Scroll to the end, then copy.
+    func testTheBarTakesALongScreenshot() async throws {
+        slides?.process.terminate()
+        let slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        NSPasteboard.general.clearContents()
+        let vm = try model()
+        vm.captureScreenshot()
+        try await Task.sleep(for: .milliseconds(1200))
+        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        try await Task.sleep(for: .milliseconds(1000))
+        try clickBar(144)
+        try await Task.sleep(for: .milliseconds(1500))
+        // Auto Scroll, in the middle of the area.
+        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        for _ in 0..<60 { try await Task.sleep(for: .milliseconds(500)) }
+        try clickBar(25)
+        // Joining takes a while in a debug build.
+        for _ in 0..<240 where vm.isCapturing { try await Task.sleep(for: .milliseconds(250)) }
+        let data = try XCTUnwrap(NSPasteboard.general.data(forType: .png))
+        let image = try XCTUnwrap(NSBitmapImageRep(data: data)?.cgImage)
+        XCTAssertGreaterThan(image.height, 6000)
+    }
+
+    /// Drag to take; a click goes through and turns the page; Escape ends.
+    func testQueueTakesWhatIsDraggedOutAndLetsClicksThrough() async throws {
+        let slides = try XCTUnwrap(slides)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let title = CGPoint(x: frame.minX + 30, y: top - frame.maxY + 40)
+        let button = CGPoint(x: frame.maxX - 30 - 45, y: top - (frame.minY + 20 + 16))
+        let queue = QueueCapture()
+        let run = Task { await queue.run() }
+        try await Task.sleep(for: .milliseconds(800))
+        for _ in 0..<3 {
+            try await drag(from: title, to: CGPoint(x: title.x + 400, y: title.y + 120))
+            try await Task.sleep(for: .milliseconds(600))
+            click(button)
+            try await Task.sleep(for: .milliseconds(900))
+        }
+        press(53)   // Escape
+        let pages = await run.value
+        defer { pages.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
+        XCTAssertEqual(pages.count, 3)
+        for (index, page) in pages.enumerated() {
+            let image = try XCTUnwrap(PageImages.wholeImage(at: page))
+            XCTAssertTrue(try text(in: image).contains("Page \(index + 1)"), "\(index)")
+        }
+    }
+
+    /// Long Screenshot Here while recording, scrolled 1500 points by hand;
+    /// run on a fresh window, it scrolls as far again, no further.
+    func testRecordsALongScreenshotAndScrollsAsFarAgain() async throws {
+        slides?.process.terminate()
+        var slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        var frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        let top = NSScreen.screens[0].frame.maxY
+        let vm = try model()
+        vm.macros.macros = []
+
+        vm.recordMacro()
+        try await Task.sleep(for: .milliseconds(800))
+        let recording = try XCTUnwrap(vm.activeRecording)
+        let long = Task { await recording.captureHere(scrolling: true) }
+        try await Task.sleep(for: .milliseconds(1200))
+        click(CGPoint(x: frame.midX, y: top - frame.midY))
+        try await Task.sleep(for: .milliseconds(1500))
+        // The slides in front, so the wheel reaches them, as it would the
+        // user's.
+        NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(400))
+        // By hand, clear of the Auto Scroll button.
+        let wheel = CGPoint(x: frame.midX, y: top - frame.maxY + frame.height / 4)
+        for _ in 0..<30 {
+            let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -50, wheel2: 0, wheel3: 0)
+            event?.location = wheel
+            event?.post(tap: .cghidEventTap)
+            try await Task.sleep(for: .milliseconds(60))
+        }
+        try await Task.sleep(for: .milliseconds(1500))
+        try clickBar(25)   // ✓
+        await long.value
+        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && !($0 is KeyPanel) && $0.isVisible && $0.frame.width > 300 })
+        click(CGPoint(x: panel.frame.maxX - 14 - 25, y: top - (panel.frame.minY + 14 + 10)))   // Done
+        for _ in 0..<50 where vm.macros.macros.isEmpty { try await Task.sleep(for: .milliseconds(100)) }
+
+        let macro = try XCTUnwrap(vm.macros.macros.first)
+        XCTAssertEqual(macro.steps.count, 1, "the scrolling is the step's, not steps of its own: \(macro.steps)")
+        guard case let .capture(area)? = macro.steps.first?.action else { return XCTFail("\(macro.steps)") }
+        let distance = try XCTUnwrap(area.scrollDistance)
+        XCTAssertEqual(distance, 1500, accuracy: 60)
+
+        // A fresh window, at the top again.
+        slides.process.terminate()
+        slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
+        vm.macros.macros[0].repetition = .once
+        vm.macros.macros[0].output = .images
+        let before = Set(vm.items.map(\.id))
+        vm.runMacro(id: macro.id)
+        for _ in 0..<600 where vm.isCapturing { try await Task.sleep(for: .milliseconds(100)) }
+        try await Task.sleep(for: .milliseconds(500))
+        let choice = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width > 300 })
+        click(CGPoint(x: choice.frame.midX, y: top - (choice.frame.maxY - 14 - 22 - 10 - 11)))
+        for _ in 0..<100 where vm.items.count == before.count { try await Task.sleep(for: .milliseconds(100)) }
+        let added = vm.items.filter { !before.contains($0.id) }
+        // The recorded picture and the run's are the same: one is kept.
+        XCTAssertEqual(added.count, 1)
+        let image = try XCTUnwrap(PageImages.wholeImage(at: try XCTUnwrap(added.first).url))
+        let pixelsPerPoint = CGFloat(image.width) / frame.width
+        XCTAssertEqual(CGFloat(image.height), (frame.height + 1500) * pixelsPerPoint, accuracy: 80 * pixelsPerPoint)
+        vm.stopProcessing()
+    }
+
+    /// Scrolled by hand, in quick turns of the wheel, it still joins.
+    func testJoinsWhatIsScrolledByHand() async throws {
+        slides?.process.terminate()
+        let slides = try await launch(helper, scrolling: true)
+        self.slides = slides
+        let target = CaptureTarget.window(slides.window)
+        let frame = try XCTUnwrap(ScreenCapture.frame(of: target))
+        let top = NSScreen.screens[0].frame.maxY
+        let first = try await ScreenCapture.grab(target)
+        let session = Task { await ScrollingCapture().run(target, first: first) }
+        try await Task.sleep(for: .milliseconds(1000))
+        NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
+        try await Task.sleep(for: .milliseconds(400))
+        let wheel = CGPoint(x: frame.midX, y: top - frame.maxY + frame.height / 4)
+        for _ in 0..<30 {
+            let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -50, wheel2: 0, wheel3: 0)
+            event?.location = wheel
+            event?.post(tap: .cghidEventTap)
+            try await Task.sleep(for: .milliseconds(60))
+        }
+        try await Task.sleep(for: .milliseconds(1500))
+        try clickBar(25)   // ✓
+        let (files, finish) = await session.value
+        defer { files.first.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) } }
+        XCTAssertEqual(finish, .copy)
+        XCTAssertGreaterThan(files.count, 2)
+        let joined = ScrollStitcher.stitch(files)
+        if joined == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
+            for (index, file) in files.enumerated() {
+                try? FileManager.default.copyItem(at: file, to: URL(fileURLWithPath: dump).appending(path: "hand-\(index).png"))
+            }
+        }
+        let long = try XCTUnwrap(joined?.first)
+        let pixelsPerPoint = CGFloat(first.width) / frame.width
+        XCTAssertEqual(CGFloat(long.height), (frame.height + 1500) * pixelsPerPoint, accuracy: 80 * pixelsPerPoint)
+    }
+
+    /// Pointing at the floating button opens out Queue Screenshots and Record
+    /// Actions; moving away closes them again.
+    func testTheFloatingButtonOpensOutUnderThePointer() async throws {
+        let vm = try model()
+        let floating = FloatingCaptureButton(model: vm)
+        defer { floating.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width == FloatingCaptureButton.side })
+        let resting = panel.frame
+        let top = NSScreen.screens[0].frame.maxY
+        func move(to point: CGPoint) {
+            CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?
+                .post(tap: .cghidEventTap)
+        }
+        move(to: CGPoint(x: resting.midX - 80, y: top - resting.midY))
+        try await Task.sleep(for: .milliseconds(300))
+        move(to: CGPoint(x: resting.midX, y: top - resting.midY))
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(panel.frame.height, FloatingCaptureButton.side + FloatingCaptureButton.extrasHeight)
+        move(to: CGPoint(x: resting.midX - 300, y: top - resting.midY))
+        try await Task.sleep(for: .milliseconds(900))
+        XCTAssertEqual(panel.frame, resting)
+    }
+
+    private func model() throws -> OCRViewModel {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["OCRFLOW_LIBRARY_DIR"] != nil,
+                          "Set OCRFLOW_LIBRARY_DIR to a scratch folder: the app's list is kept there")
+        let vm = OCRViewModel()
+        vm.removeItems(ids: Set(vm.items.map(\.id)))
+        return vm
     }
 }
 

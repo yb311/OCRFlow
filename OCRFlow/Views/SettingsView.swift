@@ -882,18 +882,14 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.globalCaptureShortcut,
                               title: "Capture with \(GlobalHotKey.captureTitle) from any app",
-                              subtitle: "Drag out part of the screen or click a window, and it is recognized right away. \(GlobalHotKey.captureAgainTitle) takes the same area again, for page after page")
+                              subtitle: "Drag out part of the screen or click a window, then choose what to do with it: copy, save, recognize the text, or scroll on for a long screenshot")
                     if vm.globalCaptureShortcut, vm.captureShortcutTaken {
                         Label("Another app is already using \(GlobalHotKey.captureTitle)", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(.orange)
                     }
-                    if vm.globalCaptureShortcut, vm.captureAgainShortcutTaken {
-                        Label("Another app is already using \(GlobalHotKey.captureAgainTitle)", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(.orange)
-                    }
                     toggleRow(isOn: $vm.showFloatingButton,
                               title: "Show floating capture button",
-                              subtitle: "A small round button above all windows. Click to capture, drag to move it, right-click for more")
+                              subtitle: "A small round button above all windows. Click to capture; point at it for Queue Screenshots and Record Actions. Drag to move it, right-click for more")
                 }
             }
 

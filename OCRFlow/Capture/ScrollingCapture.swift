@@ -3,58 +3,146 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Takes something too long for the screen — a web page, a document, a
-/// chat — by scrolling it from top to bottom a screenful at a time, capturing
-/// each once it has settled, until it stops moving: the end.
+/// chat — scrolled through, capturing as it goes, to be joined into one long
+/// picture.
 ///
-/// Nothing about any app or site is known. It works from what the screen
-/// shows.
+/// The user scrolls it, at their own pace, to wherever they want it to end,
+/// or has OCRFlow scroll it a screenful at a time. What has been joined so
+/// far is shown beside it as it grows. Nothing about any app or site is
+/// known: it works from what the screen shows.
 @MainActor
 final class ScrollingCapture {
     /// However long the page, a run ends here.
     static let pageLimit = 300
 
     private let state = ScrollRunState()
-    private var panel: NSPanel?
+    private var panels: [NSPanel] = []
     private var stopRequested = false
     private var escapeMonitor: Any?
+    private var finish: CaptureFinish?
+    private let folder = URL.temporaryDirectory
+        .appending(path: "OCRFlow Pages \(UUID().uuidString)", directoryHint: .isDirectory)
+    private var pages: [URL] = []
+    private var joining = false
 
-    /// Scrolls what the user chooses from top to bottom, a screenful at a
-    /// time, capturing each. The pictures, in order, to be joined into one
-    /// long one; empty when cancelled.
-    func run() async -> [URL] {
-        guard InputControl.isAllowed() else { return [] }
-        guard let first = await ScreenCapture.choose(returnFocus: true),
-              let firstPrint = await Self.look(at: first.target),
-              let frame = ScreenCapture.frame(of: first.target) else { return [] }
-        let target = first.target
-        let folder = URL.temporaryDirectory
-            .appending(path: "OCRFlow Pages \(UUID().uuidString)", directoryHint: .isDirectory)
+    /// Takes `target` scrolled through, from `first` — a picture of it as it
+    /// is now — until the user picks one of `finishes` from the bar. The
+    /// pictures, in order, to be joined, and what was picked; nothing when
+    /// cancelled.
+    func run(_ target: CaptureTarget, first: CGImage,
+             finishes: [CaptureFinish] = [.cancel, .recognize, .save, .copy]) async -> (pages: [URL], finish: CaptureFinish) {
+        guard InputControl.isAllowed(), let firstPrint = await Self.look(at: target),
+              let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var pages: [URL] = []
-        func keep(_ image: CGImage) {
-            let url = folder.appending(path: String(format: "%04d.png", pages.count + 1))
-            if Self.write(image, to: url) { pages.append(url) }
-        }
-        keep(first.image)
+        keep(first)
+        // Every picture the size of the first, to be joined.
+        let size = CGSize(width: first.width, height: first.height)
+        let steps = Self.scrollSteps(by: -(frame.height * 0.7).rounded(), at: Self.eventPoint(frame))
 
-        // Most of a screenful down, from the middle of it, so each picture
-        // shares a band with the one before to be joined along.
-        let top = NSScreen.screens.first?.frame.maxY ?? 0
-        let point = CGPoint(x: frame.midX, y: top - frame.midY)
-        let steps = Self.scrollSteps(by: -(frame.height * 0.7).rounded(), at: point)
-
-        state.onStop = { [weak self] in self?.stopRequested = true }
-        showPanel(avoiding: frame)
+        state.preview = first
+        state.onAutomatic = { [state] in state.automatic.toggle() }
+        showPanels(around: frame, finishes: finishes)
         watchForEscape()
-        await turnPages(with: steps, of: target, first: firstPrint,
-                        size: CGSize(width: first.image.width, height: first.image.height)) { image in
+
+        var last = firstPrint
+        var missed = 0
+        while finish == nil, pages.count < Self.pageLimit {
+            if state.automatic {
+                await StepPlayer.play(steps, offset: .zero) { [weak self] in self?.finish != nil }
+                guard let page = await nextPage(of: target, after: last, size: size) else {
+                    // The end: the user picks what to do with it.
+                    state.automatic = false
+                    continue
+                }
+                keep(page.image)
+                last = page.print
+                continue
+            }
+            // By hand: whatever the user has scrolled to, as often as it
+            // changes, so neighbours overlap however fast they go.
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let look = await Self.look(at: target) else {
+                // The window closed: nothing left to scroll.
+                missed += 1
+                if missed > 10 { finish = .cancel }
+                continue
+            }
+            missed = 0
+            guard !look.isSamePage(as: last), let image = try? await ScreenCapture.grab(target, like: size),
+                  // A window being resized or minimized is no screenful.
+                  abs(CGFloat(image.width) - size.width) <= 4, abs(CGFloat(image.height) - size.height) <= 4 else { continue }
             keep(image)
-            state.pages = pages.count
-            return pages.count
+            last = look
         }
         stopWatchingForEscape()
-        closePanel()
+        panels.forEach { $0.orderOut(nil) }
+        panels = []
+        let finish = finish ?? .copy
+        guard finish != .cancel else {
+            try? FileManager.default.removeItem(at: folder)
+            return ([], .cancel)
+        }
+        return (pages, finish)
+    }
+
+    /// Scrolls `target` on from `first` by `distance` points — to the end,
+    /// without one — a screenful at a time, with nothing on screen: for a
+    /// macro being run. The pictures, in order, to be joined.
+    func runAutomatically(_ target: CaptureTarget, first: CGImage, distance: CGFloat?) async -> [URL] {
+        guard let firstPrint = await Self.look(at: target), let frame = ScreenCapture.frame(of: target) else { return [] }
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        keep(first)
+        let size = CGSize(width: first.width, height: first.height)
+        let screenful = (frame.height * 0.7).rounded()
+        var remaining = distance ?? .infinity
+        var last = firstPrint
+        watchForEscape()
+        defer { stopWatchingForEscape() }
+        while !stopRequested, remaining > 0.5, pages.count < Self.pageLimit {
+            let step = min(screenful, remaining)
+            remaining -= step
+            await StepPlayer.play(Self.scrollSteps(by: -step, at: Self.eventPoint(frame)), offset: .zero) { [weak self] in
+                self?.stopRequested ?? true
+            }
+            guard let page = await nextPage(of: target, after: last, size: size) else { break }
+            keep(page.image)
+            last = page.print
+        }
         return pages
+    }
+
+    private func keep(_ image: CGImage) {
+        let url = folder.appending(path: String(format: "%04d.png", pages.count + 1))
+        guard Self.write(image, to: url) else { return }
+        pages.append(url)
+        state.pages = pages.count
+        if pages.count > 1 { joinForPreview() }
+    }
+
+    /// What has been joined so far, shown as it grows — or word that the
+    /// last screenful would not join, while there is time to scroll back.
+    private func joinForPreview() {
+        guard !joining else { return }
+        joining = true
+        let pages = self.pages
+        Task {
+            let joined = await Task.detached { ScrollStitcher.stitch(pages) }.value
+            joining = false
+            if let first = joined?.first {
+                state.preview = first
+                state.lost = false
+            } else {
+                state.lost = true
+            }
+            // More may have come in meanwhile.
+            if self.pages.count != pages.count, finish == nil { joinForPreview() }
+        }
+    }
+
+    /// Where to scroll: a quarter of the way down, clear of the Auto Scroll
+    /// button in the middle, which would otherwise take the wheel.
+    private static func eventPoint(_ frame: CGRect) -> CGPoint {
+        CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.maxY + frame.height / 4)
     }
 
     /// The pointer moved to `point`, then a scroll of `distance` points
@@ -73,27 +161,6 @@ final class ScrollingCapture {
             steps.append(RecordedStep(event: event, delay: 0.012, app: nil))
         }
         return steps
-    }
-
-    /// Moves on with `steps` again and again, handing each new screenful to
-    /// `keep`, which says how many there are now. Ends when the screen stops
-    /// changing, at the limit, or when stopped. `first` is a look at the
-    /// first screenful, taken with `look(at:)`; `size`, that of the first
-    /// picture, which the rest keep so they can be joined.
-    func turnPages(with steps: [RecordedStep], of target: CaptureTarget,
-                   first: PageFingerprint, size: CGSize?, keep: (CGImage) -> Int) async {
-        var last = first
-        var count = 1
-        while !stopRequested, count < Self.pageLimit {
-            await StepPlayer.play(steps, offset: .zero) { [weak self] in
-                self?.stopRequested ?? true
-            }
-            guard let page = await nextPage(of: target, after: last, size: size),
-                  // Back at the start: a deck that goes round.
-                  count < 2 || !page.print.isSamePage(as: first) else { return }
-            count = keep(page.image)
-            last = page.print
-        }
     }
 
     // MARK: - Watching the screen
@@ -141,23 +208,6 @@ final class ScrollingCapture {
         return (image, current)
     }
 
-    /// Escape stops the run from any app. Only the user's own: the steps
-    /// being repeated may well press it themselves.
-    private func watchForEscape() {
-        escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            MainActor.assumeIsolated {
-                guard event.keyCode == 53,
-                      event.cgEvent?.getIntegerValueField(.eventSourceUserData) != StepPlayer.marker else { return }
-                self?.stopRequested = true
-            }
-        }
-    }
-
-    private func stopWatchingForEscape() {
-        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
-        escapeMonitor = nil
-    }
-
     // MARK: - Files
 
     static func write(_ image: CGImage, to url: URL) -> Bool {
@@ -192,46 +242,117 @@ final class ScrollingCapture {
         return CGImageDestinationFinalize(destination)
     }
 
-    // MARK: - Panel
+    // MARK: - On screen
 
-    private func showPanel(avoiding target: CGRect?) {
-        panel = HUDPanel.show(ScrollRunView(state: state), avoiding: target)
+    private func showPanels(around area: CGRect, finishes: [CaptureFinish]) {
+        let outline = CaptureMarks.outline(area, catchesClicks: false)
+        let size = CaptureMarks.sizeLabel(for: area)
+        let bar = CaptureMarks.bar(CaptureActionsBar(items: finishes) { [weak self] picked in
+            self?.finish = picked
+            self?.stopRequested = true
+        }, beside: area)
+
+        // In the middle of the area, the button that scrolls for the user.
+        let buttonHost = FirstMouseHostingView(rootView: AutoScrollButton(state: state))
+        let buttonSize = buttonHost.fittingSize
+        let button = CaptureMarks.panel(CGRect(x: area.midX - buttonSize.width / 2, y: area.midY - buttonSize.height / 2,
+                                               width: buttonSize.width, height: buttonSize.height))
+        button.contentView = buttonHost
+
+        // Beside it, on whichever side has more room, what has been joined.
+        let screen = CaptureMarks.screenFrame(for: area)
+        let width = min(max(area.width * 0.6, 160), 320)
+        let right = screen.maxX - area.maxX >= area.minX - screen.minX
+        let x = right ? min(area.maxX + 12, screen.maxX - width) : max(area.minX - 12 - width, screen.minX)
+        let preview = CaptureMarks.panel(CGRect(x: x, y: area.minY, width: width, height: area.height))
+        preview.ignoresMouseEvents = true
+        preview.contentView = NSHostingView(rootView: JoinedPreview(state: state))
+
+        panels = [outline, size, preview, button, bar]
+        panels.forEach { $0.orderFrontRegardless() }
     }
 
-    private func closePanel() {
-        panel?.orderOut(nil)
-        panel = nil
+    /// Escape lets it go, from any app. Only the user's own: OCRFlow's
+    /// scrolling sends no keys, but a macro's steps may.
+    private func watchForEscape() {
+        escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard event.keyCode == 53,
+                      event.cgEvent?.getIntegerValueField(.eventSourceUserData) != StepPlayer.marker else { return }
+                self?.stopRequested = true
+                if self?.finish == nil { self?.finish = .cancel }
+            }
+        }
+    }
+
+    private func stopWatchingForEscape() {
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
     }
 }
 
-// MARK: - What the panel shows
+// MARK: - What is shown
 
 @MainActor
 @Observable
 private final class ScrollRunState {
     /// Captured so far.
     var pages = 1
+    /// OCRFlow scrolling, rather than the user.
+    var automatic = false
+    /// What has been joined so far.
+    var preview: CGImage?
+    /// The last screenful would not join to the one before.
+    var lost = false
 
-    @ObservationIgnored var onStop: () -> Void = {}
+    @ObservationIgnored var onAutomatic: () -> Void = {}
 }
 
-private struct ScrollRunView: View {
+private struct AutoScrollButton: View {
     let state: ScrollRunState
 
     var body: some View {
-        HStack(spacing: 12) {
-            ProgressView().controlSize(.small)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Capturing screenful \(state.pages + 1)…")
-                    .font(.headline)
-                    .monospacedDigit()
-                Text("Stops by itself at the end. Press Esc to stop now; leave the mouse and keyboard alone meanwhile.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        Button { state.onAutomatic() } label: {
+            Label(state.automatic ? "Stop Scrolling" : "Auto Scroll",
+                  systemImage: state.automatic ? "pause.fill" : "arrow.down")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.78), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Scroll by hand at your own pace, or let OCRFlow scroll. Stop wherever you want the picture to end.")
+    }
+}
+
+private struct JoinedPreview: View {
+    let state: ScrollRunState
+
+    /// The newest part, at the bottom, as the page grows: what was just
+    /// scrolled to is what the user wants to see joined.
+    var body: some View {
+        VStack(spacing: 6) {
+            GeometryReader { space in
+                if let preview = state.preview {
+                    let height = space.size.width * CGFloat(preview.height) / CGFloat(max(preview.width, 1))
+                    Image(decorative: preview, scale: 1)
+                        .resizable()
+                        .frame(width: space.size.width, height: height)
+                        .frame(width: space.size.width, height: space.size.height, alignment: .bottom)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
+                }
             }
-            Spacer(minLength: 0)
-            Button("Stop") { state.onStop() }
+            Text(state.lost ? "Too fast: scroll back a little, then on more slowly"
+                            : "\(state.pages) captured")
+                .font(.caption)
+                .foregroundStyle(state.lost ? Color.orange : Color.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.6), in: Capsule())
         }
     }
 }

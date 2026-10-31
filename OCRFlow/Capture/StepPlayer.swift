@@ -15,7 +15,7 @@ struct RecordedStep {
 enum StepPlayer {
     /// Marks the events posted here, so they can be told apart from the
     /// user's own.
-    static let marker: Int64 = 0x4F43_5246   // 'OCRF'
+    nonisolated static let marker: Int64 = 0x4F43_5246   // 'OCRF'
 
     /// `offset` moves every pointer position, for a window that has moved
     /// since it was recorded. Stops between steps once `shouldStop` says so.

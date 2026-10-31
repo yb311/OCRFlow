@@ -359,7 +359,9 @@ struct MacroTests {
     @Test func theCaptureShortcutsAreNotSteps() {
         let held: CGEventFlags = [.maskCommand, .maskShift, .maskAlternate]
         #expect(GlobalHotKey.isOwn(keyCode: 19, flags: held))
-        #expect(GlobalHotKey.isOwn(keyCode: 20, flags: held.union(.maskNonCoalesced)))
+        #expect(GlobalHotKey.isOwn(keyCode: 19, flags: held.union(.maskNonCoalesced)))
+        // ⌥⇧⌘3 is no longer OCRFlow's.
+        #expect(!GlobalHotKey.isOwn(keyCode: 20, flags: held))
         #expect(!GlobalHotKey.isOwn(keyCode: 19, flags: [.maskCommand, .maskShift]))
         #expect(!GlobalHotKey.isOwn(keyCode: 124, flags: held))
     }

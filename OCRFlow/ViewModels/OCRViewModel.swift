@@ -1073,16 +1073,14 @@ final class OCRViewModel {
 
     // MARK: - Capture shortcut
 
-    /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one, and
-    /// the same place again with ⌥⇧⌘3.
+    /// Capture a screenshot with ⌥⇧⌘2 from any app, not only this one.
     var globalCaptureShortcut = true {
         didSet { persistSettings(); if !isRestoringSettings { updateCaptureShortcut() } }
     }
     /// True when another app already holds ⌥⇧⌘2.
     private(set) var captureShortcutTaken = false
-    /// True when another app already holds ⌥⇧⌘3.
-    private(set) var captureAgainShortcutTaken = false
     @ObservationIgnored private var captureHotKeys: [GlobalHotKey] = []
+
     /// Brings the main window to the front, opening one if it was closed —
     /// for a capture made from another app, or the menu bar. Set by the app.
     @ObservationIgnored var showMainWindow: (() -> Void)?
@@ -1091,12 +1089,9 @@ final class OCRViewModel {
         captureHotKeys.forEach { $0.unregister() }
         captureHotKeys = []
         captureShortcutTaken = false
-        captureAgainShortcutTaken = false
         guard globalCaptureShortcut else { return }
         let capture = GlobalHotKey.capture { [weak self] in self?.captureScreenshot() }
-        let again = GlobalHotKey.captureAgain { [weak self] in self?.captureSameAreaAgain() }
         if capture.register() { captureHotKeys.append(capture) } else { captureShortcutTaken = true }
-        if again.register() { captureHotKeys.append(again) } else { captureAgainShortcutTaken = true }
     }
 
     // MARK: - Presence
@@ -1259,9 +1254,6 @@ final class OCRViewModel {
     /// From the moment capture is asked for until the picture is taken or
     /// the user gives up, so a second press does not start a second one.
     var isCapturing = false
-    /// Where the last screenshot was taken, so the same place can be taken
-    /// again — the next page of a document shown on screen, say.
-    private(set) var lastCaptureTarget: CaptureTarget?
     /// Files asked to be read while a run was busy — screenshots, files
     /// added with 「添加后自动识别」 on, 「开始识别」 from the list — read once
     /// it ends.
@@ -1279,7 +1271,8 @@ final class OCRViewModel {
     @ObservationIgnored var showMacros: (() -> Void)?
 
     /// Lets the user drag out a part of the screen or click a window, then
-    /// reads it like any other file.
+    /// asks what to do with it: copy it, save it, recognize its text, or
+    /// scroll on for a long screenshot.
     func captureScreenshot() {
         // While recording, the user's usual way to take a screenshot marks
         // where the macro captures.
@@ -1290,71 +1283,143 @@ final class OCRViewModel {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
-            let taken = await ScreenCapture.choose()
-            isCapturing = false
-            guard let taken else { return }
-            lastCaptureTarget = taken.target
-            // Taken from another app: the result is what the user is
-            // waiting to see.
-            receiveCapture(taken.image, show: true)
+            defer { isCapturing = false }
+            guard let taken = await ScreenCapture.choose(), let area = ScreenCapture.frame(of: taken.target) else { return }
+            var images = [taken.image]
+            var finish = await CaptureBar.choose(around: area)
+            if finish == .longCapture {
+                let (pages, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
+                guard let joined = await join(pages) else { return }
+                images = joined
+                finish = picked
+            }
+            switch finish {
+            case .recognize: recognizeCaptures(images)
+            case .copy: copyCaptures(images)
+            case .save: saveCaptures(images)
+            case .cancel, .longCapture: break
+            }
         }
     }
 
-    /// Takes the same place as last time again, straight away. If it is gone
-    /// — the window closed — the user chooses again.
-    func captureSameAreaAgain() {
-        guard let target = lastCaptureTarget else { return captureScreenshot() }
+    /// Screenfuls scrolled through, joined: the long picture, or a few for a
+    /// very long one. Nil when there were none, or when they would not join
+    /// — the user has been told.
+    func join(_ pages: [URL]) async -> [CGImage]? {
+        guard let folder = pages.first?.deletingLastPathComponent() else { return nil }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        guard pages.count > 1 else { return PageImages.wholeImage(at: pages[0]).map { [$0] } }
+        if let joined = await Task.detached(operation: { [pages] in ScrollStitcher.stitch(pages) }).value { return joined }
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = String(localized: "The long screenshot could not be joined")
+        alert.informativeText = String(localized: "Each screenful has to overlap the one before. Scroll a little slower, in one direction, or use Auto Scroll.")
+        alert.runModal()
+        return nil
+    }
+
+    /// Into the list, and read.
+    private func recognizeCaptures(_ images: [CGImage]) {
+        let date = Self.captureDate()
+        let files = images.compactMap { image -> URL? in
+            let url = newCaptureURL(named: String(localized: "Screenshot \(date)"), extension: "png")
+            return ScrollingCapture.write(image, to: url) ? url : nil
+        }
+        guard !files.isEmpty else { return }
+        // Taken from another app: the result is what the user is waiting
+        // to see.
+        showMainWindow?()
+        addCaptures(files)
+    }
+
+    /// At the size it looks on screen, as PNG for apps that take it and as a
+    /// picture for the rest.
+    private func copyCaptures(_ images: [CGImage]) {
+        guard let image = images.first else { return }
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let picture = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale,
+                                                          height: CGFloat(image.height) / scale))
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([picture])
+        if let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) {
+            pasteboard.setData(png, forType: .png)
+        }
+        HUDPanel.toast(String(localized: "Copied"))
+    }
+
+    /// Where the user says, now. A very long picture in parts goes beside
+    /// the first, numbered.
+    private func saveCaptures(_ images: [CGImage]) {
+        NSApp.activate()
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = String(localized: "Screenshot \(Self.captureDate())") + ".png"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let stem = url.deletingPathExtension().lastPathComponent
+        var saved: [URL] = []
+        for (index, image) in images.enumerated() {
+            let target = index == 0 ? url
+                : Self.freeURL(in: url.deletingLastPathComponent(), named: "\(stem) \(index + 1)", extension: "png")
+            if ScrollingCapture.write(image, to: target) { saved.append(target) }
+        }
+        if saved.isEmpty { HUDPanel.toast(String(localized: "Could not save the screenshot")) }
+    }
+
+    /// Screenshots taken one after another until Escape: dragging takes an
+    /// area, everything else works as usual. What becomes of them is asked
+    /// at the end.
+    func queueScreenshots() {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
-            let result = await ScreenCapture.retake(target)
+            let pages = await QueueCapture().run()
             isCapturing = false
-            switch result {
-            case .taken(let image):
-                // The app in front stays in front: the next page is turned
-                // there.
-                receiveCapture(image, show: false)
-            case .gone:
-                lastCaptureTarget = nil
-                captureScreenshot()
-            case .failed:
+            guard let folder = pages.first?.deletingLastPathComponent() else { return }
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let options: [ResultChoice.Option] = pages.count > 1
+                ? [.recognizeTogether, .recognizeEach, .save, .discard] : [.recognize, .save, .discard]
+            switch await ResultChoice.ask(String(localized: "\(pages.count) screenshots taken"), options: options) {
+            case .recognizeTogether:
+                deliver(await captureFiles(from: pages, as: .document, named: nil))
+            case .recognizeEach, .recognize:
+                deliver(await captureFiles(from: pages, as: .images, named: nil))
+            case .save:
+                guard let target = ResultChoice.chooseFolder(String(localized: "Choose where to save the screenshots")) else { return }
+                let saved = await captureFiles(from: pages, as: .images, named: nil, into: target)
+                if !saved.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(saved) }
+            case .discard:
                 break
             }
         }
     }
 
-    /// Scrolls what the user chooses from top to bottom, into one long
-    /// picture read as one document.
-    func captureScrolling() {
-        guard !isCapturing else { return }
-        isCapturing = true
-        Task {
-            let pages = await ScrollingCapture().run()
-            isCapturing = false
-            await receivePages(pages)
-        }
-    }
-
-    /// Screenfuls scrolled through, as one long picture.
-    private func receivePages(_ pages: [URL]) async {
-        guard let folder = pages.first?.deletingLastPathComponent() else { return }
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let files = await captureFiles(from: pages, as: .longImage, named: nil)
+    /// Into the list, shown, and read.
+    func deliver(_ files: [URL]) {
         guard !files.isEmpty else { return }
         showMainWindow?()
         addCaptures(files)
     }
 
-    /// Puts what was captured — one picture a file — into the screenshots
-    /// folder: as one document, one long picture (or a few, for a very long
-    /// one) or a file each. The files given are left where they are.
+    /// Puts what was captured — one picture a file — together: as one
+    /// document, one long picture (or a few, for a very long one) or a file
+    /// each. The files given are left where they are.
+    ///
+    /// Into the library's screenshots folder, to be read, or, given a
+    /// `folder`, saved there as they are — a document then as a PDF.
     /// `name` heads the file names; by default they say what they are.
-    func captureFiles(from pages: [URL], as output: Macro.Output, named name: String?) async -> [URL] {
+    func captureFiles(from pages: [URL], as output: Macro.Output, named name: String?,
+                      into folder: URL? = nil) async -> [URL] {
         guard !pages.isEmpty else { return [] }
         let date = Self.captureDate()
         func label(_ fallback: String) -> String { name.map { "\($0) \(date)" } ?? fallback }
+        func destination(_ label: String, _ pathExtension: String) -> URL {
+            folder.map { Self.freeURL(in: $0, named: label, extension: pathExtension) }
+                ?? newCaptureURL(named: label, extension: pathExtension)
+        }
         func copy(_ page: URL, _ label: String) -> URL? {
-            let url = newCaptureURL(named: label, extension: page.pathExtension)
+            let url = destination(label, page.pathExtension)
             return (try? FileManager.default.copyItem(at: page, to: url)) == nil ? nil : url
         }
         switch output {
@@ -1364,29 +1429,72 @@ final class OCRViewModel {
             let joined = await Task.detached { [pages] in ScrollStitcher.stitch(pages) }.value
             if let joined {
                 return joined.compactMap { image in
-                    let url = newCaptureURL(named: label(String(localized: "Long Screenshot \(date)")), extension: "png")
+                    let url = destination(label(String(localized: "Long Screenshot \(date)")), "png")
                     return ScrollingCapture.write(image, to: url) ? url : nil
                 }
             }
             // Not one scrolled view after all: pages, then.
-            return await captureFiles(from: pages, as: .document, named: name)
+            return await captureFiles(from: pages, as: .document, named: name, into: folder)
         case .document, .longImage:
-            if pages.count == 1 {
+            if pages.count == 1, folder == nil || LongImagePages.pages(of: pages[0]) == nil {
                 return [copy(pages[0], label(String(localized: "Screenshot \(date)")))].compactMap { $0 }
             }
+            // A long picture among them is cut into pages of a usual shape,
+            // as it would be read.
+            let scratch = URL.temporaryDirectory.appending(path: "OCRFlow Cut \(UUID().uuidString)", directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: scratch) }
+            let cut = Self.cuttingLongPages(pages, into: scratch)
+            if let folder {
+                let url = Self.freeURL(in: folder, named: label(String(localized: "Pages \(date)")), extension: "pdf")
+                return Self.writePDF(of: cut, to: url) ? [url] : []
+            }
             let url = newCaptureURL(named: label(String(localized: "Pages \(date)")), extension: "tiff")
-            return ScrollingCapture.assemble(pages, into: url) ? [url] : []
+            return ScrollingCapture.assemble(cut, into: url) ? [url] : []
         }
     }
 
-    private func receiveCapture(_ image: CGImage, show: Bool) {
-        let url = newCaptureURL(named: String(localized: "Screenshot \(Self.captureDate())"), extension: "png")
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
-        else { return }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { return }
-        if show { showMainWindow?() }
-        addCapture(url)
+    /// The pages, with any long one in pages of a usual shape, written into
+    /// `scratch`.
+    private nonisolated static func cuttingLongPages(_ pages: [URL], into scratch: URL) -> [URL] {
+        pages.flatMap { page -> [URL] in
+            guard let cuts = LongImagePages.pages(of: page), cuts.count > 1 else { return [page] }
+            try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+            return cuts.indices.compactMap { index in
+                guard let image = LongImagePages.page(index, of: page, cutAt: cuts) else { return nil }
+                let url = scratch.appending(path: "\(UUID().uuidString).png")
+                guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString,
+                                                                        1, nil) else { return nil }
+                CGImageDestinationAddImage(destination, image, nil)
+                return CGImageDestinationFinalize(destination) ? url : nil
+            }
+        }
+    }
+
+    /// A PDF of the pictures, a page each, at the size they were on a Retina
+    /// screen.
+    private nonisolated static func writePDF(of pages: [URL], to url: URL) -> Bool {
+        guard let context = CGContext(url as CFURL, mediaBox: nil, nil) else { return false }
+        for page in pages {
+            guard let image = PageImages.wholeImage(at: page) else { continue }
+            var box = CGRect(x: 0, y: 0, width: CGFloat(image.width) / 2, height: CGFloat(image.height) / 2)
+            context.beginPage(mediaBox: &box)
+            context.draw(image, in: box)
+            context.endPage()
+        }
+        context.closePDF()
+        return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+    }
+
+    /// A name not taken yet in `folder`, which is made if need be.
+    nonisolated static func freeURL(in folder: URL, named name: String, extension pathExtension: String) -> URL {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var url = folder.appending(component: name).appendingPathExtension(pathExtension)
+        var count = 1
+        while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+            count += 1
+            url = folder.appending(component: "\(name) \(count)").appendingPathExtension(pathExtension)
+        }
+        return url
     }
 
     /// The time in a file name: sortable, and with no colons, which Finder
@@ -1402,20 +1510,8 @@ final class OCRViewModel {
     /// relaunch. Numbered when there are several in one second, as there are
     /// when taking page after page.
     private func newCaptureURL(named name: String, extension pathExtension: String) -> URL {
-        let folder = store.directory.appending(path: "Screenshots", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var url = folder.appending(component: name).appendingPathExtension(pathExtension)
-        var count = 1
-        while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
-            count += 1
-            url = folder.appending(component: "\(name) \(count)").appendingPathExtension(pathExtension)
-        }
-        return url
-    }
-
-    /// Adds a capture to the list, selected, and reads it.
-    private func addCapture(_ url: URL) {
-        addCaptures([url])
+        Self.freeURL(in: store.directory.appending(path: "Screenshots", directoryHint: .isDirectory),
+                     named: name, extension: pathExtension)
     }
 
     /// Adds captures to the list, selected, and reads them.

@@ -13,11 +13,7 @@ struct MenuBarMenu: View {
             // Shown only while the global shortcut is actually in place.
             .keyboardShortcut(vm.globalCaptureShortcut && !vm.captureShortcutTaken
                               ? KeyboardShortcut("2", modifiers: [.command, .shift, .option]) : nil)
-        Button("Capture Same Area Again") { vm.captureSameAreaAgain() }
-            .keyboardShortcut(vm.globalCaptureShortcut && !vm.captureAgainShortcutTaken
-                              ? KeyboardShortcut("3", modifiers: [.command, .shift, .option]) : nil)
-            .disabled(vm.lastCaptureTarget == nil)
-        Button("Scrolling Capture…") { vm.captureScrolling() }
+        Button("Queue Screenshots") { vm.queueScreenshots() }
 
         Divider()
         Button("Record Actions…") { vm.recordMacro() }

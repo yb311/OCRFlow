@@ -239,6 +239,16 @@
         }
       }
     },
+    "%@, scrolled on %@ pt into one long picture" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，往下滚动 %2$@ 点拼成长图"
+          }
+        }
+      }
+    },
     "%@. Retried with %@, which also failed: %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -391,6 +401,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有 %lld 个 PDF 未能写入"
+          }
+        }
+      }
+    },
+    "%lld captured" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已截取 %lld 张"
           }
         }
       }
@@ -821,6 +841,26 @@
         }
       }
     },
+    "%lld screenshots taken" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已截取 %lld 张"
+          }
+        }
+      }
+    },
+    "%lld taken" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已截 %lld 张"
+          }
+        }
+      }
+    },
     "%lld times" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1097,6 +1137,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "浮在所有窗口之上的小圆按钮。单击截图，拖动可移动位置，右键查看更多"
+          }
+        }
+      }
+    },
+    "A small round button above all windows. Click to capture; point at it for Queue Screenshots and Record Actions. Drag to move it, right-click for more" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浮在所有窗口上方的小圆按钮。点按截图；鼠标移上去会展开“队列截图”和“录制操作”。拖动可以移动它，右键查看更多"
           }
         }
       }
@@ -1421,6 +1471,16 @@
         }
       }
     },
+    "Auto Scroll" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动滚动"
+          }
+        }
+      }
+    },
     "Automatically recognize new files added to a folder" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1651,6 +1711,16 @@
         }
       }
     },
+    "Cancel (Esc or right-click)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消（Esc 或右键）"
+          }
+        }
+      }
+    },
     "Cancelled" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1701,22 +1771,12 @@
         }
       }
     },
-    "Capture Same Area Again" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再次截取同一区域"
-          }
-        }
-      }
-    },
     "Capture Screenshot" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "截图识别"
+            "value" : "截图"
           }
         }
       }
@@ -1787,16 +1847,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "截取…"
-          }
-        }
-      }
-    },
-    "Capturing screenful %lld…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在截取第 %lld 屏…"
           }
         }
       }
@@ -2015,6 +2065,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择导出位置，%lld 个文件将各自保存为 .%@，并保留原文件夹结构"
+          }
+        }
+      }
+    },
+    "Choose where to save the screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择截图的保存位置"
           }
         }
       }
@@ -2342,7 +2402,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已复制"
+            "value" : "已拷贝"
           }
         }
       }
@@ -2437,6 +2497,16 @@
         }
       }
     },
+    "Copy to the clipboard (Return)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝到剪贴板（回车）"
+          }
+        }
+      }
+    },
     "Core ML (Neural Engine / GPU)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2463,6 +2533,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "对应 PaddleOCR 的 use_doc_unwarping，两个引擎都会用到。"
+          }
+        }
+      }
+    },
+    "Could not save the screenshot" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存截图"
           }
         }
       }
@@ -2807,6 +2887,16 @@
         }
       }
     },
+    "Discard" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "丢弃"
+          }
+        }
+      }
+    },
     "Display formula" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2843,6 +2933,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "照常做一遍想让它重复的操作。需要留下屏幕上的内容时，点“截取此处”，或者用截图快捷键。"
+          }
+        }
+      }
+    },
+    "Do what you want repeated, the way you normally would. To keep what is on screen at a point, click Capture Here — or use the screenshot shortcut. Long Screenshot Here scrolls on as far as you take it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照常做一遍想让它重复的操作。需要留下屏幕上的内容时，点“截取此处”，或者用截图快捷键。“长截图此处”会一直滚到你停下的位置。"
           }
         }
       }
@@ -2977,12 +3077,22 @@
         }
       }
     },
-    "Drag out part of the screen or click a window, and it is recognized right away. %@ takes the same area again, for page after page" : {
+    "Drag out an area to take it. Clicks, scrolling and keys work as usual — turn the page, then drag again. Press Esc to finish." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拖选屏幕的一部分或点按一个窗口，马上就会识别。%@ 可再次截取同一区域，适合一页接一页地截。"
+            "value" : "拖动框选即截取。点按、滚动和按键照常使用——翻到下一页再框选。按 Esc 结束。"
+          }
+        }
+      }
+    },
+    "Drag out part of the screen or click a window, then choose what to do with it: copy, save, recognize the text, or scroll on for a long screenshot" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "框选屏幕的一部分或点按一个窗口，然后选择怎么处理：拷贝、保存、识别文字，或者往下滚动截长图"
           }
         }
       }
@@ -3003,6 +3113,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拖入图片、PDF 或整个文件夹"
+          }
+        }
+      }
+    },
+    "Each screenful has to overlap the one before. Scroll a little slower, in one direction, or use Auto Scroll." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每一屏都要和上一屏有重叠。请滚得慢一点、只往一个方向滚，或者用“自动滚动”。"
           }
         }
       }
@@ -3545,6 +3665,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找出分栏、标题、表格与图片，并确定阅读顺序。未安装时，只能按分栏估计顺序"
+          }
+        }
+      }
+    },
+    "Finish" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束"
           }
         }
       }
@@ -4269,6 +4399,26 @@
         }
       }
     },
+    "Long Screenshot Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长截图此处"
+          }
+        }
+      }
+    },
+    "Long screenshot: scroll on from here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长截图：从这里往下滚动"
+          }
+        }
+      }
+    },
     "Manage All Models…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4925,6 +5075,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只在 temperature 大于 0 时生效：从累计概率达到该值的候选里采样"
+          }
+        }
+      }
+    },
+    "Only save the pictures…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只保存图片…"
           }
         }
       }
@@ -5767,6 +5927,16 @@
         }
       }
     },
+    "Queue Screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "队列截图"
+          }
+        }
+      }
+    },
     "Quit OCRFlow" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6139,6 +6309,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新识别这一页"
+          }
+        }
+      }
+    },
+    "Recognize as one document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别为一份文档"
+          }
+        }
+      }
+    },
+    "Recognize each on its own" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分别识别"
+          }
+        }
+      }
+    },
+    "Recognize the text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别文字"
           }
         }
       }
@@ -6987,6 +7187,16 @@
         }
       }
     },
+    "Save Here" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存到这里"
+          }
+        }
+      }
+    },
     "Save images when exporting Markdown" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7003,6 +7213,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存…"
+          }
+        }
+      }
+    },
+    "Save… (Space)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存…（空格）"
           }
         }
       }
@@ -7033,6 +7253,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "截图 %@"
+          }
+        }
+      }
+    },
+    "Scroll by hand at your own pace, or let OCRFlow scroll. Stop wherever you want the picture to end." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以按自己的节奏手动滚动，也可以让 OCRFlow 自动滚动。想在哪里结束就停在哪里。"
           }
         }
       }
@@ -7073,16 +7303,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "向上滚动 %lld 点"
-          }
-        }
-      }
-    },
-    "Scrolling Capture…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "滚动截长图…"
           }
         }
       }
@@ -7597,6 +7817,16 @@
         }
       }
     },
+    "Stop Scrolling" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止滚动"
+          }
+        }
+      }
+    },
     "Stop recognition. Unfinished files are marked “Cancelled”" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7613,16 +7843,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止中…"
-          }
-        }
-      }
-    },
-    "Stops by itself at the end. Press Esc to stop now; leave the mouse and keyboard alone meanwhile." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "滚到底会自动停止。按 Esc 可立即停止；截取期间请不要动鼠标和键盘。"
           }
         }
       }
@@ -8037,6 +8257,16 @@
         }
       }
     },
+    "The long screenshot could not be joined" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长截图没能拼接起来"
+          }
+        }
+      }
+    },
     "The model has no vocabulary" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8419,6 +8649,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为了重复你的点按和按键，请在“隐私与安全性 → 辅助功能”中打开 OCRFlow。只有在你演示翻页时才会记录你的操作，而且不会保存。"
+          }
+        }
+      }
+    },
+    "Too fast: scroll back a little, then on more slowly" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太快了：往回滚一点，再慢一些往下滚"
           }
         }
       }
@@ -8959,6 +9199,16 @@
         }
       }
     },
+    "When a run ends, you choose whether they are recognized, only saved, or discarded." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次运行结束时，由你选择识别、只保存还是丢弃。"
+          }
+        }
+      }
+    },
     "When off, OCRFlow starts in the menu bar, and its Dock icon only appears while one of its windows is open" : {
       "localizations" : {
         "zh-Hans" : {
@@ -9255,6 +9505,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」有手动修改"
+          }
+        }
+      }
+    },
+    "“%@” took %lld screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”截取了 %2$lld 张"
           }
         }
       }

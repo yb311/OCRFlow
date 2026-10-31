@@ -140,14 +140,8 @@ struct OCRFlowApp: App {
                 }
                 .keyboardShortcut("2", modifiers: [.command, .shift])
 
-                Button("Capture Same Area Again") {
-                    viewModel.captureSameAreaAgain()
-                }
-                .keyboardShortcut("3", modifiers: [.command, .shift, .option])
-                .disabled(viewModel.lastCaptureTarget == nil)
-
-                Button("Scrolling Capture…") {
-                    viewModel.captureScrolling()
+                Button("Queue Screenshots") {
+                    viewModel.queueScreenshots()
                 }
 
                 Divider()

@@ -14,6 +14,9 @@
 		F10000010000000000000D01 /* ScrollStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D01 /* ScrollStitcher.swift */; };
 		F10000010000000000000D02 /* Macro.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D02 /* Macro.swift */; };
 		F10000010000000000000D03 /* ElementLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D03 /* ElementLocator.swift */; };
+		F10000010000000000000E01 /* CaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000E01 /* CaptureBar.swift */; };
+		F10000010000000000000E02 /* QueueCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000E02 /* QueueCapture.swift */; };
+		F10000010000000000000E03 /* ResultChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000E03 /* ResultChoice.swift */; };
 		F10000010000000000000D04 /* ScreenWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D04 /* ScreenWindows.swift */; };
 		F10000010000000000000D05 /* MacroRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D05 /* MacroRecorder.swift */; };
 		F10000010000000000000D06 /* HUDPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000020000000000000D06 /* HUDPanel.swift */; };
@@ -120,6 +123,9 @@
 		F10000020000000000000D01 /* ScrollStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollStitcher.swift; sourceTree = "<group>"; };
 		F10000020000000000000D02 /* Macro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Macro.swift; sourceTree = "<group>"; };
 		F10000020000000000000D03 /* ElementLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementLocator.swift; sourceTree = "<group>"; };
+		F10000020000000000000E01 /* CaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureBar.swift; sourceTree = "<group>"; };
+		F10000020000000000000E02 /* QueueCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueCapture.swift; sourceTree = "<group>"; };
+		F10000020000000000000E03 /* ResultChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultChoice.swift; sourceTree = "<group>"; };
 		F10000020000000000000D04 /* ScreenWindows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWindows.swift; sourceTree = "<group>"; };
 		F10000020000000000000D05 /* MacroRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroRecorder.swift; sourceTree = "<group>"; };
 		F10000020000000000000D06 /* HUDPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDPanel.swift; sourceTree = "<group>"; };
@@ -253,6 +259,9 @@
 				F10000020000000000000D06 /* HUDPanel.swift */,
 				F10000020000000000000D05 /* MacroRecorder.swift */,
 				F10000020000000000000D04 /* ScreenWindows.swift */,
+				F10000020000000000000E03 /* ResultChoice.swift */,
+				F10000020000000000000E02 /* QueueCapture.swift */,
+				F10000020000000000000E01 /* CaptureBar.swift */,
 				F10000020000000000000D03 /* ElementLocator.swift */,
 				F10000020000000000000D02 /* Macro.swift */,
 				F10000020000000000000D01 /* ScrollStitcher.swift */,
@@ -707,6 +716,9 @@
 				F10000010000000000000D06 /* HUDPanel.swift in Sources */,
 				F10000010000000000000D05 /* MacroRecorder.swift in Sources */,
 				F10000010000000000000D04 /* ScreenWindows.swift in Sources */,
+				F10000010000000000000E03 /* ResultChoice.swift in Sources */,
+				F10000010000000000000E02 /* QueueCapture.swift in Sources */,
+				F10000010000000000000E01 /* CaptureBar.swift in Sources */,
 				F10000010000000000000D03 /* ElementLocator.swift in Sources */,
 				F10000010000000000000D02 /* Macro.swift in Sources */,
 				F10000010000000000000D01 /* ScrollStitcher.swift in Sources */,

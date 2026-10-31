@@ -209,6 +209,11 @@ enum ScrollStitcher {
         let minOverlap = max(16, middle / 10)
         guard middle > minOverlap + 1 else { return nil }
 
+        // Not moved at all: scrolling by hand catches the same screenful
+        // twice now and then.
+        let unmoved = (top..<(top + middle)).filter { a.difference(row: $0, from: b, row: $0) > 12 }.count
+        if unmoved * 20 <= middle { return 0 }
+
         // Every distance, roughly: every third row of the overlap.
         var candidates: [(shift: Int, error: Float)] = []
         for shift in 1...(middle - minOverlap) {

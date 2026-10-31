@@ -130,6 +130,9 @@ struct CaptureArea: Codable, Hashable, Sendable {
     /// Part of a window, measured from its top-left; or, outside any window,
     /// part of the screen. Nil: the whole window.
     var rect: CGRect?
+    /// Scrolled on this far, in points, and joined into one long picture —
+    /// as far as the user scrolled while recording. Nil: as it is.
+    var scrollDistance: Double?
 }
 
 /// A control, told apart the way the Accessibility interface describes it.
