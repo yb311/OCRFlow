@@ -146,10 +146,6 @@ struct OCRFlowApp: App {
                 .keyboardShortcut("3", modifiers: [.command, .shift, .option])
                 .disabled(viewModel.lastCaptureTarget == nil)
 
-                Button("Capture Page by Page…") {
-                    viewModel.capturePageByPage()
-                }
-
                 Button("Scrolling Capture…") {
                     viewModel.captureScrolling()
                 }

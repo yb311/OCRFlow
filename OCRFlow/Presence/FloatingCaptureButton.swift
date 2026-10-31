@@ -130,9 +130,6 @@ final class FloatingCaptureButton {
         }
         again.isEnabled = model.lastCaptureTarget != nil
         menu.addItem(again)
-        menu.addItem(MenuAction.item(String(localized: "Capture Page by Page…")) { [weak model] in
-            model?.capturePageByPage()
-        })
         menu.addItem(MenuAction.item(String(localized: "Scrolling Capture…")) { [weak model] in
             model?.captureScrolling()
         })

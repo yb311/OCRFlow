@@ -87,33 +87,6 @@ final class LiveCaptureTests: XCTestCase {
         return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 
-    /// Records what `turn` does to turn from page 1 to page 2, as the user
-    /// would show it, then turns the rest of the slides with it.
-    private func capturePages(turn: () async throws -> Void,
-                              afterRecording: () async throws -> Void = {}) async throws -> [CGImage] {
-        let slides = try XCTUnwrap(slides)
-        let target = CaptureTarget.window(slides.window)
-        let first = try await ScreenCapture.grab(target)
-        let look = await PageByPageCapture.look(at: target)
-        let firstLook = try XCTUnwrap(look)
-        let frame = ScreenCapture.frame(of: target)
-
-        let recorder = StepRecorder()
-        recorder.start()
-        try await turn()
-        try await Task.sleep(for: .milliseconds(400))
-        let steps = recorder.stop()
-        XCTAssertEqual(recorder.actions, 1)
-        try await afterRecording()
-
-        var pages = [first]
-        await PageByPageCapture().turnPages(with: steps, of: target, recordedFrame: frame, first: firstLook) { image in
-            pages.append(image)
-            return pages.count
-        }
-        return pages
-    }
-
     private func assertSlides(_ pages: [CGImage], file: StaticString = #filePath, line: UInt = #line) throws {
         let texts = try pages.map { try text(in: $0) }
         XCTAssertEqual(pages.count, 5, "\(texts)", file: file, line: line)
@@ -145,35 +118,6 @@ final class LiveCaptureTests: XCTestCase {
         let region = try await ScreenCapture.grab(.region(display: main, rect: title))
         XCTAssertEqual(region.width, Int(400 * NSScreen.screens[0].backingScaleFactor))
         XCTAssertTrue(try text(in: region).contains("Page 1"))
-    }
-
-    func testRepeatsAnArrowKeyToTheLastPage() async throws {
-        let pages = try await capturePages(turn: {
-            press(124)   // →
-        })
-        try assertSlides(pages)
-    }
-
-    /// A click on the page's Next button, repeated after the window has been
-    /// moved: the clicks follow it.
-    func testRepeatsAClickOnAWindowThatMoved() async throws {
-        let slides = try XCTUnwrap(slides)
-        // Where the window server put the window, which may not be where
-        // the helper asked for it.
-        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
-        let top = NSScreen.screens[0].frame.maxY
-        // The button sits 20 points up from the bottom and 30 in from the
-        // right edge, 90 by 32.
-        let button = CGPoint(x: frame.maxX - 30 - 45, y: top - (frame.minY + 20 + 16))
-        let pages = try await capturePages(turn: {
-            click(button)
-        }, afterRecording: {
-            // Moved after the click is recorded, before it is repeated.
-            kill(slides.process.processIdentifier, SIGUSR1)
-            try await Task.sleep(for: .milliseconds(300))
-        })
-        XCTAssertNotEqual(ScreenCapture.frame(of: .window(slides.window))?.origin.x, frame.minX)
-        try assertSlides(pages)
     }
 
     // MARK: - Choosing
@@ -223,34 +167,6 @@ final class LiveCaptureTests: XCTestCase {
         let window = await clicked.value
         XCTAssertEqual(window?.target, .window(slides.window))
         XCTAssertTrue(try text(in: try XCTUnwrap(window?.image)).contains("Page 1"))
-    }
-
-    /// The whole of Capture Page by Page, as the user goes through it: click
-    /// the window, turn the page once, click Done on the panel.
-    func testCapturesPageByPageFromStartToFinish() async throws {
-        let slides = try XCTUnwrap(slides)
-        let frame = try XCTUnwrap(ScreenCapture.frame(of: .window(slides.window)))
-        let top = NSScreen.screens[0].frame.maxY
-
-        let run = Task { await PageByPageCapture().run() }
-        try await Task.sleep(for: .milliseconds(1200))
-        click(CGPoint(x: frame.midX, y: top - frame.midY))
-        try await Task.sleep(for: .milliseconds(800))
-        press(124)   // →
-        try await Task.sleep(for: .milliseconds(600))
-
-        // Done sits in the panel's bottom-right corner.
-        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible && $0.frame.width > 300 })
-        click(CGPoint(x: panel.frame.maxX - 14 - 25, y: top - (panel.frame.minY + 14 + 10)))
-
-        let pages = await run.value
-        defer { try? FileManager.default.removeItem(at: pages.first?.deletingLastPathComponent() ?? URL.temporaryDirectory.appending(path: "none")) }
-        XCTAssertFalse(panel.isVisible)
-        let document = URL.temporaryDirectory.appending(path: "Pages \(UUID().uuidString).tiff")
-        defer { try? FileManager.default.removeItem(at: document) }
-        XCTAssertTrue(PageByPageCapture.assemble(pages, into: document))
-        XCTAssertEqual(PageImages.frameCount(of: document), 5)
-        try assertSlides((0..<5).compactMap { PageImages.image(at: document, frame: $0) })
     }
 
     // MARK: - Macros
@@ -330,22 +246,22 @@ final class LiveCaptureTests: XCTestCase {
         self.slides = slides
         let target = CaptureTarget.window(slides.window)
         let first = try await ScreenCapture.grab(target)
-        let look = await PageByPageCapture.look(at: target)
+        let look = await ScrollingCapture.look(at: target)
         let firstLook = try XCTUnwrap(look)
         let frame = try XCTUnwrap(ScreenCapture.frame(of: target))
         let top = NSScreen.screens[0].frame.maxY
-        let steps = PageByPageCapture.scrollSteps(by: -(frame.height * 0.7).rounded(),
+        let steps = ScrollingCapture.scrollSteps(by: -(frame.height * 0.7).rounded(),
                                                   at: CGPoint(x: frame.midX, y: top - frame.midY))
         var pages = [first]
-        await PageByPageCapture().turnPages(with: steps, of: target, recordedFrame: frame, first: firstLook,
-                                            alreadyTurned: false) { image in
+        await ScrollingCapture().turnPages(with: steps, of: target, first: firstLook,
+                                           size: CGSize(width: first.width, height: first.height)) { image in
             pages.append(image)
             return pages.count
         }
         XCTAssertGreaterThan(pages.count, 4)
         if ScrollStitcher.stitch(pages) == nil, let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
             for (index, page) in pages.enumerated() {
-                _ = PageByPageCapture.write(page, to: URL(fileURLWithPath: dump).appending(path: "scroll-\(index).png"))
+                _ = ScrollingCapture.write(page, to: URL(fileURLWithPath: dump).appending(path: "scroll-\(index).png"))
             }
         }
         let joined = try XCTUnwrap(ScrollStitcher.stitch(pages))
@@ -354,7 +270,7 @@ final class LiveCaptureTests: XCTestCase {
         // Read as a long screenshot is: in pages.
         let url = URL.temporaryDirectory.appending(path: "long-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: url) }
-        XCTAssertTrue(PageByPageCapture.write(joined[0], to: url))
+        XCTAssertTrue(ScrollingCapture.write(joined[0], to: url))
         let count = PageImages.frameCount(of: url)
         XCTAssertGreaterThan(count, 1)
         let text = try (0..<count).compactMap { PageImages.image(at: url, frame: $0) }.map { try self.text(in: $0) }

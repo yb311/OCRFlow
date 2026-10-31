@@ -1701,16 +1701,6 @@
         }
       }
     },
-    "Capture Page by Page…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "逐页截取…"
-          }
-        }
-      }
-    },
     "Capture Same Area Again" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1801,12 +1791,12 @@
         }
       }
     },
-    "Capturing page %lld…" : {
+    "Capturing screenful %lld…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在截取第 %lld 页…"
+            "value" : "正在截取第 %lld 屏…"
           }
         }
       }
@@ -5489,16 +5479,6 @@
         }
       }
     },
-    "Page 1 is captured. Now go to the next page the way you normally would — click, press a key or scroll — then click Done." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 1 页已截取。现在像平常一样翻到下一页——点按、按键或滚动都可以——然后点按“完成”。"
-          }
-        }
-      }
-    },
     "Page Handling" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7267,16 +7247,6 @@
         }
       }
     },
-    "Show OCRFlow how to turn the page" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演示一次如何翻页"
-          }
-        }
-      }
-    },
     "Show all boxes (turn off to show only the block under the pointer)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7647,12 +7617,12 @@
         }
       }
     },
-    "Stops by itself at the last page. Press Esc to stop now; leave the mouse and keyboard alone meanwhile." : {
+    "Stops by itself at the end. Press Esc to stop now; leave the mouse and keyboard alone meanwhile." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "到最后一页会自动停止。按 Esc 可立即停止；截取期间请不要动鼠标和键盘。"
+            "value" : "滚到底会自动停止。按 Esc 可立即停止；截取期间请不要动鼠标和键盘。"
           }
         }
       }

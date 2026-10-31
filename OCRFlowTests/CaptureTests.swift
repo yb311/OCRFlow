@@ -33,7 +33,7 @@ struct CaptureTests {
         #expect(pixels == CGRect(x: 10, y: 939, width: 31, height: 41))
     }
 
-    // MARK: - Page by page
+    // MARK: - Pages
 
     /// A page of "text": dark bars on white, in rows that depend on `seed`.
     private func page(width: Int = 1200, height: Int = 800, seed: Int, dot: CGRect? = nil) -> CGImage {
@@ -100,7 +100,7 @@ struct CaptureTests {
             return url
         }
         let document = folder.appending(path: "Pages.tiff")
-        #expect(PageByPageCapture.assemble(pages, into: document))
+        #expect(ScrollingCapture.assemble(pages, into: document))
         #expect(PageImages.frameCount(of: document) == 3)
         #expect(DocumentRecognizer.pageCount(of: document) == 3)
         for (index, size) in sizes.enumerated() {

@@ -71,12 +71,20 @@ enum ScrollStitcher {
             cut = CGRect(x: span.lowerBound, y: 0, width: span.count, height: height)
         }
 
-        var top = height / 2, bottom = height / 2 - 1
+        // The edges every pair shares — but one: the first picture is
+        // usually taken while choosing what to capture, its window in the
+        // background, and a background window's title bar is lighter.
+        var tops: [Int] = [], bottoms: [Int] = []
         guard pairs({ a, b in
-            top = sameRows(a, b, from: 0, by: 1, upTo: top)
-            bottom = sameRows(a, b, from: height - 1, by: -1, upTo: bottom)
+            tops.append(sameRows(a, b, from: 0, by: 1, upTo: height / 2))
+            bottoms.append(sameRows(a, b, from: height - 1, by: -1, upTo: height / 2 - 1))
             return true
         }) else { return nil }
+        func shared(_ counts: [Int]) -> Int {
+            let sorted = counts.sorted()
+            return sorted.count >= 3 ? sorted[1] : sorted[0]
+        }
+        let top = shared(tops), bottom = shared(bottoms)
 
         var shifts: [Int] = []
         guard pairs({ a, b in

@@ -1,65 +1,13 @@
 import AppKit
 
-/// One thing the user did — a click, a key, a scroll, the pointer moving —
-/// kept as the system delivered it, so it can be done again exactly.
-///
-/// Nothing is known about what was clicked or why: the same recording works
-/// for any app and any page.
+/// One event to send — a click, a key, a scroll, the pointer moving — with
+/// the pause before it, ready to be sent again and again.
 struct RecordedStep {
     let event: CGEvent
     /// Since the step before.
     let delay: TimeInterval
     /// The app in front when it happened, which a key press goes to.
     let app: pid_t?
-}
-
-/// Watches what the user does in other apps until told to stop.
-///
-/// Needs Accessibility permission to see key presses; see `InputControl`.
-@MainActor
-final class StepRecorder {
-    private(set) var steps: [RecordedStep] = []
-    /// Clicks, key presses and scrolls so far — what the user would count.
-    private(set) var actions = 0
-    var onChange: () -> Void = {}
-
-    private var monitor: Any?
-    private var lastTime: TimeInterval?
-
-    func start() {
-        let types: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .leftMouseDragged,
-                                            .rightMouseDown, .rightMouseUp, .rightMouseDragged,
-                                            .otherMouseDown, .otherMouseUp, .otherMouseDragged,
-                                            .mouseMoved, .scrollWheel, .keyDown, .keyUp, .flagsChanged]
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: types) { [weak self] event in
-            MainActor.assumeIsolated { self?.record(event) }
-        }
-    }
-
-    /// The steps, without the pointer's way to the Done button at the end.
-    func stop() -> [RecordedStep] {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        while let last = steps.last, last.event.type == .mouseMoved { steps.removeLast() }
-        return steps
-    }
-
-    private func record(_ event: NSEvent) {
-        guard let cgEvent = event.cgEvent else { return }
-        let delay = lastTime.map { event.timestamp - $0 } ?? 0
-        lastTime = event.timestamp
-        steps.append(RecordedStep(event: cgEvent, delay: delay,
-                                  app: NSWorkspace.shared.frontmostApplication?.processIdentifier))
-        switch event.type {
-        case .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown:
-            actions += 1
-        case .scrollWheel where event.phase == .began || (event.phase == [] && event.momentumPhase == []):
-            actions += 1
-        default:
-            return
-        }
-        onChange()
-    }
 }
 
 /// Does recorded steps again.

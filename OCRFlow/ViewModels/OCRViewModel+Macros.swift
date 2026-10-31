@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 
 /// Recording what the user does, and doing it again.
 extension OCRViewModel {
@@ -44,7 +45,18 @@ extension OCRViewModel {
         shown.forEach { $0.orderOut(nil) }
         Task {
             let player = MacroPlayer()
-            var runs = await player.run(macro)
+            // The run's captures keep the size of those taken while recording,
+            // to be joined with them.
+            var sizes: [UUID: CGSize] = [:]
+            for step in macro.steps {
+                guard let url = macros.recordedCapture(for: step.id),
+                      let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                      let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                      let height = properties[kCGImagePropertyPixelHeight] as? Int else { continue }
+                sizes[step.id] = CGSize(width: width, height: height)
+            }
+            var runs = await player.run(macro, sizes: sizes)
             defer { try? FileManager.default.removeItem(at: player.folder) }
             isCapturing = false
             runningMacroID = nil

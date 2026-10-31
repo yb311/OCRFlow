@@ -43,7 +43,7 @@ final class MacroLibrary {
     /// Keeps what a capture step took while it was recorded.
     func keep(_ image: CGImage, for step: UUID) {
         try? FileManager.default.createDirectory(at: capturesFolder, withIntermediateDirectories: true)
-        _ = PageByPageCapture.write(image, to: captureFile(for: step))
+        _ = ScrollingCapture.write(image, to: captureFile(for: step))
         capturesChanged += 1
     }
 

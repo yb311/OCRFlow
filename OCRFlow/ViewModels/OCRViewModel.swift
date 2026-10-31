@@ -1323,37 +1323,23 @@ final class OCRViewModel {
         }
     }
 
-    /// Captures a document shown on screen page after page, into one
-    /// multi-page file read as one document.
-    func capturePageByPage() {
-        guard !isCapturing else { return }
-        isCapturing = true
-        Task {
-            let capture = PageByPageCapture()
-            let pages = await capture.run()
-            isCapturing = false
-            await receivePages(pages, scrolled: capture.turnedByScrolling)
-        }
-    }
-
     /// Scrolls what the user chooses from top to bottom, into one long
     /// picture read as one document.
     func captureScrolling() {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
-            let pages = await PageByPageCapture().runScrolling()
+            let pages = await ScrollingCapture().run()
             isCapturing = false
-            await receivePages(pages, scrolled: true)
+            await receivePages(pages)
         }
     }
 
-    /// Pages captured one after another, as one document: a long picture when
-    /// they were scrolled through, else a page each.
-    private func receivePages(_ pages: [URL], scrolled: Bool) async {
+    /// Screenfuls scrolled through, as one long picture.
+    private func receivePages(_ pages: [URL]) async {
         guard let folder = pages.first?.deletingLastPathComponent() else { return }
         defer { try? FileManager.default.removeItem(at: folder) }
-        let files = await captureFiles(from: pages, as: scrolled ? .longImage : .document, named: nil)
+        let files = await captureFiles(from: pages, as: .longImage, named: nil)
         guard !files.isEmpty else { return }
         showMainWindow?()
         addCaptures(files)
@@ -1379,7 +1365,7 @@ final class OCRViewModel {
             if let joined {
                 return joined.compactMap { image in
                     let url = newCaptureURL(named: label(String(localized: "Long Screenshot \(date)")), extension: "png")
-                    return PageByPageCapture.write(image, to: url) ? url : nil
+                    return ScrollingCapture.write(image, to: url) ? url : nil
                 }
             }
             // Not one scrolled view after all: pages, then.
@@ -1389,7 +1375,7 @@ final class OCRViewModel {
                 return [copy(pages[0], label(String(localized: "Screenshot \(date)")))].compactMap { $0 }
             }
             let url = newCaptureURL(named: label(String(localized: "Pages \(date)")), extension: "tiff")
-            return PageByPageCapture.assemble(pages, into: url) ? [url] : []
+            return ScrollingCapture.assemble(pages, into: url) ? [url] : []
         }
     }
 

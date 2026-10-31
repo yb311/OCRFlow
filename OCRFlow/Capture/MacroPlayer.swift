@@ -25,10 +25,17 @@ final class MacroPlayer {
     /// run's screenfuls do not fit in memory. The caller removes it.
     let folder = URL.temporaryDirectory.appending(path: "OCRFlow Run \(UUID().uuidString)", directoryHint: .isDirectory)
     private var written = 0
+    /// The size of what each capture step took first: the rest keep it, so
+    /// they can be joined.
+    private var sizes: [UUID: CGSize] = [:]
 
     /// What the capture steps took, as files in `folder`: one list for each
     /// address, or one in all.
-    func run(_ macro: Macro) async -> [[URL]] {
+    ///
+    /// `sizes` are those of pictures the capture steps took before — while
+    /// they were recorded — for the run's to keep.
+    func run(_ macro: Macro, sizes: [UUID: CGSize] = [:]) async -> [[URL]] {
+        self.sizes = sizes
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         guard InputControl.isAllowed(), ScreenCapture.checkAllowed() else { return [] }
         state.name = macro.name
@@ -111,7 +118,7 @@ final class MacroPlayer {
         images.compactMap { image in
             written += 1
             let url = folder.appending(path: String(format: "%04d.png", written))
-            return PageByPageCapture.write(image, to: url) ? url : nil
+            return ScrollingCapture.write(image, to: url) ? url : nil
         }
     }
 
@@ -174,7 +181,9 @@ final class MacroPlayer {
             }
             guard let target else { return nil }
             await settle(target, waitForChange: false)
-            return try? await ScreenCapture.grab(target)
+            guard let image = try? await ScreenCapture.grab(target, like: sizes[step.id]) else { return nil }
+            if sizes[step.id] == nil { sizes[step.id] = CGSize(width: image.width, height: image.height) }
+            return image
 
         case let .wait(seconds):
             let until = Date().addingTimeInterval(seconds)
@@ -324,7 +333,7 @@ final class MacroPlayer {
     /// a page loading, a slide fading in, a scroll gliding to a halt.
     private func settle(_ target: CaptureTarget, waitForChange: Bool = true, longest: Double = 10) async {
         try? await Task.sleep(for: .milliseconds(150))
-        guard var last = await PageByPageCapture.look(at: target) else { return }
+        guard var last = await ScrollingCapture.look(at: target) else { return }
         let deadline = Date().addingTimeInterval(longest)
         if waitForChange {
             // Most steps change something within a second. One that does not
@@ -333,14 +342,14 @@ final class MacroPlayer {
             var changed = false
             while !stopRequested, Date() < changeBy {
                 try? await Task.sleep(for: .milliseconds(150))
-                guard let look = await PageByPageCapture.look(at: target) else { return }
+                guard let look = await ScrollingCapture.look(at: target) else { return }
                 if !look.isSamePage(as: last) { last = look; changed = true; break }
             }
             guard changed else { return }
         }
         while !stopRequested, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(250))
-            guard let look = await PageByPageCapture.look(at: target) else { return }
+            guard let look = await ScrollingCapture.look(at: target) else { return }
             if look.isSamePage(as: last) { return }
             last = look
         }
@@ -350,9 +359,9 @@ final class MacroPlayer {
     /// display.
     private func lookAtScreen(for macro: Macro) async -> PageFingerprint? {
         if let place = macro.steps.lazy.compactMap(\.window).first, let window = ScreenWindows.find(place) {
-            return await PageByPageCapture.look(at: .window(window.id))
+            return await ScrollingCapture.look(at: .window(window.id))
         }
-        return await PageByPageCapture.look(at: ScreenWindows.display(at: NSEvent.mouseLocationInEventCoordinates))
+        return await ScrollingCapture.look(at: ScreenWindows.display(at: NSEvent.mouseLocationInEventCoordinates))
     }
 
     // MARK: - The user

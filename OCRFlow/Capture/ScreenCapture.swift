@@ -48,8 +48,10 @@ enum ScreenCapture {
     }
 
     /// The place as it is now, with no flash and no message if it fails.
-    static func grab(_ target: CaptureTarget, maxWidth: Int? = nil) async throws -> CGImage {
-        try await ScreenGrabber.capture(target, excluding: ownHelperWindows, maxWidth: maxWidth)
+    /// `like` keeps the size of an earlier picture of the same place, for
+    /// pictures to be joined.
+    static func grab(_ target: CaptureTarget, maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
+        try await ScreenGrabber.capture(target, excluding: ownHelperWindows, maxWidth: maxWidth, like: earlier)
     }
 
     /// The floating button and anything else of the app's that floats over

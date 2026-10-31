@@ -117,7 +117,8 @@ struct MacroTests {
         #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
     }
 
-    /// A title bar shades a little as its window comes to the front, and
+    /// A title bar is lighter while its window is in the background — as it
+    /// is for the first picture, taken while choosing what to capture — and
     /// draws a line under itself once something has scrolled beneath it.
     @Test func aTitleBarThatChangesFaintlyStaysPut() throws {
         let page = longPage()
@@ -128,7 +129,7 @@ struct MacroTests {
             let context = context(width: plain.width, height: plain.height)
             context.draw(plain, in: CGRect(x: 0, y: 0, width: plain.width, height: plain.height))
             if index == 0 {
-                context.setFillColor(CGColor(gray: 1, alpha: 0.012))
+                context.setFillColor(CGColor(gray: 1, alpha: 0.3))
                 context.fill(CGRect(x: 0, y: layout.height - layout.header, width: plain.width, height: layout.header))
             } else {
                 context.setFillColor(CGColor(gray: 0, alpha: 1))
@@ -402,7 +403,7 @@ struct MacroTests {
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
         let tiff = folder.appending(path: "Pages.tiff")
-        #expect(PageByPageCapture.assemble((1...3).map { longPage(height: 500, seed: $0) }, into: tiff))
+        #expect(ScrollingCapture.assemble((1...3).map { longPage(height: 500, seed: $0) }, into: tiff))
         let pages = try OCRViewModel.exportOriginal(tiff, into: out)
         let written = try FileManager.default.contentsOfDirectory(atPath: pages.path(percentEncoded: false)).sorted()
         #expect(written == ["Pages 1.png", "Pages 2.png", "Pages 3.png"])
