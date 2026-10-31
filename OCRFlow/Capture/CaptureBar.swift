@@ -51,6 +51,8 @@ final class CaptureBar {
         }, beside: area)
         panels = shades + [catcher, size, bar]
         panels.forEach { $0.orderFrontRegardless() }
+        // Up over the held screen, which can go now.
+        CaptureOverlay.closeLingering()
 
         // The keys come here without OCRFlow coming forward: the bar is a
         // panel that takes the keyboard while another app stays active, as

@@ -6,12 +6,13 @@ enum ScreenCapture {
     /// Holds the screen still and lets the user choose a part of it or a
     /// window. Nil when cancelled, or when it could not be taken — the user
     /// has been told why. The app that was in front is in front again
-    /// afterwards.
-    static func choose() async -> (image: CGImage, target: CaptureTarget)? {
+    /// afterwards. `lingering`: the held screen stays until what comes next
+    /// shows — see `CaptureOverlay.closeLingering()`.
+    static func choose(lingering: Bool = false) async -> (image: CGImage, target: CaptureTarget)? {
         guard isAllowed() else { return nil }
         do {
             let shots = try await ScreenGrabber.displays(excluding: ownHelperWindows)
-            switch await CaptureOverlay.choose(from: shots) {
+            switch await CaptureOverlay.choose(from: shots, lingering: lingering) {
             case nil:
                 return nil
             case let .region(target, image):

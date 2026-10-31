@@ -16,9 +16,13 @@ final class CaptureOverlay {
         case window(CGWindowID)
     }
 
-    /// Nil when the user cancels.
-    static func choose(from shots: [CGDirectDisplayID: CGImage]) async -> Choice? {
+    /// Nil when the user cancels. `lingering`: once something is chosen,
+    /// the held screen stays until `closeLingering()` — or a moment — so
+    /// what comes next can show over it with no flash of the live screen
+    /// between.
+    static func choose(from shots: [CGDirectDisplayID: CGImage], lingering: Bool = false) async -> Choice? {
         let overlay = CaptureOverlay(shots: shots)
+        overlay.lingering = lingering
         current = overlay
         return await withCheckedContinuation { continuation in
             overlay.continuation = continuation
@@ -28,9 +32,22 @@ final class CaptureOverlay {
 
     /// Kept alive while it waits.
     private static var current: CaptureOverlay?
+    /// Still showing after the choice, until what comes next is up.
+    private static var lingeringPanels: [NSPanel] = []
+
+    /// Takes away the held screen kept after a choice.
+    static func closeLingering() {
+        lingeringPanels.forEach { $0.orderOut(nil) }
+        lingeringPanels = []
+    }
 
     private struct Spot {
-        let id: CGWindowID
+        /// Nil for a part of something with no window of its own: the
+        /// Dock's bar of icons.
+        let id: CGWindowID?
+        /// An ordinary window, taken by itself; anything else — the menu
+        /// bar, its icons, the Dock — is cut from the held picture.
+        let ordinary: Bool
         /// In screen coordinates, as `NSScreen.frame` uses.
         let frame: CGRect
     }
@@ -43,6 +60,7 @@ final class CaptureOverlay {
     /// Given back its place once the choice is made: what comes next — the
     /// bar of buttons, a long screenshot, a recording — happens there.
     private var previousApp: NSRunningApplication?
+    private var lingering = false
 
     /// Where a drag started, and the screen it is kept to.
     private var dragStart: (point: NSPoint, screen: NSScreen)?
@@ -56,23 +74,62 @@ final class CaptureOverlay {
         windows = Self.windowsFrontToBack()
     }
 
+    /// Everything that can be picked out by pointing at it, front to back:
+    /// app windows, and the small things over them — the menu bar, its
+    /// icons, the Dock. A see-through layer over a whole display, which
+    /// parts of the system keep in front without drawing in it, is not one;
+    /// what its app shows in it is found through Accessibility instead.
     private static func windowsFrontToBack() -> [Spot] {
         let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
         // Window bounds are measured down from the top of the main display.
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        return list.compactMap { info in
-            // Layer 0 is ordinary app windows: not the menu bar, the Dock or
-            // the desktop.
-            guard info[kCGWindowLayer as String] as? Int == 0,
-                  info[kCGWindowOwnerPID as String] as? pid_t != ownPID,
+        let displays = NSScreen.screens.map(\.frame)
+        var spots: [Spot] = []
+        var overlaysOf: [pid_t] = []
+        for info in list {
+            guard let layer = info[kCGWindowLayer as String] as? Int, layer < 1000,
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID,
                   (info[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   let id = info[kCGWindowNumber as String] as? CGWindowID,
                   let bounds = info[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: bounds),
-                  rect.width >= 40, rect.height >= 40 else { return nil }
-            return Spot(id: id, frame: CGRect(x: rect.minX, y: top - rect.maxY, width: rect.width, height: rect.height))
+                  rect.width >= 4, rect.height >= 4 else { continue }
+            let frame = CGRect(x: rect.minX, y: top - rect.maxY, width: rect.width, height: rect.height)
+            if layer != 0, displays.contains(where: { frame.intersection($0).width * frame.intersection($0).height
+                                                        >= $0.width * $0.height * 0.9 }) {
+                overlaysOf.append(pid)
+                continue
+            }
+            spots.append(Spot(id: id, ordinary: layer == 0, frame: frame))
+        }
+        // In front of the windows, as they are on screen.
+        let parts = overlaysOf.flatMap { accessibleParts(of: $0, top: top, displays: displays) }
+        return parts + spots
+    }
+
+    /// The top-level parts an app shows, as Accessibility reports them —
+    /// for an app that draws in a layer over the whole screen, the Dock.
+    private static func accessibleParts(of pid: pid_t, top: CGFloat, displays: [CGRect]) -> [Spot] {
+        guard AXIsProcessTrusted() else { return [] }
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.2)
+        var children: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXChildrenAttribute as CFString, &children) == .success,
+              let elements = children as? [AXUIElement] else { return [] }
+        return elements.compactMap { element in
+            var position: CFTypeRef?, size: CFTypeRef?
+            var origin = CGPoint.zero, extent = CGSize.zero
+            guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position) == .success,
+                  AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size) == .success,
+                  let position, let size,
+                  AXValueGetValue(position as! AXValue, .cgPoint, &origin),
+                  AXValueGetValue(size as! AXValue, .cgSize, &extent),
+                  extent.width >= 4, extent.height >= 4 else { return nil }
+            let frame = CGRect(x: origin.x, y: top - origin.y - extent.height, width: extent.width, height: extent.height)
+            guard !displays.contains(where: { frame.width * frame.height >= $0.width * $0.height * 0.9 }) else { return nil }
+            return Spot(id: nil, ordinary: false, frame: frame)
         }
     }
 
@@ -98,7 +155,7 @@ final class CaptureOverlay {
         first.makeMain()
         NSApp.activate()
         NSCursor.crosshair.push()
-        pointerMoved(to: pointer)
+        redraw()
     }
 
     private func finish(_ choice: Choice?) {
@@ -106,7 +163,17 @@ final class CaptureOverlay {
         self.continuation = nil
         NSCursor.pop()
         previousApp?.activate()
-        for panel in panels { panel.orderOut(nil) }
+        if choice != nil, lingering {
+            // Kept until what comes next is up — or a moment, at most.
+            let held = panels.map { $0 as NSPanel }
+            Self.lingeringPanels = held
+            Task {
+                try? await Task.sleep(for: .milliseconds(500))
+                if Self.lingeringPanels.first === held.first { Self.closeLingering() }
+            }
+        } else {
+            for panel in panels { panel.orderOut(nil) }
+        }
         panels.removeAll()
         Self.current = nil
         continuation.resume(returning: choice)
@@ -118,6 +185,8 @@ final class CaptureOverlay {
 
     // MARK: - Events
 
+    /// Nothing is picked out before the pointer first moves: the whole
+    /// screen is dimmed, as on being asked to choose.
     fileprivate func pointerMoved(to pointer: NSPoint) {
         guard dragStart == nil else { return }
         highlight = windows.first { NSMouseInRect(pointer, $0.frame, false) }?.frame
@@ -154,8 +223,14 @@ final class CaptureOverlay {
         // Big enough to hold any text; anything smaller was meant as a click.
         if let dragged, dragged.width >= 4, dragged.height >= 4 {
             finish(region(dragged.integral, on: start.screen))
-        } else if let window = windows.first(where: { NSMouseInRect(start.point, $0.frame, false) }) {
-            finish(.window(window.id))
+        } else if let spot = windows.first(where: { NSMouseInRect(start.point, $0.frame, false) }) {
+            // A window by itself; the menu bar, the Dock and the like as
+            // they were on the held screen.
+            if spot.ordinary, let id = spot.id {
+                finish(.window(id))
+            } else {
+                finish(region(spot.frame.intersection(start.screen.frame).integral, on: start.screen))
+            }
         } else {
             finish(region(start.screen.frame, on: start.screen))
         }
@@ -270,8 +345,11 @@ private final class OverlayMarks: NSView {
 
         // What a release would take — the area dragged out, or the window
         // under the pointer — stands out bright; everything else, on every
-        // screen, is dimmed.
-        guard let chosen = overlay.selection ?? overlay.highlight else { return }
+        // screen, is dimmed. Before the pointer has moved, all of it is.
+        guard let chosen = overlay.selection ?? overlay.highlight else {
+            CaptureShade.draw(in: bounds, around: .null)
+            return
+        }
         let cut = local(chosen)
         CaptureShade.draw(in: bounds, around: cut)
         guard cut.intersects(bounds) else { return }

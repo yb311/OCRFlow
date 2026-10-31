@@ -1284,7 +1284,13 @@ final class OCRViewModel {
         isCapturing = true
         Task {
             defer { isCapturing = false }
-            guard let taken = await ScreenCapture.choose(), let area = ScreenCapture.frame(of: taken.target) else { return }
+            // The held screen stays until the bar is up over it: no flash of
+            // the live screen between the two.
+            guard let taken = await ScreenCapture.choose(lingering: true),
+                  let area = ScreenCapture.frame(of: taken.target) else {
+                CaptureOverlay.closeLingering()
+                return
+            }
             var images = [taken.image]
             var finish = await CaptureBar.choose(around: area)
             if finish == .longCapture {
