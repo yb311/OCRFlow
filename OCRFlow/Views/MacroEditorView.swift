@@ -115,10 +115,21 @@ private struct MacroDetailView: View {
             }
 
             Section {
-                TextField("Addresses", text: urls, prompt: Text(verbatim: "https://example.com/first\nhttps://example.com/second"),
-                          axis: .vertical)
-                    .lineLimit(3...8)
-                    .labelsHidden()
+                // A text editor, not a field: Return starts the next address
+                // rather than ending the editing.
+                TextEditor(text: urls)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 72, maxHeight: 160)
+                    .overlay(alignment: .topLeading) {
+                        if macro.urls.allSatisfy({ $0.isEmpty }) {
+                            Text(verbatim: "https://example.com/first\nhttps://example.com/second")
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityLabel(Text("Addresses"))
             } header: {
                 Text("Pages to Open")
             } footer: {
