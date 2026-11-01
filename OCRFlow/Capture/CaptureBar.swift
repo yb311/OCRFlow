@@ -185,6 +185,35 @@ enum CaptureMarks {
         return frame
     }
 
+    /// A long screenshot's own controls, beside the area on whichever side
+    /// has more room: the button that scrolls for the user on top, what has
+    /// been joined under it, one column — the same left edge, the same
+    /// width — its top level with the area's. Nothing goes over the area,
+    /// where the pointer and the wheel are the user's, unless the screen
+    /// has no room beside it.
+    ///
+    /// `screen` is the visible part of the screen the area is on.
+    static func scrollColumnFrames(for area: CGRect, on screen: CGRect,
+                                   buttonHeight: CGFloat) -> (button: CGRect, preview: CGRect) {
+        let gap: CGFloat = 8, spacing: CGFloat = 8
+        let room = (left: area.minX - screen.minX - 2 * gap, right: screen.maxX - area.maxX - 2 * gap)
+        let right = room.right >= room.left
+        // As wide as the preview needs to be read; narrower only for want of
+        // room, never so narrow that the button's name no longer fits.
+        let width = min(columnWidth, max(minimumColumnWidth, right ? room.right : room.left))
+        let x = right ? min(area.maxX + gap, screen.maxX - gap - width) : max(area.minX - gap - width, screen.minX + gap)
+        let top = min(area.maxY, screen.maxY - gap)
+        let button = CGRect(x: x, y: top - buttonHeight, width: width, height: buttonHeight)
+        let bottom = max(area.minY, screen.minY + gap)
+        let previewHeight = max(button.minY - spacing - bottom, minimumPreviewHeight)
+        let preview = CGRect(x: x, y: button.minY - spacing - previewHeight, width: width, height: previewHeight)
+        return (button, preview)
+    }
+
+    static let columnWidth: CGFloat = 240
+    static let minimumColumnWidth: CGFloat = 140
+    static let minimumPreviewHeight: CGFloat = 80
+
     static func bar(_ content: some View, beside area: CGRect) -> NSPanel {
         let host = FirstMouseHostingView(rootView: content)
         let text = sizeText(for: area).size(withAttributes: [.font: sizeFont])
@@ -201,6 +230,11 @@ enum CaptureMarks {
         let center = CGPoint(x: area.midX, y: area.midY)
         return (NSScreen.screens.first { NSMouseInRect(center, $0.frame, false) }
             ?? NSScreen.screens.first { $0.frame.intersects(area) } ?? NSScreen.main ?? NSScreen.screens[0]).frame
+    }
+
+    /// Pixels a point, on the screen the area is on.
+    static func backingScale(for area: CGRect) -> CGFloat {
+        (NSScreen.screens.first { $0.frame.intersects(area) } ?? NSScreen.main)?.backingScaleFactor ?? 2
     }
 
     static func screenFrame(for area: CGRect) -> CGRect {

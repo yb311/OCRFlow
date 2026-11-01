@@ -26,7 +26,7 @@ final class ScrollingCapture {
     private var escapeMonitor: Any?
     private var takeoverMonitor: Any?
     private var finish: CaptureFinish?
-    private let stitcher = LiveStitcher()
+    private var stitcher = LiveStitcher()
     private var stream: FrameStream?
     private var scroller: SmoothScroller?
     private var lastGrowth = ContinuousClock.now
@@ -39,11 +39,18 @@ final class ScrollingCapture {
     /// picture, in parts when very long, and what was picked; nothing when
     /// cancelled.
     func run(_ target: CaptureTarget, first: CGImage,
-             finishes: [CaptureFinish] = [.cancel, .recognize, .save, .copy]) async -> (parts: [CGImage], finish: CaptureFinish) {
+             finishes: [CaptureFinish] = [.recognize, .cancel, .save, .copy]) async -> (parts: [CGImage], finish: CaptureFinish) {
         guard InputControl.isAllowed(), let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
-        state.head = LiveStitcher.scaled(first, toWidth: LiveStitcher.previewWidth)
         state.onAutomatic = { [weak self] in self?.toggleAutomatic(target, in: frame) }
-        showPanels(around: frame, finishes: finishes)
+        state.pixelsPerPoint = CGFloat(first.width) / max(frame.width, 1)
+        state.update(width: first.width, height: first.height)
+        let previewPanel = showPanels(around: frame, finishes: finishes)
+        // Drawn at the preview's size in the screen's own pixels, so it is
+        // as sharp as anything else on it.
+        let previewWidth = Int((previewPanel.width * CaptureMarks.backingScale(for: frame)).rounded())
+        stitcher = LiveStitcher(previewWidth: previewWidth)
+        state.previewWidth = previewWidth
+        state.head = LiveStitcher.scaled(first, toWidth: previewWidth)
         watchForEscape()
         defer {
             stopWatchingForEscape()
@@ -57,8 +64,11 @@ final class ScrollingCapture {
         // done: at the end of the page nothing more comes in, and it waits.
         while finish == nil {
             try? await Task.sleep(for: .milliseconds(50))
-            // The user took the pointer back.
-            if scroller?.isDone == true { stopAutomatic() }
+            // The user took the pointer back; or at the end of the page,
+            // nothing more comes in.
+            if scroller?.isDone == true || (state.automatic && ContinuousClock.now - lastGrowth > Self.endAfter) {
+                stopAutomatic()
+            }
             if grown > Self.heightLimit { finish = .copy }
         }
         stopAutomatic()
@@ -97,7 +107,7 @@ final class ScrollingCapture {
         let stitcher = self.stitcher
         let stream = FrameStream { [weak self] image in
             let outcome = stitcher.add(image)
-            let taken = stitcher.taken
+            let size = (stitcher.width, stitcher.height + stitcher.grown)
             // What came into view, small, for the preview to grow by; and,
             // the first time, the head it grows under, now that the bar at
             // the bottom that stays put is known.
@@ -106,7 +116,7 @@ final class ScrollingCapture {
                 slice = stitcher.previewSlices.last
                 if stitcher.previewSlices.count == 1 { head = stitcher.previewHead() }
             }
-            Task { @MainActor in self?.took(outcome, taken: taken, slice: slice, head: head) }
+            Task { @MainActor in self?.took(outcome, size: size, slice: slice, head: head) }
         }
         do {
             try await stream.start(target, size: size)
@@ -118,8 +128,8 @@ final class ScrollingCapture {
         return true
     }
 
-    private func took(_ outcome: LiveStitcher.Outcome, taken: Int, slice: CGImage?, head: CGImage?) {
-        state.pages = taken
+    private func took(_ outcome: LiveStitcher.Outcome, size: (width: Int, height: Int), slice: CGImage?, head: CGImage?) {
+        state.update(width: size.width, height: size.height)
         if let head { state.head = head }
         if let slice { state.grow(by: slice) }
         switch outcome {
@@ -216,13 +226,6 @@ final class ScrollingCapture {
 
     // MARK: - Files
 
-    static func write(_ image: CGImage, to url: URL) -> Bool {
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
-        else { return false }
-        CGImageDestinationAddImage(destination, image, nil)
-        return CGImageDestinationFinalize(destination)
-    }
-
     /// One multi-page TIFF, which is read as one document: one result, one
     /// export, one searchable PDF. Each page keeps its full resolution.
     nonisolated static func assemble(_ images: [CGImage], into url: URL) -> Bool {
@@ -250,7 +253,8 @@ final class ScrollingCapture {
 
     // MARK: - On screen
 
-    private func showPanels(around area: CGRect, finishes: [CaptureFinish]) {
+    /// The preview's frame.
+    private func showPanels(around area: CGRect, finishes: [CaptureFinish]) -> CGRect {
         // As while choosing: the rest dimmed. The wheel goes through.
         let shades = CaptureMarks.shades(around: area)
         let size = CaptureMarks.sizeLabel(for: area)
@@ -258,26 +262,25 @@ final class ScrollingCapture {
             self?.finish = picked
         }, beside: area)
 
-        // Beside it, on whichever side has more room, the button that
-        // scrolls for the user and under it what has been joined. Nothing is
-        // over the area: there the pointer and the wheel are the user's.
-        let screen = CaptureMarks.screenFrame(for: area)
-        let width = min(max(area.width * 0.6, 160), 320)
-        let right = screen.maxX - area.maxX >= area.minX - screen.minX
-        let x = right ? min(area.maxX + 12, screen.maxX - width) : max(area.minX - 12 - width, screen.minX)
+        // Beside it, the button that scrolls for the user and under it what
+        // has been joined.
         let buttonHost = FirstMouseHostingView(rootView: AutoScrollButton(state: state))
-        let buttonHeight = buttonHost.fittingSize.height
-        // As wide as the column, so the longer "Stop Scrolling" fits too.
-        let button = CaptureMarks.panel(CGRect(x: x, y: area.maxY - buttonHeight, width: width, height: buttonHeight))
+        let column = CaptureMarks.scrollColumnFrames(for: area, on: CaptureMarks.screenFrame(for: area),
+                                                     buttonHeight: buttonHost.fittingSize.height)
+        // The panels keep the frames given here, whatever the content would
+        // rather be: the button fills the column, whichever name it shows.
+        buttonHost.sizingOptions = []
+        let button = CaptureMarks.panel(column.button)
         button.contentView = buttonHost
-        let previewHeight = max(area.height - buttonHeight - 8, 80)
-        let preview = CaptureMarks.panel(CGRect(x: x, y: area.maxY - buttonHeight - 8 - previewHeight,
-                                                width: width, height: previewHeight))
+        let previewHost = NSHostingView(rootView: JoinedPreview(state: state))
+        previewHost.sizingOptions = []
+        let preview = CaptureMarks.panel(column.preview)
         preview.ignoresMouseEvents = true
-        preview.contentView = NSHostingView(rootView: JoinedPreview(state: state))
+        preview.contentView = previewHost
 
         panels = shades + [size, preview, button, bar]
         panels.forEach { $0.orderFrontRegardless() }
+        return column.preview
     }
 
     /// Escape lets it go, from any app. Only the user's own: OCRFlow's
@@ -423,8 +426,11 @@ final class SmoothScroller: NSObject, @unchecked Sendable {
 @MainActor
 @Observable
 private final class ScrollRunState {
-    /// Captured so far.
-    var pages = 1
+    /// The long picture so far, in points, as the size label gives an area.
+    private(set) var size = ""
+    @ObservationIgnored var pixelsPerPoint: CGFloat = 1
+    /// Of the pictures the preview is made of, in pixels.
+    @ObservationIgnored var previewWidth = 1
     /// OCRFlow scrolling, rather than the user.
     var automatic = false
     /// What has been joined, small: the first frame, then each strip that
@@ -469,6 +475,12 @@ private final class ScrollRunState {
         }
     }
 
+    func update(width: Int, height: Int) {
+        let text = CaptureMarks.sizeText(for: CGRect(x: 0, y: 0, width: CGFloat(width) / pixelsPerPoint,
+                                                     height: CGFloat(height) / pixelsPerPoint))
+        if text != size { size = text }
+    }
+
     private func add(_ image: CGImage) {
         strips.append(Strip(id: count, image: image))
         count += 1
@@ -489,8 +501,10 @@ private struct AutoScrollButton: View {
                   systemImage: state.automatic ? "pause.fill" : "arrow.down")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
                 .background(.black.opacity(0.78), in: Capsule())
                 .contentShape(Capsule())
         }
@@ -510,7 +524,7 @@ private struct JoinedPreview: View {
         VStack(spacing: 6) {
             GeometryReader { space in
                 let width = space.size.width
-                let grown = CGFloat(state.grown) * width / CGFloat(LiveStitcher.previewWidth)
+                let grown = CGFloat(state.grown) * width / CGFloat(state.previewWidth)
                 VStack(spacing: 0) {
                     if let head = state.head { picture(head, width: width) }
                     ForEach(state.strips) { picture($0.image, width: width) }
@@ -521,9 +535,9 @@ private struct JoinedPreview: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
             }
-            Text(state.lost ? "Too fast: scroll back a little, then on more slowly"
-                            : "\(state.pages) captured")
-                .font(.caption)
+            // The size so far, as the size label gives an area.
+            (state.lost ? Text("Too fast: scroll back a little, then on more slowly") : Text(verbatim: state.size))
+                .font(state.lost ? .caption : Font(CaptureMarks.sizeFont))
                 .foregroundStyle(state.lost ? Color.orange : Color.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)

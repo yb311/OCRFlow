@@ -19,8 +19,9 @@ final class LiveStitcher: @unchecked Sendable {
         case lost
     }
 
-    /// Width of the picture shown while it grows.
-    static let previewWidth = 240
+    /// Width, in pixels, of the picture shown while it grows; nil when none
+    /// is shown.
+    let previewWidth: Int?
 
     private var first: CGImage?
     private var firstGray: ScrollStitcher.Gray?
@@ -34,7 +35,6 @@ final class LiveStitcher: @unchecked Sendable {
     private var slices: [CGImage] = []
     /// The same, small, for showing while it grows.
     private(set) var previewSlices: [CGImage] = []
-    private var moving: [Bool] = []
     /// Rows at the bottom see-through at the sides: a window's rounded
     /// corners, which stay put as a bar at the bottom does.
     private var corners = 0
@@ -45,6 +45,10 @@ final class LiveStitcher: @unchecked Sendable {
     var width: Int { first?.width ?? 0 }
     var height: Int { first?.height ?? 0 }
 
+    init(previewWidth: Int? = nil) {
+        self.previewWidth = previewWidth
+    }
+
     func add(_ frame: CGImage) -> Outcome {
         guard let first, let lastGray else {
             let copy = Self.copy(frame) ?? frame
@@ -53,7 +57,6 @@ final class LiveStitcher: @unchecked Sendable {
             let gray = ScrollStitcher.Gray(copy)
             firstGray = gray
             lastGray = gray
-            moving = Array(repeating: false, count: copy.width)
             taken = 1
             return .grew(by: 0)
         }
@@ -71,15 +74,30 @@ final class LiveStitcher: @unchecked Sendable {
         if shift == nil {
             shift = ScrollStitcher.shift(from: lastGray, to: gray, top: edges.top, bottom: edges.bottom, near: lastShift)
         }
-        guard let shift else { return .lost }
+        guard let shift else {
+            // Over the whole frame until the bars that stay put are known:
+            // a change in place leaves the rows above and below it alike,
+            // which would pass for such bars.
+            let fixed = self.edges ?? (0, 0)
+            guard ScrollStitcher.changedInPlace(from: lastGray, to: gray, top: fixed.top, bottom: fixed.bottom)
+            else { return .lost }
+            // Changed, not scrolled — its window came to the front, say, as
+            // the capture began: carried on from as it looks now, and begun
+            // from it while nothing has been joined.
+            self.lastGray = gray
+            if grown == 0, let copy = Self.copy(frame) {
+                self.first = copy
+                firstGray = gray
+            }
+            return .unchanged
+        }
         guard shift > 0 else { return .unchanged }
 
         if self.edges == nil { self.edges = edges }
-        ScrollStitcher.markMovingColumns(from: lastGray, to: gray, in: &moving)
         let end = height - edges.bottom
         guard let slice = Self.copy(frame, rows: (end - shift)..<end) else { return .lost }
         slices.append(slice)
-        if let small = Self.scaled(slice, toWidth: Self.previewWidth) { previewSlices.append(small) }
+        if let previewWidth, let small = Self.scaled(slice, toWidth: previewWidth) { previewSlices.append(small) }
         grown += shift
         taken += 1
         if edges.bottom > 0 { foot = Self.copy(frame, rows: end..<height) }
@@ -91,14 +109,15 @@ final class LiveStitcher: @unchecked Sendable {
     /// The first frame, small, down to the bottom bar that stays put — what
     /// the rest is shown joined under.
     func previewHead() -> CGImage? {
-        guard let first else { return nil }
+        guard let first, let previewWidth else { return nil }
         let end = height - (edges?.bottom ?? 0)
-        return Self.copy(first, rows: 0..<end).flatMap { Self.scaled($0, toWidth: Self.previewWidth) }
+        return Self.copy(first, rows: 0..<end).flatMap { Self.scaled($0, toWidth: previewWidth) }
     }
 
     /// The finished picture — in parts, each no taller than `maxHeight`,
-    /// when it is very long — without columns beside the scrolling part
-    /// that stayed put.
+    /// when it is very long — as wide as the frames: the user chose the
+    /// area, and all of it is kept, whether or not each column changed as
+    /// it scrolled (the first letters of lines that all begin alike do not).
     func finish(maxHeight: Int = ScrollStitcher.maxHeight) -> [CGImage] {
         guard let first else { return [] }
         let edges = edges ?? (0, 0)
@@ -108,7 +127,6 @@ final class LiveStitcher: @unchecked Sendable {
         pieces += slices
         if edges.bottom > 0, let foot = foot ?? Self.copy(first, rows: end..<height) { pieces.append(foot) }
 
-        let span = ScrollStitcher.columns(moving).flatMap { $0.count < width * 9 / 10 ? $0 : nil } ?? 0..<width
         // Into parts; each after the first starts with the header again.
         var parts: [[CGImage]] = [[]]
         var partHeight = 0
@@ -121,7 +139,7 @@ final class LiveStitcher: @unchecked Sendable {
             parts[parts.count - 1].append(piece)
             partHeight += piece.height
         }
-        return parts.compactMap { Self.stack($0, columns: span) }
+        return parts.compactMap { Self.stack($0) }
     }
 
     // MARK: - Pictures

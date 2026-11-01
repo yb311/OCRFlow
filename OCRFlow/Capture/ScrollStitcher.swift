@@ -333,6 +333,20 @@ enum ScrollStitcher {
         return chosen.shift
     }
 
+    /// Whether `b` is `a` changed where it is rather than scrolled: most of
+    /// the rows with something on them are just as they were. A window
+    /// coming to the front redraws its selection and title in other
+    /// colours; a page scrolled too far at once has other lines in every
+    /// place.
+    static func changedInPlace(from a: Gray, to b: Gray, top: Int, bottom: Int) -> Bool {
+        var busy = 0, same = 0
+        for row in top..<(a.height - bottom) where a.busy[row] || b.busy[row] {
+            busy += 1
+            if a.difference(row: row, from: b, row: row) <= 12 { same += 1 }
+        }
+        return busy > 0 && same * 2 >= busy
+    }
+
     // MARK: - Drawing
 
     /// Rows of one of the pictures.

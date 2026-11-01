@@ -193,6 +193,54 @@ struct MacroTests {
         #expect(differing == 0)
     }
 
+    /// As wide as the area chosen, every column of it: here a margin down
+    /// the left that never changes as the page scrolls past it.
+    @Test func keepsTheWholeWidthChosen() throws {
+        let page = longPage()
+        let layout = Layout()
+        let margin = 60
+        func framed(_ offset: Int) -> CGImage {
+            let inner = frame(of: page, at: offset, layout)
+            let context = context(width: margin + inner.width, height: inner.height)
+            context.setFillColor(CGColor(gray: 0.9, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: margin, height: inner.height))
+            context.draw(inner, in: CGRect(x: margin, y: 0, width: inner.width, height: inner.height))
+            return context.makeImage()!
+        }
+        let stitcher = LiveStitcher()
+        let offsets = Array(stride(from: 0, through: 600, by: 12))
+        for offset in offsets { _ = stitcher.add(framed(offset)) }
+        let long = try #require(stitcher.finish().first)
+        #expect(long.width == margin + layout.width)
+        #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
+    }
+
+    /// The view redrawn where it is before anything scrolls — its window
+    /// coming to the front as the capture begins: not "too fast", and the
+    /// picture begins from it as it looks now.
+    @Test func aChangeInPlaceIsNotAScrollTooFar() throws {
+        let page = longPage()
+        let layout = Layout()
+        // A selection on the page, in another colour once its window is
+        // in front.
+        let selected = context(width: page.width, height: page.height)
+        selected.draw(page, in: CGRect(x: 0, y: 0, width: page.width, height: page.height))
+        selected.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 1, alpha: 0.5))
+        selected.fill(CGRect(x: 0, y: page.height - 230, width: page.width, height: 30))
+        let front = selected.makeImage()!
+
+        let stitcher = LiveStitcher()
+        var outcomes = [stitcher.add(frame(of: page, at: 0, layout))]
+        for offset in stride(from: 0, through: 400, by: 20) { outcomes.append(stitcher.add(frame(of: front, at: offset, layout))) }
+        #expect(outcomes[1] == .unchanged)
+        #expect(!outcomes.contains(.lost))
+        let long = try #require(stitcher.finish().first)
+        let expected = expectedLong(front, to: 400, layout, frame: frame(of: front, at: 0, layout))
+        #expect(long.height == expected.height)
+        let differing = zip(pixels(long), pixels(expected)).filter { abs(Int($0) - Int($1)) > 2 }.count
+        #expect(differing == 0)
+    }
+
     /// A window's rounded corners, see-through, at the bottom of each frame:
     /// at the bottom of the picture once, not brought along by every strip.
     @Test func aWindowsRoundedCornersAreNotJoinedOnDownItsSides() throws {
@@ -414,6 +462,29 @@ struct MacroTests {
         #expect(steps.first?.action == .capture(area))
     }
 
+    /// In Stage Manager the window server lists a window in the strip at
+    /// the side as it is drawn there, a thumbnail, under the same title —
+    /// and before the real one. The one the size it was recorded at is the
+    /// window the steps happened in.
+    @Test func theWindowWithItsTitleAndSizeIsTheOne() {
+        func window(_ id: CGWindowID, _ title: String?, _ frame: CGRect) -> ScreenWindow {
+            ScreenWindow(id: id, pid: 1, appName: "Notes", title: title, frame: frame, layer: 0)
+        }
+        let place = WindowPlace(bundleID: "com.apple.Notes", appName: "Notes", title: "Draft",
+                                frame: CGRect(x: 200, y: 100, width: 900, height: 700))
+        let thumbnail = window(1, "Draft", CGRect(x: 8, y: 300, width: 81, height: 101))
+        let real = window(2, "Draft", CGRect(x: 240, y: 90, width: 900, height: 700))
+        let other = window(3, "Other", CGRect(x: 200, y: 100, width: 900, height: 700))
+        #expect(ScreenWindows.pick([thumbnail, other, real], for: place)?.id == 2)
+        // Only the thumbnail: that, to be brought forward.
+        #expect(ScreenWindows.pick([thumbnail, other], for: place)?.id == 1)
+        // No title to go by: the one its size, else the frontmost.
+        var untitled = place
+        untitled.title = nil
+        #expect(ScreenWindows.pick([thumbnail, other], for: untitled)?.id == 3)
+        #expect(ScreenWindows.pick([thumbnail], for: untitled)?.id == 1)
+    }
+
     @Test func aMacroIsKeptAsItWas() throws {
         var macro = Macro(name: "Deck", steps: MacroStepBuilder.steps(from: [
             input(.capture(CaptureArea(rect: nil))),
@@ -479,7 +550,7 @@ struct MacroTests {
         let capture = MacroStep(action: .capture(CaptureArea(rect: nil)))
         let key = MacroStep(action: .key(MacroStep.Key(keyCode: 124)))
         library.macros = [Macro(name: "Deck", steps: [capture, key])]
-        library.keep(longPage(height: 600), for: capture.id)
+        library.keep(longPage(height: 600), for: capture.id, pixelsPerPoint: 2)
         #expect(library.recordedCaptures(of: library.macros[0]).count == 1)
 
         // Kept across launches.
@@ -495,7 +566,7 @@ struct MacroTests {
         let library = MacroLibrary(directory: folder)
         let capture = MacroStep(action: .capture(CaptureArea(rect: nil)))
         library.macros = [Macro(name: "Deck", steps: [capture])]
-        library.keep(longPage(height: 600), for: capture.id)
+        library.keep(longPage(height: 600), for: capture.id, pixelsPerPoint: 2)
         library.discardRecordedCaptures(of: library.macros[0])
         #expect(library.recordedCaptures(of: library.macros[0]).isEmpty)
         #expect(library.macros[0].steps.count == 1)
