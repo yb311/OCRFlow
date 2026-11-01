@@ -36,6 +36,8 @@ final class FloatingCaptureButton {
     private var watchTask: Task<Void, Never>?
     /// Where the main button rests, whatever the panel's size.
     private var resting: NSRect = .zero
+    /// The others are out, or opening.
+    private var isOpen = false
 
     init(model: OCRViewModel) {
         state = FloatingButtonState(model: model)
@@ -58,7 +60,6 @@ final class FloatingCaptureButton {
             state: state,
             queue: { [weak model] in model?.queueScreenshots() },
             record: { [weak model] in model?.recordMacro() }))
-        extras.isHidden = true
         let container = NSView(frame: NSRect(x: 0, y: 0, width: Self.side, height: Self.side))
         container.addSubview(extras)
         container.addSubview(button)
@@ -99,18 +100,15 @@ final class FloatingCaptureButton {
     // MARK: - Opening out
 
     private func expand() {
-        guard extras.isHidden, !state.dragging else { return }
-        let screen = (NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
-        state.upward = resting.minY - Self.extrasHeight < screen.minY
-        state.trailing = resting.midX > screen.midX
-        layOut(open: true)
-        extras.layoutSubtreeIfNeeded()
-        // Laid out closed at the new size first, then opened on a later
-        // pass: the buttons spring straight out of the main one, rather than
-        // sliding in from the side as the panel widens.
+        guard !isOpen, !state.dragging else { return }
+        orient()
+        isOpen = true
+        layOut()
+        // Shown closed where they will open first, then opened on a later
+        // pass: they spring straight out of the main button, up or down.
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(16))
-            guard let self, !self.extras.isHidden, !self.state.dragging else { return }
+            guard let self, self.isOpen, !self.state.dragging else { return }
             self.state.expanded = true
         }
         watchPointer()
@@ -118,36 +116,53 @@ final class FloatingCaptureButton {
 
     private func collapse() {
         watchTask?.cancel()
-        guard state.expanded || !extras.isHidden else { return }
+        guard isOpen else { return }
+        isOpen = false
         state.expanded = false
         state.hoveredExtra = nil
-        layOut(open: false)
+        layOut()
+    }
+
+    /// Which way they open: down, or up near the bottom of the screen; their
+    /// names on the side away from the edge. Settled while they are closed,
+    /// so the change is never seen.
+    private func orient() {
+        let screen = (NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        let upward = resting.minY - Self.extrasHeight < screen.minY
+        let trailing = resting.midX > screen.midX
+        if state.upward != upward { state.upward = upward }
+        if state.trailing != trailing { state.trailing = trailing }
     }
 
     /// Rests the main button at `frame`.
     private func rest(at frame: NSRect) {
         resting = frame
-        layOut(open: !extras.isHidden)
+        if !isOpen { orient() }
+        layOut()
     }
 
-    /// The panel around the main button: just the button, or, `open`, with
-    /// the others and room for their names on the side away from the edge.
-    private func layOut(open: Bool) {
-        guard open else {
-            extras.isHidden = true
-            button.frame = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
-            panel.setFrame(resting, display: true)
-            return
+    /// The panel around the main button: just the button, or, open, with
+    /// the others and room for their names.
+    ///
+    /// What holds the others keeps one size, open or closed — closed, it
+    /// lies outside the panel, unseen — so nothing in it is laid out again
+    /// as they open, and nothing slides sideways. All is placed before
+    /// anything is drawn.
+    private func layOut() {
+        let size = NSSize(width: Self.side + Self.labelRoom, height: Self.side + Self.extrasHeight)
+        // The main button's place among the others.
+        let mainAt = NSPoint(x: state.trailing ? Self.labelRoom : 0, y: state.upward ? 0 : Self.extrasHeight)
+        let frame = isOpen ? NSRect(x: resting.minX - mainAt.x, y: resting.minY - mainAt.y, width: size.width, height: size.height)
+            : resting
+        let buttonAt = NSPoint(x: resting.minX - frame.minX, y: resting.minY - frame.minY)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            context.allowsImplicitAnimation = false
+            panel.setFrame(frame, display: false)
+            button.frame = NSRect(origin: buttonAt, size: NSSize(width: Self.side, height: Self.side))
+            extras.frame = NSRect(origin: NSPoint(x: buttonAt.x - mainAt.x, y: buttonAt.y - mainAt.y), size: size)
         }
-        let width = Self.side + Self.labelRoom
-        let height = Self.side + Self.extrasHeight
-        let x = state.trailing ? resting.minX - Self.labelRoom : resting.minX
-        let y = state.upward ? resting.minY : resting.minY - Self.extrasHeight
-        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
-        button.frame = NSRect(x: state.trailing ? Self.labelRoom : 0, y: state.upward ? 0 : Self.extrasHeight,
-                              width: Self.side, height: Self.side)
-        extras.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        extras.isHidden = false
+        panel.display()
     }
 
     /// Which button the pointer is on, for its name, and closing once it has
@@ -162,7 +177,7 @@ final class FloatingCaptureButton {
             var away = 0
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(80))
-                guard let self, !self.extras.isHidden else { return }
+                guard let self, self.isOpen else { return }
                 let pointer = NSEvent.mouseLocation
                 let circles = self.circles()
                 self.state.hoveredExtra = circles.dropFirst().firstIndex { $0.insetBy(dx: -3, dy: -3).contains(pointer) }
