@@ -2307,22 +2307,22 @@
         }
       }
     },
-    "Copy All Text" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拷贝所有文本"
-          }
-        }
-      }
-    },
     "Copy Diagnostic Info" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝诊断信息"
+          }
+        }
+      }
+    },
+    "Copy Selected Text" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝所选文本"
           }
         }
       }
@@ -6449,6 +6449,16 @@
         }
       }
     },
+    "Remove the selected files from the list" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从列表中移除所选文件"
+          }
+        }
+      }
+    },
     "Removes extra whitespace at both ends of each line" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7793,6 +7803,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文本检测与识别"
+          }
+        }
+      }
+    },
+    "Text OCRFlow is unsure of, and tables or formulas it couldn't fully read, are listed here once files are recognized." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件识别完成后，OCRFlow 没把握的文字，以及没能完整读出的表格和公式，会列在这里。"
           }
         }
       }

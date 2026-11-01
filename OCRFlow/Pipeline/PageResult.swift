@@ -146,6 +146,19 @@ enum LowConfidence: Hashable, Codable {
     case lines(unsure: Int, of: Int)
     case average(percent: Int)
 
+    /// What casts doubt on a region read as `lines`, if anything: their
+    /// average confidence below `averageBelow`, or a quarter of them below
+    /// `dropScore`. One stray mark read at 0.3 among ten good lines is noise,
+    /// and the drop threshold already removes it; a quarter of the lines
+    /// below it means the region itself is hard to read.
+    static func finding(in lines: [PPTextLine], dropScore: Double, averageBelow: Double) -> LowConfidence? {
+        guard !lines.isEmpty else { return nil }
+        let mean = lines.reduce(0) { $0 + $1.confidence } / Double(lines.count)
+        let unsure = lines.filter { $0.confidence < dropScore }.count
+        if unsure * 4 >= lines.count { return .lines(unsure: unsure, of: lines.count) }
+        return mean < averageBelow ? .average(percent: Int((mean * 100).rounded())) : nil
+    }
+
     var description: String {
         switch self {
         case let .lines(unsure, total):

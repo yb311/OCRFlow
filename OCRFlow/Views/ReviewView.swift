@@ -106,15 +106,26 @@ struct ReviewDetailView: View {
     @State private var choice: Choice = .current
     @State private var pageImage: NSImage?
     @State private var crop: NSImage?
+    /// Whether anything was waiting when review began: done reviewing and
+    /// nothing to review are different news.
+    @State private var hadEntries = false
 
     var body: some View {
         let entries = vm.reviewEntries
         Group {
             if entries.isEmpty {
                 ContentUnavailableView {
-                    Label("All Reviewed", systemImage: "checkmark.circle")
+                    if hadEntries {
+                        Label("All Reviewed", systemImage: "checkmark.circle")
+                    } else {
+                        Label("Nothing to Review", systemImage: "checkmark.circle")
+                    }
                 } description: {
-                    Text("Your corrections are saved in the results and will be included in exports.")
+                    if hadEntries {
+                        Text("Your corrections are saved in the results and will be included in exports.")
+                    } else {
+                        Text("Text OCRFlow is unsure of, and tables or formulas it couldn't fully read, are listed here once files are recognized.")
+                    }
                 } actions: {
                     Button("Back to Workspace") { vm.mode = .workspace }
                         .buttonStyle(.borderedProminent)
@@ -124,8 +135,14 @@ struct ReviewDetailView: View {
                 pane(for: entries[index], at: index, of: entries)
             }
         }
-        .onAppear { settleFocus(entries) }
-        .onChange(of: entries.map(\.id)) { settleFocus(vm.reviewEntries) }
+        .onAppear {
+            hadEntries = !entries.isEmpty
+            settleFocus(entries)
+        }
+        .onChange(of: entries.map(\.id)) {
+            if !vm.reviewEntries.isEmpty { hadEntries = true }
+            settleFocus(vm.reviewEntries)
+        }
     }
 
     private func currentIndex(in entries: [ReviewEntry]) -> Int {

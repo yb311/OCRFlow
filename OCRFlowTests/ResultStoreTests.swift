@@ -20,6 +20,18 @@ final class ResultStoreTests {
         PageResult(size: CGSize(width: 100, height: 50), rawText: text)
     }
 
+    @Test func removingSelectsTheNeighbour() {
+        let ids = (0..<4).map { _ in UUID() }
+        // The one after, when there is one.
+        #expect(OCRViewModel.neighbour(afterRemoving: [ids[1]], from: ids) == ids[2])
+        // At the end of the list, the one before — not the first.
+        #expect(OCRViewModel.neighbour(afterRemoving: [ids[3]], from: ids) == ids[2])
+        #expect(OCRViewModel.neighbour(afterRemoving: [ids[2], ids[3]], from: ids) == ids[1])
+        // Removed on both sides of one that stays.
+        #expect(OCRViewModel.neighbour(afterRemoving: [ids[0], ids[2], ids[3]], from: ids) == ids[1])
+        #expect(OCRViewModel.neighbour(afterRemoving: Set(ids), from: ids) == nil)
+    }
+
     @Test func queueRoundTripsWithResults() {
         var done = ImageItem(url: URL(filePath: "/a/done.png"))
         done.status = .completed

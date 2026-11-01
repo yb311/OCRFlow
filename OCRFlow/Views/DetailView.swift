@@ -33,14 +33,6 @@ struct DetailView: View {
                 Text("\(exportable) recognized")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("Export \(exportable) Files…") { vm.exportSelectedItems() }
-                        .buttonStyle(.borderedProminent)
-                    Button("Copy All Text") { vm.copySelectedText() }
-                        .buttonStyle(.bordered)
-                    Button("Translate \(exportable) Files…") { translating = true }
-                        .buttonStyle(.bordered)
-                }
             }
             if !rerunnable.isEmpty {
                 // Carries a document stopped part-way on from where it got
@@ -51,9 +43,21 @@ struct DetailView: View {
                 .buttonStyle(.bordered)
                 .disabled(vm.isProcessing)
             }
-            Button("Remove Selected Files", role: .destructive) { vm.removeSelectedItems() }
-                .buttonStyle(.bordered)
-                .foregroundStyle(.red)
+            HStack(spacing: 10) {
+                if exportable > 0 {
+                    Button("Export \(exportable) Files…") { vm.exportSelectedItems() }
+                        .buttonStyle(.borderedProminent)
+                    Button("Copy Selected Text") { vm.copySelectedText() }
+                        .buttonStyle(.bordered)
+                    Button("Translate \(exportable) Files…") { translating = true }
+                        .buttonStyle(.bordered)
+                }
+                Button("Remove", role: .destructive) { vm.removeSelectedItems() }
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.red)
+                    .help("Remove the selected files from the list")
+            }
+            .fixedSize()
             Button("Deselect All") { vm.selectedIDs = [] }
                 .buttonStyle(.link)
                 .help("Deselect all files (Esc or ⇧⌘A)")
@@ -274,7 +278,7 @@ struct ItemDetailView: View {
                         .labelStyle(.iconOnly)
                 }
                 .accessibilityAddTraits(vm.showTextBoxes ? .isSelected : [])
-                .buttonStyle(.borderless)
+                .buttonStyle(.accessoryBarAction)
                 .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
                 .help(vm.showTextBoxes
                       ? "Showing every recognized region. Click to outline only the one under the pointer"
@@ -316,7 +320,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Zoom Out", systemImage: "minus.magnifyingglass").labelStyle(.iconOnly)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.accessoryBarAction)
             .keyboardShortcut("-", modifiers: .command)
             .disabled(imageZoom <= Self.minZoom)
             .help("Zoom Out (⌘-)")
@@ -333,7 +337,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.accessoryBarAction)
             .keyboardShortcut("=", modifiers: .command)
             .disabled(imageZoom >= Self.maxZoom)
             .help("Zoom In (⌘+)")
@@ -344,7 +348,7 @@ struct ItemDetailView: View {
                 Label("Fit to Window", systemImage: "arrow.up.left.and.arrow.down.right")
                     .labelStyle(.iconOnly)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.accessoryBarAction)
             .keyboardShortcut("0", modifiers: .command)
             .disabled(imageZoom == 1.0)
             .help("Fit to Window (⌘0)")
@@ -524,7 +528,7 @@ struct ItemDetailView: View {
             .keyboardShortcut(.rightArrow, modifiers: .option)
             .disabled(pageIndex >= pageCount - 1)
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.accessoryBarAction)
         .help("Turn page (⌥← / ⌥→)")
     }
 
@@ -543,7 +547,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Recognize This Page Again", systemImage: "arrow.clockwise").labelStyle(.iconOnly)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.accessoryBarAction)
             .disabled(!vm.canRereadPage(item))
             .help(vm.isProcessing ? "Recognition is in progress. You can recognize this page again once it finishes" : "Recognize this page again; other pages stay as they are")
         }
@@ -572,7 +576,7 @@ struct ItemDetailView: View {
             }
             .keyboardShortcut("g", modifiers: .command)
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.accessoryBarAction)
         .help("“\(searchNeedle)”: match \(matchIndex + 1) of \(searchMatches.count) in this file (⌘G next, ⇧⌘G previous)")
     }
 
@@ -581,6 +585,22 @@ struct ItemDetailView: View {
     private var presentAuxiliaryLabels: [PPLayoutLabel] {
         let present = Set(blocks.map(\.label))
         return PPLayoutLabel.auxiliary.filter(present.contains)
+    }
+
+    /// Where the line or region picked on the page is in the plain text.
+    private var plainTextHighlight: NSRange? {
+        let text = pageText.text
+        switch selection {
+        case let .line(index) where lines.indices.contains(index):
+            let wanted = lines[index].text.trimmingCharacters(in: .whitespaces)
+            let before = lines[..<index].filter { $0.text.trimmingCharacters(in: .whitespaces) == wanted }.count
+            return PlainTextView.range(of: wanted, occurrence: before, in: text)
+        case let .block(index) where blocks.indices.contains(index):
+            let first = blocks[index].text.components(separatedBy: "\n").first ?? ""
+            return PlainTextView.range(of: first.trimmingCharacters(in: .whitespaces), occurrence: 0, in: text)
+        default:
+            return nil
+        }
     }
 
     private var selectedLineIndex: Int? {
@@ -754,7 +774,7 @@ struct ItemDetailView: View {
                         .help("Export only the results for “\(item.fileName)”")
                     }
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.accessoryBarAction)
                 .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12)
@@ -968,14 +988,7 @@ struct ItemDetailView: View {
                                                 blockIndex: source, text: text)
                             })
                     case .plain:
-                        ScrollView {
-                            Text(pageText.text)
-                                .font(.body)
-                                .textSelection(.enabled)
-                                .lineSpacing(4)
-                                .padding(16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                        PlainTextView(text: pageText.text, highlighted: plainTextHighlight)
                     case .translation:
                         TranslationPane(item: item, isTranslating: vm.translatingIDs.contains(item.id))
                     }
@@ -1226,6 +1239,75 @@ struct ItemDetailView: View {
 ///
 /// The boxes are in image-pixel coordinates, so they first have to be mapped
 /// into the letterboxed rectangle that `scaledToFit` actually paints.
+/// The page's text as one selectable document, which shows where the line
+/// picked on the page is: selected, scrolled to, and pointed out the way Find
+/// points out a match.
+struct PlainTextView: NSViewRepresentable {
+    let text: String
+    var highlighted: NSRange?
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.autohidesScrollers = true
+        guard let view = scroll.documentView as? NSTextView else { return scroll }
+        view.isEditable = false
+        view.isSelectable = true
+        view.drawsBackground = false
+        view.textContainerInset = NSSize(width: 12, height: 16)
+        view.isAutomaticLinkDetectionEnabled = false
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let view = scroll.documentView as? NSTextView else { return }
+        if context.coordinator.text != text {
+            context.coordinator.text = text
+            context.coordinator.highlighted = nil
+            let style = NSMutableParagraphStyle()
+            style.lineSpacing = 4
+            view.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [
+                .font: NSFont.preferredFont(forTextStyle: .body),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: style,
+            ]))
+        }
+        guard context.coordinator.highlighted != highlighted else { return }
+        context.coordinator.highlighted = highlighted
+        guard let range = highlighted, NSMaxRange(range) <= (text as NSString).length else {
+            view.setSelectedRange(NSRange(location: view.selectedRange().location, length: 0))
+            return
+        }
+        view.setSelectedRange(range)
+        view.scrollRangeToVisible(range)
+        view.showFindIndicator(for: range)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var text: String?
+        var highlighted: NSRange?
+    }
+
+    /// The `occurrence`th place `needle` is in `text`, counting from zero;
+    /// the last one if there are fewer, since cleaning the text up can merge
+    /// lines that were apart on the page.
+    nonisolated static func range(of needle: String, occurrence: Int, in text: String) -> NSRange? {
+        guard !needle.isEmpty else { return nil }
+        let string = text as NSString
+        var found: [NSRange] = []
+        var start = 0
+        while start < string.length, found.count <= occurrence {
+            let range = string.range(of: needle, range: NSRange(location: start, length: string.length - start))
+            guard range.location != NSNotFound else { break }
+            found.append(range)
+            start = NSMaxRange(range)
+        }
+        return found.indices.contains(occurrence) ? found[occurrence] : found.last
+    }
+}
+
 struct TextBoxOverlay: View {
     let lines: [PPTextLine]
     let imageSize: CGSize
@@ -1315,13 +1397,17 @@ struct LayoutBlockOverlay: View {
                     // hidden under the next region's outline, and each one is
                     // put where it does not sit on top of another.
                     var placed: [CGRect] = []
+                    let indices = visibleIndices
+                    let rects = indices.map { index in
+                        CGRect(x: fitted.minX + blocks[index].rect.minX * sx,
+                               y: fitted.minY + blocks[index].rect.minY * sy,
+                               width: blocks[index].rect.width * sx,
+                               height: blocks[index].rect.height * sy)
+                    }
 
-                    for index in visibleIndices {
+                    for (position, index) in indices.enumerated() {
                         let block = blocks[index]
-                        let rect = CGRect(x: fitted.minX + block.rect.minX * sx,
-                                          y: fitted.minY + block.rect.minY * sy,
-                                          width: block.rect.width * sx,
-                                          height: block.rect.height * sy)
+                        let rect = rects[position]
                         let isSelected = index == selected
                         let isHovered = index == highlighted
                         let lit = isSelected || isHovered
@@ -1368,8 +1454,7 @@ struct LayoutBlockOverlay: View {
                         let size = badge.measure(in: CGSize(width: 240, height: rect.height))
                         let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
                                                                              height: size.height + 4),
-                                                      avoiding: placed, within: fitted,
-                                                      outsideFirst: isFlagged || isDropped)
+                                                      avoiding: placed, regions: rects, within: fitted)
                         placed.append(chip)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),
                                      with: .color(tint.opacity(isDropped && !lit && showsAll ? 0.6 : 1)))
@@ -1390,37 +1475,40 @@ struct LayoutBlockOverlay: View {
             .filter(blocks.indices.contains).sorted()
     }
 
-    /// Somewhere for the label that is not on top of another label.
+    /// Somewhere for the label that covers neither text nor another label.
     ///
-    /// A page with regions packed against each other stacks its numbers into an
-    /// unreadable pile otherwise. The corners are tried in turn and the first
-    /// free one wins; if the region is boxed in on all four, the label goes
-    /// where it belongs and overlaps, which is at least predictable.
-    ///
-    /// `outsideFirst` tries above and below the region before its corners: on
-    /// a region flagged for review the label must not cover what needs
-    /// checking.
-    static func chipPlacement(for rect: CGRect, size: CGSize,
-                              avoiding placed: [CGRect], within bounds: CGRect,
-                              outsideFirst: Bool = false) -> CGRect {
-        var candidates = [
+    /// Outside the region first — above it, to its left, below it — where it
+    /// sits on the page's margins and gutters rather than on the first words
+    /// of the region, and only where no other region is. A page with regions
+    /// packed against each other leaves no such place, and the label goes in
+    /// a corner of its own region instead; if all four are taken, top left,
+    /// which overlaps but is at least predictable.
+    nonisolated static func chipPlacement(for rect: CGRect, size: CGSize,
+                              avoiding placed: [CGRect], regions: [CGRect],
+                              within bounds: CGRect) -> CGRect {
+        let outside = [
+            CGPoint(x: rect.minX, y: rect.minY - size.height - 1),                // just above
+            CGPoint(x: rect.minX - size.width - 1, y: rect.minY),                 // just left
+            CGPoint(x: rect.minX, y: rect.maxY + 1),                              // just below
+        ]
+        let inside = [
             CGPoint(x: rect.minX, y: rect.minY),                                  // inside top left
             CGPoint(x: rect.maxX - size.width, y: rect.minY),                     // inside top right
             CGPoint(x: rect.minX, y: rect.maxY - size.height),                    // inside bottom left
             CGPoint(x: rect.maxX - size.width, y: rect.maxY - size.height),       // inside bottom right
-            CGPoint(x: rect.minX, y: rect.minY - size.height - 1),                // just above
-            CGPoint(x: rect.minX, y: rect.maxY + 1),                              // just below
-            CGPoint(x: rect.minX - size.width - 1, y: rect.minY),                 // just left
         ]
-        if outsideFirst {
-            candidates = Array(candidates[4...]) + Array(candidates[..<4])
+        let others = regions.filter { $0 != rect }
+        for origin in outside {
+            let chip = CGRect(origin: origin, size: size)
+            guard bounds.contains(chip), !others.contains(where: { $0.intersects(chip) }) else { continue }
+            if !placed.contains(where: { $0.intersects(chip) }) { return chip }
         }
-        for origin in candidates {
+        for origin in inside {
             let chip = CGRect(origin: origin, size: size)
             guard bounds.contains(chip) else { continue }
             if !placed.contains(where: { $0.intersects(chip) }) { return chip }
         }
-        return CGRect(origin: candidates[0], size: size)
+        return CGRect(origin: inside[0], size: size)
     }
 
     /// The app's accent, and orange for a region flagged for review — the one

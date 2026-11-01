@@ -1576,16 +1576,8 @@ final class OCRViewModel {
     }
 
     func removeItems(ids: Set<UUID>) {
-        // Determine next selection after removal
         if !selectedIDs.isDisjoint(with: ids) {
-            let remaining = items.filter { !ids.contains($0.id) }
-            // Pick the item that came right after the last removed one
-            if let lastRemovedIdx = items.lastIndex(where: { ids.contains($0.id) }) {
-                let candidate = remaining.first(where: { items.firstIndex(of: $0).map { $0 > lastRemovedIdx } ?? false })
-                selectedIDs = candidate.map { [$0.id] } ?? (remaining.first.map { [$0.id] } ?? [])
-            } else {
-                selectedIDs = []
-            }
+            selectedIDs = Self.neighbour(afterRemoving: ids, from: items.map(\.id)).map { [$0] } ?? []
         }
         for item in items where ids.contains(item.id) && item.status != .processing {
             if let key = item.resume?.key { store.removePartial(for: key) }
@@ -1595,6 +1587,17 @@ final class OCRViewModel {
         recalcProgress()
         store.remove(Array(ids))
         store.saveQueue(items)
+    }
+
+    /// What stays selected once `removed` are gone, the way Finder and Mail
+    /// do it: the item just after them, or at the end of the list the one
+    /// just before.
+    nonisolated static func neighbour(afterRemoving removed: Set<UUID>, from order: [UUID]) -> UUID? {
+        guard let first = order.firstIndex(where: removed.contains),
+              let last = order.lastIndex(where: removed.contains) else { return nil }
+        return order[(last + 1)...].first { !removed.contains($0) }
+            ?? order[..<first].last { !removed.contains($0) }
+            ?? order.first { !removed.contains($0) }
     }
 
     func clearAll() {

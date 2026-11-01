@@ -335,17 +335,10 @@ struct LayeredPipeline {
                 : .keep(review: .layoutTextUnread)
         }
 
-        let mean = lines.reduce(0) { $0 + $1.confidence } / Double(lines.count)
-        let unsure = lines.filter { $0.confidence < paddleConfig.dropScore }.count
-        // One stray mark read at 0.3 among ten good lines is noise, and the
-        // drop threshold already removes it. A quarter of the lines below it
-        // means the region itself is hard to read.
-        guard mean < config.escalationConfidence || unsure * 4 >= lines.count else {
+        guard let finding = LowConfidence.finding(in: lines, dropScore: paddleConfig.dropScore,
+                                                  averageBelow: config.escalationConfidence) else {
             return .keep(review: nil)
         }
-        let finding: LowConfidence = unsure * 4 >= lines.count
-            ? .lines(unsure: unsure, of: lines.count)
-            : .average(percent: Int((mean * 100).rounded()))
         return canEscalate
             ? .vl(.ocr, reason: .lowConfidence(finding))
             : .keep(review: .lowConfidence(finding))

@@ -38,6 +38,47 @@ final class PipelineTests {
         #expect(!PPDocumentAssembler.plainText(from: blocks, dropping: [.header]).contains("#"))
     }
 
+    @Test func wrappedLinesJoinTheWayEachScriptIsWritten() {
+        #expect(PPDocumentAssembler.reflowed("这是一段\n中文文字") == "这是一段中文文字")
+        #expect(PPDocumentAssembler.reflowed("测试\ngolf") == "测试 golf")
+        #expect(PPDocumentAssembler.reflowed("the lazy dog.\n第 2 行") == "the lazy dog. 第 2 行")
+        #expect(PPDocumentAssembler.reflowed("他说：\n“你好”") == "他说：“你好”")
+        #expect(PPDocumentAssembler.reflowed("一行……\n下一行") == "一行……下一行")
+        #expect(PPDocumentAssembler.reflowed("a quick\nbrown fox") == "a quick brown fox")
+        #expect(PPDocumentAssembler.reflowed("a hyphen-\nated word") == "a hyphenated word")
+        #expect(PPDocumentAssembler.reflowed("한국어\n문장") == "한국어 문장")
+    }
+
+    @Test func aRegionsLabelSitsBesideItsText() {
+        let page = CGRect(x: 0, y: 0, width: 600, height: 800)
+        let size = CGSize(width: 20, height: 13)
+        let first = CGRect(x: 60, y: 60, width: 480, height: 100)
+        let second = CGRect(x: 60, y: 200, width: 480, height: 100)
+        // Room above: the label goes there, off the first words.
+        let above = LayoutBlockOverlay.chipPlacement(for: second, size: size, avoiding: [],
+                                                     regions: [first, second], within: page)
+        #expect(above.maxY <= second.minY && !above.intersects(first))
+        // Packed against the region above and one to its left: below.
+        let packed = CGRect(x: 60, y: 161, width: 480, height: 100)
+        let side = CGRect(x: 0, y: 150, width: 58, height: 200)
+        let below = LayoutBlockOverlay.chipPlacement(for: packed, size: size, avoiding: [],
+                                                     regions: [first, side, packed], within: page)
+        #expect(below.minY >= packed.maxY)
+        // Nowhere outside: a corner of its own.
+        let full = CGRect(x: 0, y: 0, width: 600, height: 800)
+        let corner = LayoutBlockOverlay.chipPlacement(for: full, size: size, avoiding: [],
+                                                      regions: [full], within: page)
+        #expect(full.contains(corner))
+    }
+
+    @Test func aLinePickedOnThePageIsFoundInItsText() {
+        let text = "合计\n苹果 3\n合计\n梨 2"
+        #expect(PlainTextView.range(of: "合计", occurrence: 0, in: text) == NSRange(location: 0, length: 2))
+        #expect(PlainTextView.range(of: "合计", occurrence: 1, in: text) == NSRange(location: 8, length: 2))
+        #expect(PlainTextView.range(of: "合计", occurrence: 5, in: text) == NSRange(location: 8, length: 2))
+        #expect(PlainTextView.range(of: "香蕉", occurrence: 0, in: text) == nil)
+    }
+
     @Test func pdfTextOutsideEveryRegionGetsItsOwn() {
         let column = PPLayoutBlock(rect: CGRect(x: 0, y: 0, width: 300, height: 200),
                                    label: .text, score: 0.9, readingOrder: 0)

@@ -338,11 +338,15 @@ enum DocumentRecognizer {
             }
             var config = settings.paddleConfig
             if drawnByPDF { config.useDocOrientation = false }
+            // Every line comes back, however unsure, so the unsure ones can
+            // say which regions are worth checking; the drop threshold is
+            // applied after, as 智能分层 does.
+            config.dropScore = 0
             let result = try paddle.recognize(image: image, config: config,
                                               progress: progress, isCancelled: isCancelled)
-            return PageResult(size: CGSize(width: image.width, height: image.height),
-                              lines: result.lines, blocks: result.blocks,
-                              blockSource: .plainOCR, rawText: result.lines.plainText)
+            return plainOCRPage(result, size: CGSize(width: image.width, height: image.height),
+                                dropScore: settings.paddleConfig.dropScore,
+                                doubtBelow: settings.layered.escalationConfidence)
         case .auto:
             guard let layered = engines.layered else {
                 throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
@@ -351,6 +355,34 @@ enum DocumentRecognizer {
             page.notes += unavailableNotes(engines, page: page)
             return page
         }
+    }
+
+    /// A page PP-OCRv6 read on its own, with the lines below `dropScore`
+    /// left out and the regions it is unsure of flagged for review — by the
+    /// rule 智能分层 uses, which has a second reader to send them to; here
+    /// the person reading is the only one.
+    static func plainOCRPage(_ result: PPOCREngine.Page, size: CGSize,
+                             dropScore: Double, doubtBelow: Double) -> PageResult {
+        var blocks = result.blocks
+        for index in blocks.indices {
+            let members = result.members.indices.contains(index)
+                ? result.members[index].map { result.lines[$0] } : []
+            guard !members.isEmpty else { continue }
+            blocks[index].text = members.filter { $0.confidence >= dropScore }.map(\.text)
+                .joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            let label = blocks[index].label
+            guard label.vlTask == .ocr, !label.isPageFurniture, !label.producesFigure else { continue }
+            blocks[index].review = LowConfidence.finding(in: members, dropScore: dropScore,
+                                                         averageBelow: doubtBelow).map { .lowConfidence($0) }
+        }
+        let kept = result.lines.filter { $0.confidence >= dropScore }
+        var page = PageResult(size: size, lines: kept, blocks: blocks,
+                              blockSource: .plainOCR, rawText: kept.plainText)
+        if blocks.isEmpty, let finding = LowConfidence.finding(in: result.lines, dropScore: dropScore,
+                                                               averageBelow: doubtBelow) {
+            page.notes.append(.warning(.lowConfidence(finding)))
+        }
+        return page
     }
 
     /// Says so on a page with structure, when 智能分层 had no VLM to read it.

@@ -286,10 +286,14 @@ enum PPDocumentAssembler {
 
     // MARK: - Paragraphs
 
-    /// Joins the lines of a paragraph the way the page set them: Chinese and
-    /// Japanese run on without a space, other scripts take one, and a word
-    /// hyphenated across a line break is put back together. A line that
-    /// starts a list item stays a line of its own.
+    /// Joins the lines of a paragraph the way the page set them, by the
+    /// segment-break rules of CSS Text Level 3 (§4.1.3): a break between two
+    /// wide (Chinese or Japanese) characters goes away, as does one between
+    /// a wide character and the quotes and dashes those scripts share with
+    /// others; any other break becomes a space, so “测试” and “golf” on two
+    /// lines read “测试 golf”. A word hyphenated across a line break is put
+    /// back together, and a line that starts a list item stays a line of
+    /// its own.
     static func reflowed(_ text: String) -> String {
         let lines = text.components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -305,7 +309,7 @@ enum PPDocumentAssembler {
                let first, first.isLowercase {
                 result.removeLast()
                 result += line
-            } else if let last, let first, isWideScript(last) || isWideScript(first) {
+            } else if let last, let first, joinsWithoutSpace(last, first) {
                 result += line
             } else {
                 result += " " + line
@@ -320,12 +324,48 @@ enum PPDocumentAssembler {
                           options: .regularExpression) != nil
     }
 
-    /// Scripts written without spaces between words, plus their punctuation.
-    private static func isWideScript(_ character: Character) -> Bool {
+    static func joinsWithoutSpace(_ before: Character, _ after: Character) -> Bool {
+        switch (isEastAsianWide(before), isEastAsianWide(after)) {
+        case (true, true):   return true
+        case (true, false):  return isSharedPunctuation(after)
+        case (false, true):  return isSharedPunctuation(before)
+        case (false, false): return false
+        }
+    }
+
+    /// East Asian Width F, W or H (UAX #11) outside Hangul, which is written
+    /// with spaces: the blocks Chinese and Japanese text is made of.
+    private static func isEastAsianWide(_ character: Character) -> Bool {
         guard let scalar = character.unicodeScalars.first else { return false }
         switch scalar.value {
-        case 0x3000...0x303F, 0x3040...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF,
-             0xF900...0xFAFF, 0xFF00...0xFFEF, 0x20000...0x2FA1F:
+        case 0x2E80...0x2FDF,   // CJK radicals, Kangxi radicals
+             0x2FF0...0x303E,   // ideographic description, CJK symbols and punctuation
+             0x3040...0x30FF,   // hiragana, katakana
+             0x3100...0x312F,   // bopomofo
+             0x3190...0x31FF,   // kanbun, bopomofo extended, CJK strokes, katakana extension
+             0x3200...0x4DBF,   // enclosed CJK, CJK compatibility, extension A
+             0x4E00...0x9FFF,   // CJK unified ideographs
+             0xF900...0xFAFF,   // CJK compatibility ideographs
+             0xFE10...0xFE1F,   // vertical forms
+             0xFE30...0xFE6F,   // CJK compatibility forms, small form variants
+             0xFF01...0xFF60,   // fullwidth forms
+             0xFF61...0xFF9F,   // halfwidth katakana and punctuation
+             0xFFE0...0xFFE6,   // fullwidth signs
+             0x20000...0x3FFFD: // supplementary and tertiary ideographic planes
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Punctuation and symbols of ambiguous width — curly quotes, dashes,
+    /// ellipses, middle dots — which Chinese and Japanese set with no space.
+    private static func isSharedPunctuation(_ character: Character) -> Bool {
+        guard let scalar = character.unicodeScalars.first, !scalar.isASCII else { return false }
+        switch scalar.properties.generalCategory {
+        case .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+             .initialPunctuation, .finalPunctuation, .otherPunctuation,
+             .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol:
             return true
         default:
             return false

@@ -115,7 +115,7 @@ struct SidebarView: View {
                                 .disabled(vm.isProcessing)
                             }
                             if allExportable {
-                                Button(count > 1 ? "Copy All Text" : "Copy Text") {
+                                Button(count > 1 ? "Copy Selected Text" : "Copy Text") {
                                     if count > 1 { vm.copySelectedText() }
                                     else { vm.copyText(for: item.id) }
                                 }
@@ -157,7 +157,7 @@ struct SidebarView: View {
             Divider()
             bottomToolbar
         }
-        .onChange(of: filter) {
+        .onChange(of: "\(filter)#\(query)") {
             // Keep the detail pane pointing at something the list still shows.
             let visible = Set(visibleItems.map(\.id))
             let survivors = vm.selectedIDs.intersection(visible)
@@ -339,21 +339,30 @@ struct SidebarView: View {
 
 struct SidebarRowView: View {
     @Environment(OCRViewModel.self) private var vm
+    /// Increased on a selected row, whose background is the accent colour.
+    @Environment(\.backgroundProminence) private var prominence
     let item: ImageItem
     var query = ""
     @State private var isHovering = false
 
     /// The words around the first match in the recognised text, when the
     /// search found the file by what it says rather than by its name.
-    private var snippet: String? {
+    /// The match is in bold, as in History.
+    private var snippet: AttributedString? {
         let needle = query.trimmingCharacters(in: .whitespaces)
+        let text = item.ocrText
         guard !needle.isEmpty, !item.relativePath.localizedCaseInsensitiveContains(needle),
-              let range = item.ocrText.range(of: needle, options: .caseInsensitive) else { return nil }
-        let start = item.ocrText.index(range.lowerBound, offsetBy: -12, limitedBy: item.ocrText.startIndex)
-            ?? item.ocrText.startIndex
-        let end = item.ocrText.index(range.upperBound, offsetBy: 24, limitedBy: item.ocrText.endIndex)
-            ?? item.ocrText.endIndex
-        return "…" + item.ocrText[start..<end].replacingOccurrences(of: "\n", with: " ") + "…"
+              let range = text.range(of: needle, options: .caseInsensitive) else { return nil }
+        let start = text.index(range.lowerBound, offsetBy: -12, limitedBy: text.startIndex) ?? text.startIndex
+        let end = text.index(range.upperBound, offsetBy: 24, limitedBy: text.endIndex) ?? text.endIndex
+        func plain(_ part: Substring) -> AttributedString {
+            AttributedString(part.replacingOccurrences(of: "\n", with: " "))
+        }
+        var match = plain(text[range])
+        match.inlinePresentationIntent = .stronglyEmphasized
+        match.foregroundColor = .primary
+        return AttributedString(start > text.startIndex ? "…" : "") + plain(text[start..<range.lowerBound])
+            + match + plain(text[range.upperBound..<end]) + AttributedString(end < text.endIndex ? "…" : "")
     }
 
     var body: some View {
@@ -365,7 +374,7 @@ struct SidebarRowView: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(snippet ?? statusLine)
+                Text(snippet ?? AttributedString(statusLine))
                     .font(.caption)
                     .foregroundStyle(item.status == .failed && snippet == nil ? Color.red : Color.secondary)
                     .lineLimit(1)
@@ -380,7 +389,7 @@ struct SidebarRowView: View {
         // hover buttons offered as actions, since a pointer is what shows them.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.fileName)
-        .accessibilityValue(snippet ?? statusLine)
+        .accessibilityValue(snippet.map { String($0.characters) } ?? statusLine)
         .accessibilityActions {
             if item.status == .failed || item.status == .cancelled {
                 Button(item.resume != nil ? "Resume" : item.status == .cancelled ? "Recognize Again" : "Retry") {
@@ -413,9 +422,12 @@ struct SidebarRowView: View {
             if item.pageCount > 1 { return String(localized: "Recognizing page \(item.pagesDone)/\(item.pageCount)") }
             return String(localized: "Recognizing \(item.processingProgress.percentText)")
         case .completed:
-            let pages = String(localized: "\(item.pages.count) pages")
-            if flagCount > 0 { return String(localized: "\(pages) · \(flagCount) to review") }
-            return item.reusedCachedResult ? String(localized: "\(pages) · Reused earlier result") : pages
+            // The same line as before it was read, so a row does not change
+            // what its subtitle is about; a document says how long it is.
+            var line = "\(item.fileExtension) · \(item.fileSizeString)"
+            if item.pages.count > 1 { line += " · " + String(localized: "\(item.pages.count) pages") }
+            if flagCount > 0 { return String(localized: "\(line) · \(flagCount) to review") }
+            return item.reusedCachedResult ? String(localized: "\(line) · Reused earlier result") : line
         case .failed:
             return item.errorMessage ?? String(localized: "Recognition Failed")
         case .cancelled:
@@ -505,7 +517,7 @@ struct SidebarRowView: View {
         case .completed:
             Image(systemName: "checkmark")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.accentColor))
         case .failed:
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.red)
