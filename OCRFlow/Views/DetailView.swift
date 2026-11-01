@@ -278,7 +278,7 @@ struct ItemDetailView: View {
                         .labelStyle(.iconOnly)
                 }
                 .accessibilityAddTraits(vm.showTextBoxes ? .isSelected : [])
-                .buttonStyle(.accessoryBarAction)
+                .buttonStyle(.paneIcon)
                 .foregroundStyle(vm.showTextBoxes ? Color.accentColor : Color.secondary)
                 .help(vm.showTextBoxes
                       ? "Showing every recognized region. Click to outline only the one under the pointer"
@@ -320,7 +320,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Zoom Out", systemImage: "minus.magnifyingglass").labelStyle(.iconOnly)
             }
-            .buttonStyle(.accessoryBarAction)
+            .buttonStyle(.paneIcon)
             .keyboardShortcut("-", modifiers: .command)
             .disabled(imageZoom <= Self.minZoom)
             .help("Zoom Out (⌘-)")
@@ -337,7 +337,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
             }
-            .buttonStyle(.accessoryBarAction)
+            .buttonStyle(.paneIcon)
             .keyboardShortcut("=", modifiers: .command)
             .disabled(imageZoom >= Self.maxZoom)
             .help("Zoom In (⌘+)")
@@ -348,7 +348,7 @@ struct ItemDetailView: View {
                 Label("Fit to Window", systemImage: "arrow.up.left.and.arrow.down.right")
                     .labelStyle(.iconOnly)
             }
-            .buttonStyle(.accessoryBarAction)
+            .buttonStyle(.paneIcon)
             .keyboardShortcut("0", modifiers: .command)
             .disabled(imageZoom == 1.0)
             .help("Fit to Window (⌘0)")
@@ -529,7 +529,7 @@ struct ItemDetailView: View {
             .keyboardShortcut(.rightArrow, modifiers: .option)
             .disabled(pageIndex >= pageCount - 1)
         }
-        .buttonStyle(.accessoryBarAction)
+        .buttonStyle(.paneIcon)
         .help("Turn page (⌥← / ⌥→)")
     }
 
@@ -548,7 +548,7 @@ struct ItemDetailView: View {
             } label: {
                 Label("Recognize This Page Again", systemImage: "arrow.clockwise").labelStyle(.iconOnly)
             }
-            .buttonStyle(.accessoryBarAction)
+            .buttonStyle(.paneIcon)
             .disabled(!vm.canRereadPage(item))
             .help(vm.isProcessing ? "Recognition is in progress. You can recognize this page again once it finishes" : "Recognize this page again; other pages stay as they are")
         }
@@ -577,7 +577,7 @@ struct ItemDetailView: View {
             }
             .keyboardShortcut("g", modifiers: .command)
         }
-        .buttonStyle(.accessoryBarAction)
+        .buttonStyle(.paneIcon)
         .help("“\(searchNeedle)”: match \(matchIndex + 1) of \(searchMatches.count) in this file (⌘G next, ⇧⌘G previous)")
     }
 
@@ -775,7 +775,7 @@ struct ItemDetailView: View {
                         .help("Export only the results for “\(item.fileName)”")
                     }
                 }
-                .buttonStyle(.accessoryBarAction)
+                .buttonStyle(.paneIcon)
                 .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12)
@@ -1531,6 +1531,28 @@ struct LayoutBlockOverlay: View {
     static func color(for block: PPLayoutBlock) -> Color {
         block.review != nil ? .orange : .accentColor
     }
+}
+
+// MARK: - Pane header buttons
+
+/// A pane header's icon buttons: borderless, as icons in a header are, with
+/// the click area of a macOS control at its default size — 28 × 28 pt, the
+/// Human Interface Guidelines' figure — rather than the 13 pt of the glyph.
+struct PaneIconButtonStyle: PrimitiveButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button(role: configuration.role) {
+            configuration.trigger()
+        } label: {
+            configuration.label
+                .frame(minWidth: 28, minHeight: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
+extension PrimitiveButtonStyle where Self == PaneIconButtonStyle {
+    static var paneIcon: PaneIconButtonStyle { PaneIconButtonStyle() }
 }
 
 // MARK: - Page previews
