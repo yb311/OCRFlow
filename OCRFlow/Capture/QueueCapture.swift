@@ -59,7 +59,9 @@ final class QueueCapture {
     // MARK: - The tap
 
     private func startTap() -> Bool {
-        let types: [CGEventType] = [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .keyDown]
+        // Moves too: some ways of driving the mouse report a held button's
+        // moves as plain moves, not drags.
+        let types: [CGEventType] = [.leftMouseDown, .leftMouseDragged, .mouseMoved, .leftMouseUp, .keyDown]
         let mask = types.reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                           eventsOfInterest: mask, callback: queueTapCallback,
@@ -88,18 +90,22 @@ final class QueueCapture {
             press = event.copy()
             selecting = false
             return false
-        case .leftMouseDragged:
+        case .leftMouseDragged, .mouseMoved:
             guard let press else { return true }
             let start = press.location, now = event.location
             if !selecting, hypot(now.x - start.x, now.y - start.y) > Self.dragDistance { selecting = true }
             if selecting { showSelection(from: start, to: now) }
-            return false
+            // A plain move only moves the pointer; nothing to hold back.
+            return type == .mouseMoved
         case .leftMouseUp:
             guard let held = press else { return true }
             press = nil
-            if selecting {
+            let start = held.location, now = event.location
+            // Let go far from where it was pressed, it was a drag, even when
+            // no moves were reported in between.
+            if selecting || hypot(now.x - start.x, now.y - start.y) > Self.dragDistance {
                 selecting = false
-                let rect = Self.rect(from: held.location, to: event.location)
+                let rect = Self.rect(from: start, to: now)
                 Task { await take(rect) }
             } else {
                 // Not a drag after all: the click goes where it was aimed.

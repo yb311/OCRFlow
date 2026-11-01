@@ -579,13 +579,15 @@ struct FloatingExtras: View {
             .scaleEffect(hovered ? 1.06 : 1)
             .animation(.snappy(duration: 0.15), value: hovered)
             .accessibilityLabel(Text(name))
+            // Springing straight out of the main button as it opens: from
+            // its middle, up or down. The circle alone grows, about its own
+            // middle — the whole row, room for the name and all, would grow
+            // about the row's middle and carry the circle in from the side.
+            .scaleEffect(state.expanded ? 1 : 0.6)
+            .offset(y: state.expanded ? 0 : (state.upward ? 1 : -1) * Self.distance(index))
+            .opacity(state.expanded ? 1 : 0)
+            .animation(.spring(response: 0.32, dampingFraction: 0.78).delay(Double(index) * 0.03), value: state.expanded)
         }
-        // Springing straight out of the main button as it opens: from its
-        // middle, up or down.
-        .offset(y: state.expanded ? 0 : (state.upward ? 1 : -1) * Self.distance(index))
-        .scaleEffect(state.expanded ? 1 : 0.6)
-        .opacity(state.expanded ? 1 : 0)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78).delay(Double(index) * 0.03), value: state.expanded)
     }
 
     /// A button in the column against the screen's edge, its name on the
