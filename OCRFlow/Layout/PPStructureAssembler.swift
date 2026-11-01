@@ -36,9 +36,18 @@ enum PPStructureAssembler {
     ///
     /// `blocks` must already be in the model's reading order — `PPLayoutDetector`
     /// sorts them on the way out.
+    ///
+    /// When the layout model found no region at all, each line becomes a text
+    /// region of its own, in the order given — PP-StructureV3's rule
+    /// (`standardized_data` in PaddleX's layout parsing pipeline), so a page
+    /// too small or too plain for the layout model still has a structure.
     static func assemble(lines: [PPTextLine], blocks: [PPLayoutBlock]) -> Page {
         guard !blocks.isEmpty else {
-            return Page(lines: lines, blocks: [])
+            let regions = lines.enumerated().map { index, line in
+                PPLayoutBlock(rect: line.boundingBox, label: .text, score: line.confidence,
+                              readingOrder: index, text: line.text)
+            }
+            return Page(lines: lines, blocks: regions, members: lines.indices.map { [$0] })
         }
         guard !lines.isEmpty else {
             return Page(lines: [], blocks: blocks, members: blocks.map { _ in [] })

@@ -107,7 +107,8 @@ final class PPOCREngine: @unchecked Sendable {
         // Layout first, on the straightened page: the regions are what the
         // lines will be sorted into, and they are cheap next to recognition.
         var regions: [PPLayoutBlock] = []
-        if cfg.readingOrder.needsLayoutModel, let layout {
+        let ranLayout = cfg.readingOrder.needsLayoutModel && layout != nil
+        if ranLayout, let layout {
             // The same correction the VL pipeline applies: a "header" halfway
             // down the page is a paragraph the classifier misnamed, and leaving
             // it labelled as furniture would drop it from the document.
@@ -166,9 +167,12 @@ final class PPOCREngine: @unchecked Sendable {
         progress?(1.0)
 
         // Regions decide the order when the layout model ran; otherwise fall
-        // back to reading the geometry of the lines themselves.
-        if !regions.isEmpty {
-            let page = PPStructureAssembler.assemble(lines: lines, blocks: regions)
+        // back to reading the geometry of the lines themselves. A layout that
+        // found nothing makes a region of each line, read in that order.
+        if ranLayout {
+            let page = PPStructureAssembler.assemble(
+                lines: regions.isEmpty ? Self.inReadingOrder(lines, mode: cfg.readingOrder) : lines,
+                blocks: regions)
             return mappedBack(Page(lines: page.lines, blocks: page.blocks, members: page.members))
         }
         return mappedBack(Page(lines: Self.inReadingOrder(lines, mode: cfg.readingOrder), blocks: []))

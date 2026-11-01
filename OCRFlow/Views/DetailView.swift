@@ -1457,10 +1457,14 @@ struct LayoutBlockOverlay: View {
                                 .foregroundStyle(ink))
                         badge.shading = .color(ink)
                         let size = badge.measure(in: CGSize(width: 240, height: rect.height))
-                        let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
-                                                                             height: size.height + 4),
-                                                      avoiding: placed, regions: rects, text: text,
-                                                      within: fitted)
+                        // The region pointed at, or waiting for review, is
+                        // labelled wherever it can be; the rest only where
+                        // the label covers nothing.
+                        guard let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
+                                                                                   height: size.height + 4),
+                                                            avoiding: placed, regions: rects, text: text,
+                                                            within: fitted, required: lit || isFlagged)
+                        else { continue }
                         placed.append(chip)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),
                                      with: .color(tint.opacity(isDropped && !lit && showsAll ? 0.6 : 1)))
@@ -1487,11 +1491,13 @@ struct LayoutBlockOverlay: View {
     /// sits on the page's margins and gutters rather than on the first words
     /// of the region, and only where no other region is. A page with regions
     /// packed against each other leaves no such place, and the label goes in
-    /// a corner of its own region that has no text in it; if there is none,
-    /// top left, which overlaps but is at least predictable.
+    /// a corner of its own region that has no text in it. Failing that, a
+    /// label that is not `required` is left off, as a map leaves off the
+    /// labels that would collide; a required one goes in a free corner over
+    /// the text, or top left, which overlaps but is at least predictable.
     nonisolated static func chipPlacement(for rect: CGRect, size: CGSize,
                               avoiding placed: [CGRect], regions: [CGRect], text: [CGRect] = [],
-                              within bounds: CGRect) -> CGRect {
+                              within bounds: CGRect, required: Bool = true) -> CGRect? {
         let outside = [
             CGPoint(x: rect.minX, y: rect.minY - size.height - 1),                // just above
             CGPoint(x: rect.minX - size.width - 1, y: rect.minY),                 // just left
@@ -1509,14 +1515,14 @@ struct LayoutBlockOverlay: View {
             guard bounds.contains(chip), !others.contains(where: { $0.intersects(chip) }) else { continue }
             if !placed.contains(where: { $0.intersects(chip) }) { return chip }
         }
-        for avoidsText in [true, false] {
+        for avoidsText in required ? [true, false] : [true] {
             for origin in inside {
                 let chip = CGRect(origin: origin, size: size)
                 guard bounds.contains(chip), !placed.contains(where: { $0.intersects(chip) }) else { continue }
                 if !avoidsText || !text.contains(where: { $0.intersects(chip) }) { return chip }
             }
         }
-        return CGRect(origin: inside[0], size: size)
+        return required ? CGRect(origin: inside[0], size: size) : nil
     }
 
     /// The app's accent, and orange for a region flagged for review — the one

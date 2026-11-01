@@ -38,6 +38,26 @@ final class PipelineTests {
         #expect(!PPDocumentAssembler.plainText(from: blocks, dropping: [.header]).contains("#"))
     }
 
+    @Test func linesTheLayoutFoundNoRegionForAreRegionsOfTheirOwn() {
+        func line(_ text: String, y: CGFloat, confidence: Double) -> PPTextLine {
+            PPTextLine(quad: [CGPoint(x: 10, y: y), CGPoint(x: 200, y: y),
+                              CGPoint(x: 200, y: y + 20), CGPoint(x: 10, y: y + 20)],
+                       text: text, confidence: confidence, wasRotated: false)
+        }
+        let lines = [line("第一行", y: 10, confidence: 0.9), line("second line", y: 40, confidence: 0.6)]
+        let page = PPStructureAssembler.assemble(lines: lines, blocks: [])
+
+        #expect(page.lines == lines)
+        #expect(page.blocks.map(\.label) == [.text, .text])
+        #expect(page.blocks.map(\.text) == ["第一行", "second line"])
+        #expect(page.blocks.map(\.rect) == lines.map(\.boundingBox))
+        #expect(page.blocks.map(\.readingOrder) == [0, 1])
+        #expect(page.blocks.map(\.score) == [0.9, 0.6])
+        #expect(page.members == [[0], [1]])
+        #expect(PPDocumentAssembler.markdown(from: page.blocks).contains("second line"))
+        #expect(PPStructureAssembler.assemble(lines: [], blocks: []).blocks.isEmpty)
+    }
+
     @Test func wrappedLinesJoinTheWayEachScriptIsWritten() {
         #expect(PPDocumentAssembler.reflowed("这是一段\n中文文字") == "这是一段中文文字")
         #expect(PPDocumentAssembler.reflowed("测试\ngolf") == "测试 golf")
@@ -49,28 +69,36 @@ final class PipelineTests {
         #expect(PPDocumentAssembler.reflowed("한국어\n문장") == "한국어 문장")
     }
 
-    @Test func aRegionsLabelSitsBesideItsText() {
+    @Test func aRegionsLabelSitsBesideItsText() throws {
         let page = CGRect(x: 0, y: 0, width: 600, height: 800)
         let size = CGSize(width: 20, height: 13)
         let first = CGRect(x: 60, y: 60, width: 480, height: 100)
         let second = CGRect(x: 60, y: 200, width: 480, height: 100)
         // Room above: the label goes there, off the first words.
-        let above = LayoutBlockOverlay.chipPlacement(for: second, size: size, avoiding: [],
-                                                     regions: [first, second], within: page)
+        let above = try #require(LayoutBlockOverlay.chipPlacement(for: second, size: size, avoiding: [],
+                                                                  regions: [first, second], within: page))
         #expect(above.maxY <= second.minY && !above.intersects(first))
         // Packed against the region above and one to its left: below.
         let packed = CGRect(x: 60, y: 161, width: 480, height: 100)
         let side = CGRect(x: 0, y: 150, width: 58, height: 200)
-        let below = LayoutBlockOverlay.chipPlacement(for: packed, size: size, avoiding: [],
-                                                     regions: [first, side, packed], within: page)
+        let below = try #require(LayoutBlockOverlay.chipPlacement(for: packed, size: size, avoiding: [],
+                                                                  regions: [first, side, packed], within: page))
         #expect(below.minY >= packed.maxY)
         // Nowhere outside: a corner of its own, the one with no text in it.
         let full = CGRect(x: 0, y: 0, width: 600, height: 800)
         let lines = [CGRect(x: 0, y: 0, width: 600, height: 20), CGRect(x: 0, y: 780, width: 300, height: 20)]
-        let corner = LayoutBlockOverlay.chipPlacement(for: full, size: size, avoiding: [],
-                                                      regions: [full], text: lines, within: page)
+        let corner = try #require(LayoutBlockOverlay.chipPlacement(for: full, size: size, avoiding: [],
+                                                                   regions: [full], text: lines, within: page))
         #expect(full.contains(corner) && !lines.contains { $0.intersects(corner) })
         #expect(corner.maxX == full.maxX && corner.maxY == full.maxY)
+        // Lines stacked edge to edge, each its own region: nowhere covers
+        // nothing, so the label is left off unless it has to be there.
+        let rows = (0..<3).map { CGRect(x: 0, y: CGFloat($0) * 20, width: 600, height: 20) }
+        #expect(LayoutBlockOverlay.chipPlacement(for: rows[1], size: size, avoiding: [], regions: rows,
+                                                 text: rows, within: page, required: false) == nil)
+        let forced = try #require(LayoutBlockOverlay.chipPlacement(for: rows[1], size: size, avoiding: [],
+                                                                   regions: rows, text: rows, within: page))
+        #expect(rows[1].contains(forced))
     }
 
     @Test func aLinePickedOnThePageIsFoundInItsText() {
