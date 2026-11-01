@@ -103,18 +103,13 @@ final class FloatingCaptureButton {
 
     // MARK: - Opening out
 
+    /// Only what is drawn changes: the panel stays where it is, the size it
+    /// is. Grown under the pointer as it arrived, a click that came with it
+    /// was taken against the panel's old place and lost.
     private func expand() {
         guard !isOpen, !state.dragging else { return }
-        orient()
         isOpen = true
-        layOut()
-        // Shown closed where they will open first, then opened on a later
-        // pass: they spring straight out of the main button, up or down.
-        Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(16))
-            guard let self, self.isOpen, !self.state.dragging else { return }
-            self.state.expanded = true
-        }
+        state.expanded = true
         watchPointer()
     }
 
@@ -124,12 +119,11 @@ final class FloatingCaptureButton {
         isOpen = false
         state.expanded = false
         state.hoveredExtra = nil
-        layOut()
     }
 
     /// Which way they open: down, or up near the bottom of the screen; their
-    /// names on the side away from the edge. Settled while they are closed,
-    /// so the change is never seen.
+    /// names on the side away from the edge. Settled where the button comes
+    /// to rest, while they are closed, so the change is never seen.
     private func orient() {
         let screen = (NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
         let upward = resting.minY - Self.extrasHeight < screen.minY
@@ -141,30 +135,32 @@ final class FloatingCaptureButton {
     /// Rests the main button at `frame`.
     private func rest(at frame: NSRect) {
         resting = frame
-        if !isOpen { orient() }
-        layOut()
+        orient()
+        layOut(at: resting)
     }
 
-    /// The panel around the main button: just the button, or, open, with
-    /// the others and room for their names.
-    ///
-    /// What holds the others keeps one size, open or closed — closed, it
-    /// lies outside the panel, unseen — so nothing in it is laid out again
-    /// as they open, and nothing slides sideways. All is placed before
-    /// anything is drawn.
-    private func layOut() {
-        let size = NSSize(width: Self.side + Self.labelRoom, height: Self.side + Self.extrasHeight)
-        // The main button's place among the others.
-        let mainAt = NSPoint(x: state.trailing ? Self.labelRoom : 0, y: state.upward ? 0 : Self.extrasHeight)
-        let frame = isOpen ? NSRect(x: resting.minX - mainAt.x, y: resting.minY - mainAt.y, width: size.width, height: size.height)
-            : resting
-        let buttonAt = NSPoint(x: resting.minX - frame.minX, y: resting.minY - frame.minY)
+    /// The main button's place in the panel, which holds the others and
+    /// room for their names beside it.
+    private var mainAt: NSPoint {
+        NSPoint(x: state.trailing ? Self.labelRoom : 0, y: state.upward ? 0 : Self.extrasHeight)
+    }
+
+    /// The panel with the main button at `place` on screen. It is the one
+    /// size, open or closed — closed, the others are not drawn and clicks
+    /// go through where they would be — so opening never moves it.
+    private func panelFrame(at place: NSRect) -> NSRect {
+        NSRect(x: place.minX - mainAt.x, y: place.minY - mainAt.y,
+               width: Self.side + Self.labelRoom, height: Self.side + Self.extrasHeight)
+    }
+
+    private func layOut(at place: NSRect) {
+        let frame = panelFrame(at: place)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0
             context.allowsImplicitAnimation = false
             panel.setFrame(frame, display: false)
-            button.frame = NSRect(origin: buttonAt, size: NSSize(width: Self.side, height: Self.side))
-            extras.frame = NSRect(origin: NSPoint(x: buttonAt.x - mainAt.x, y: buttonAt.y - mainAt.y), size: size)
+            button.frame = NSRect(origin: mainAt, size: NSSize(width: Self.side, height: Self.side))
+            extras.frame = NSRect(origin: .zero, size: frame.size)
         }
         panel.display()
     }
@@ -247,17 +243,23 @@ final class FloatingCaptureButton {
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) })
                 ?? NSScreen.main else { return }
         let area = screen.visibleFrame
+        // Where the main button was let go.
+        let dropped = button.frame.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
         let travel = area.height - Self.diameter - Self.edgeGap * 2
-        let bottom = panel.frame.minY + Self.padding - area.minY - Self.edgeGap
-        let parking = Parking(trailing: panel.frame.midX > area.midX,
+        let bottom = dropped.minY + Self.padding - area.minY - Self.edgeGap
+        let parking = Parking(trailing: dropped.midX > area.midX,
                               height: travel > 0 ? min(max(bottom / travel, 0), 1) : 0.5,
                               display: screen.displayID)
         parking.save()
         resting = frame(for: parking)
+        // Turned for the side it is going to, where it was let go, then
+        // carried there.
+        orient()
+        layOut(at: dropped)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(resting, display: true)
+            panel.animator().setFrame(panelFrame(at: resting), display: true)
         }
     }
 
@@ -438,8 +440,6 @@ private final class FloatingButtonView: NSView {
         if !dragging {
             guard hypot(dx, dy) > 3 else { return }
             onDragStart()
-            // Collapsing moved the window; the drag goes on from there.
-            self.dragStart = (dragStart.pointer, window.frame.origin)
             dragging = true
             state.pressed = false
             state.dragging = true

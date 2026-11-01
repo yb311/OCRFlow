@@ -62,7 +62,7 @@ struct SidebarView: View {
                 emptyState
             } else {
                 List(visibleItems, selection: $vm.selectedIDs) { item in
-                    SidebarRowView(item: item, query: query)
+                    SidebarRowView(item: item, isSelected: vm.selectedIDs.contains(item.id), query: query)
                         .tag(item.id)
                         .contextMenu {
                             // If right-clicked item is not in selection, switch to it alone
@@ -339,9 +339,10 @@ struct SidebarView: View {
 
 struct SidebarRowView: View {
     @Environment(OCRViewModel.self) private var vm
-    /// Increased on a selected row, whose background is the accent colour.
-    @Environment(\.backgroundProminence) private var prominence
     let item: ImageItem
+    /// A selected row's background is the accent colour, which an accent
+    /// checkmark disappears into.
+    var isSelected = false
     var query = ""
     @State private var isHovering = false
 
@@ -369,7 +370,7 @@ struct SidebarRowView: View {
         HStack(spacing: 10) {
             thumbnailView
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.fileName)
+                Text(item.displayName)
                     .font(.callout)
                     .fontWeight(.medium)
                     .lineLimit(1)
@@ -388,7 +389,7 @@ struct SidebarRowView: View {
         // One element for VoiceOver — the name and where it stands — with the
         // hover buttons offered as actions, since a pointer is what shows them.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.fileName)
+        .accessibilityLabel(item.displayName)
         .accessibilityValue(snippet.map { String($0.characters) } ?? statusLine)
         .accessibilityActions {
             if item.status == .failed || item.status == .cancelled {
@@ -517,7 +518,7 @@ struct SidebarRowView: View {
         case .completed:
             Image(systemName: "checkmark")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.accentColor))
+                .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.accentColor))
         case .failed:
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.red)

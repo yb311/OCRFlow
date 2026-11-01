@@ -64,11 +64,13 @@ final class PipelineTests {
         let below = LayoutBlockOverlay.chipPlacement(for: packed, size: size, avoiding: [],
                                                      regions: [first, side, packed], within: page)
         #expect(below.minY >= packed.maxY)
-        // Nowhere outside: a corner of its own.
+        // Nowhere outside: a corner of its own, the one with no text in it.
         let full = CGRect(x: 0, y: 0, width: 600, height: 800)
+        let lines = [CGRect(x: 0, y: 0, width: 600, height: 20), CGRect(x: 0, y: 780, width: 300, height: 20)]
         let corner = LayoutBlockOverlay.chipPlacement(for: full, size: size, avoiding: [],
-                                                      regions: [full], within: page)
-        #expect(full.contains(corner))
+                                                      regions: [full], text: lines, within: page)
+        #expect(full.contains(corner) && !lines.contains { $0.intersects(corner) })
+        #expect(corner.maxX == full.maxX && corner.maxY == full.maxY)
     }
 
     @Test func aLinePickedOnThePageIsFoundInItsText() {

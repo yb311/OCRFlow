@@ -66,6 +66,9 @@ struct ImageItem: Identifiable, Equatable {
     var translation: DocumentTranslation?
 
     var fileName: String { url.lastPathComponent }
+    /// The name as Finder shows it: without the extension unless “Show all
+    /// filename extensions” is on, or the file asks to show it.
+    var displayName: String { FileManager.default.displayName(atPath: url.path(percentEncoded: false)) }
     var fileExtension: String { url.pathExtension.uppercased() }
     var isPDF: Bool { url.pathExtension.lowercased() == "pdf" }
 

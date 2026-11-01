@@ -374,7 +374,8 @@ struct ItemDetailView: View {
                                        selected: selectedBlockIndex,
                                        highlighted: hoveredBlockIndex,
                                        showsAll: vm.showTextBoxes,
-                                       dropped: vm.droppedLabels)
+                                       dropped: vm.droppedLabels,
+                                       textLines: lines.map(\.boundingBox))
                 }
                 if item.status == .completed, !lines.isEmpty {
                     TextBoxOverlay(lines: lines,
@@ -1385,6 +1386,8 @@ struct LayoutBlockOverlay: View {
     var showsAll = true
     /// Regions being left out of the document, drawn dashed.
     var dropped: Set<PPLayoutLabel> = []
+    /// Where the text lines are, so a label is not put on top of one.
+    var textLines: [CGRect] = []
 
     var body: some View {
         GeometryReader { geo in
@@ -1398,12 +1401,12 @@ struct LayoutBlockOverlay: View {
                     // put where it does not sit on top of another.
                     var placed: [CGRect] = []
                     let indices = visibleIndices
-                    let rects = indices.map { index in
-                        CGRect(x: fitted.minX + blocks[index].rect.minX * sx,
-                               y: fitted.minY + blocks[index].rect.minY * sy,
-                               width: blocks[index].rect.width * sx,
-                               height: blocks[index].rect.height * sy)
+                    func onCanvas(_ rect: CGRect) -> CGRect {
+                        CGRect(x: fitted.minX + rect.minX * sx, y: fitted.minY + rect.minY * sy,
+                               width: rect.width * sx, height: rect.height * sy)
                     }
+                    let rects = indices.map { onCanvas(blocks[$0].rect) }
+                    let text = textLines.map(onCanvas)
 
                     for (position, index) in indices.enumerated() {
                         let block = blocks[index]
@@ -1437,6 +1440,8 @@ struct LayoutBlockOverlay: View {
                         // A left-out region says so: a faint box with text in
                         // it that never shows up in the result otherwise reads
                         // as text the app failed to recognize.
+                        // The only region on the page: its number says nothing.
+                        if blocks.count == 1, !lit, !isFlagged, !isDropped, showsAll { continue }
                         let caption = isFlagged
                             ? String(localized: "\(block.readingOrder + 1) · Needs review")
                             : isDropped && (lit || !showsAll)
@@ -1454,7 +1459,8 @@ struct LayoutBlockOverlay: View {
                         let size = badge.measure(in: CGSize(width: 240, height: rect.height))
                         let chip = Self.chipPlacement(for: rect, size: CGSize(width: size.width + 8,
                                                                              height: size.height + 4),
-                                                      avoiding: placed, regions: rects, within: fitted)
+                                                      avoiding: placed, regions: rects, text: text,
+                                                      within: fitted)
                         placed.append(chip)
                         context.fill(Path(roundedRect: chip, cornerRadius: 3),
                                      with: .color(tint.opacity(isDropped && !lit && showsAll ? 0.6 : 1)))
@@ -1481,10 +1487,10 @@ struct LayoutBlockOverlay: View {
     /// sits on the page's margins and gutters rather than on the first words
     /// of the region, and only where no other region is. A page with regions
     /// packed against each other leaves no such place, and the label goes in
-    /// a corner of its own region instead; if all four are taken, top left,
-    /// which overlaps but is at least predictable.
+    /// a corner of its own region that has no text in it; if there is none,
+    /// top left, which overlaps but is at least predictable.
     nonisolated static func chipPlacement(for rect: CGRect, size: CGSize,
-                              avoiding placed: [CGRect], regions: [CGRect],
+                              avoiding placed: [CGRect], regions: [CGRect], text: [CGRect] = [],
                               within bounds: CGRect) -> CGRect {
         let outside = [
             CGPoint(x: rect.minX, y: rect.minY - size.height - 1),                // just above
@@ -1503,10 +1509,12 @@ struct LayoutBlockOverlay: View {
             guard bounds.contains(chip), !others.contains(where: { $0.intersects(chip) }) else { continue }
             if !placed.contains(where: { $0.intersects(chip) }) { return chip }
         }
-        for origin in inside {
-            let chip = CGRect(origin: origin, size: size)
-            guard bounds.contains(chip) else { continue }
-            if !placed.contains(where: { $0.intersects(chip) }) { return chip }
+        for avoidsText in [true, false] {
+            for origin in inside {
+                let chip = CGRect(origin: origin, size: size)
+                guard bounds.contains(chip), !placed.contains(where: { $0.intersects(chip) }) else { continue }
+                if !avoidsText || !text.contains(where: { $0.intersects(chip) }) { return chip }
+            }
         }
         return CGRect(origin: inside[0], size: size)
     }
