@@ -515,33 +515,43 @@ private struct AutoScrollButton: View {
 
 private struct JoinedPreview: View {
     let state: ScrollRunState
+    @State private var labelHeight: CGFloat = 0
 
-    /// The newest part, at the bottom, as the page grows a strip at a time:
-    /// what was just scrolled to is what the user wants to see joined. It
-    /// glides up as it grows, as the page itself moves, rather than jumping
-    /// a strip at a time.
+    private static let spacing: CGFloat = 6
+
+    /// Right under the button, growing down as the page does until the
+    /// column is full; from then on the newest part stays at the bottom,
+    /// since what was just scrolled to is what the user wants to see joined.
+    /// It glides up as it grows, as the page itself moves, rather than
+    /// jumping a strip at a time.
     var body: some View {
-        VStack(spacing: 6) {
-            GeometryReader { space in
-                let width = space.size.width
-                let grown = CGFloat(state.grown) * width / CGFloat(state.previewWidth)
+        GeometryReader { space in
+            let width = space.size.width
+            let scale = width / CGFloat(max(state.previewWidth, 1))
+            let grown = CGFloat(state.grown) * scale
+            let joined = CGFloat((state.head?.height ?? 0) + state.grown) * scale
+            let room = max(space.size.height - labelHeight - Self.spacing, 0)
+            VStack(spacing: Self.spacing) {
                 VStack(spacing: 0) {
                     if let head = state.head { picture(head, width: width) }
                     ForEach(state.strips) { picture($0.image, width: width) }
                 }
                 .animation(.smooth(duration: 0.3)) { $0.modifier(Glide(shown: grown, target: grown)) }
-                .frame(width: width, height: space.size.height, alignment: .bottom)
+                .frame(width: width, height: min(joined, room), alignment: .bottom)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
+                // The size so far, as the size label gives an area.
+                (state.lost ? Text("Too fast: scroll back a little, then on more slowly") : Text(verbatim: state.size))
+                    .font(state.lost ? .caption : Font(CaptureMarks.sizeFont))
+                    .foregroundStyle(state.lost ? Color.orange : Color.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .fixedSize()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { labelHeight = $0 }
             }
-            // The size so far, as the size label gives an area.
-            (state.lost ? Text("Too fast: scroll back a little, then on more slowly") : Text(verbatim: state.size))
-                .font(state.lost ? .caption : Font(CaptureMarks.sizeFont))
-                .foregroundStyle(state.lost ? Color.orange : Color.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.black.opacity(0.6), in: Capsule())
+            .frame(width: width, height: space.size.height, alignment: .top)
         }
     }
 
