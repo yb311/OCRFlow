@@ -295,7 +295,7 @@ extension OCRViewModel {
         guard let reveal else { return }
         if written == 0 {
             prompt = UserPrompt(title: String(localized: "No Tables to Export"),
-                                message: String(localized: "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information."))
+                                message: String(localized: "Only tables whose structure was recognized by close reading can be exported to Excel. Tables quick reading read as plain text have no cell information."))
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([reveal])
         }

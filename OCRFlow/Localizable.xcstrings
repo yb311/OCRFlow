@@ -299,12 +299,12 @@
         }
       }
     },
-    "%@; reread with PaddleOCR-VL" : {
+    "%@; reread closely" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@，改由 PaddleOCR-VL 重读"
+            "value" : "%@，改由仔细识别重读"
           }
         }
       }
@@ -639,16 +639,6 @@
         }
       }
     },
-    "%lld of %lld PP-OCRv6 lines have low confidence" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PP-OCRv6 有 %lld/%lld 行置信度过低"
-          }
-        }
-      }
-    },
     "%lld of %lld pages read last time. Recognizing reads only the remaining pages" : {
       "localizations" : {
         "zh-Hans" : {
@@ -687,7 +677,7 @@
         }
       }
     },
-    "%lld pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check" : {
+    "%lld pairs of cells in the table are in a different order from their text on the page; content may be in the wrong rows or columns. Please check" : {
       "localizations" : {
         "en" : {
           "variations" : {
@@ -695,13 +685,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld pair of cells in the table is ordered differently from the layout PP-OCRv6 saw; content may be in the wrong row or column. Please check"
+                  "value" : "%lld pair of cells in the table is in a different order from its text on the page; content may be in the wrong row or column. Please check"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check"
+                  "value" : "%lld pairs of cells in the table are in a different order from their text on the page; content may be in the wrong rows or columns. Please check"
                 }
               }
             }
@@ -710,17 +700,17 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "表格中 %lld 组单元格的行列顺序与 PP-OCRv6 看到的版面不符，可能有内容错行错列，请核对"
+            "value" : "表格中 %lld 组单元格的顺序与页面上文字的位置不符，可能有内容错行错列，请核对"
           }
         }
       }
     },
-    "%lld pieces of text PP-OCRv6 read inside the table (%@%@) are missing from it. Cells may have been skipped or misplaced; please check" : {
+    "%lld pieces of text quick reading found inside the table (%@%@) are missing from it. Cells may have been skipped or misplaced; please check" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%#@items@ PP-OCRv6 read inside the table (%2$@%3$@) %#@verb@ missing from it. Cells may have been skipped or misplaced; please check"
+            "value" : "%#@items@ quick reading found inside the table (%2$@%3$@) %#@verb@ missing from it. Cells may have been skipped or misplaced; please check"
           },
           "substitutions" : {
             "items" : {
@@ -768,7 +758,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PP-OCRv6 在表格中读到的 %lld 处内容（%@%@）不在表格里，可能有单元格漏读或错位，请核对"
+            "value" : "快速识别在表格中读到的 %lld 处内容（%@%@）不在表格里，可能有单元格漏读或错位，请核对"
           }
         }
       }
@@ -2167,6 +2157,106 @@
         }
       }
     },
+    "Close reading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别"
+          }
+        }
+      }
+    },
+    "Close reading can't process this image (error %d)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别无法处理这张图片（错误码 %d）"
+          }
+        }
+      }
+    },
+    "Close reading couldn't read this region: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别无法读取此区域：%@"
+          }
+        }
+      }
+    },
+    "Close reading couldn't read this region; kept the earlier reading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别无法读取此区域，保留了先前的结果"
+          }
+        }
+      }
+    },
+    "Close reading failed (error %d)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别失败（错误码 %d）"
+          }
+        }
+      }
+    },
+    "Close reading read less than half as much text as quick reading; something may be missing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别读出的文字比快速识别少一半以上，可能漏读"
+          }
+        }
+      }
+    },
+    "Close reading read nothing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别没有读出内容"
+          }
+        }
+      }
+    },
+    "Close reading read nothing; kept the earlier reading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别没有读出内容，保留了先前的结果"
+          }
+        }
+      }
+    },
+    "Close reading read nothing; kept the original result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别没有读出内容，保留了原结果"
+          }
+        }
+      }
+    },
+    "Close reading was interrupted; content may be incomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别中断，内容可能不完整"
+          }
+        }
+      }
+    },
     "Collapse" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2447,16 +2537,6 @@
         }
       }
     },
-    "Couldn't create the PaddleOCR-VL context: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 上下文创建失败：%@"
-          }
-        }
-      }
-    },
     "Couldn't create the input chunk" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2487,42 +2567,32 @@
         }
       }
     },
-    "Couldn't load PaddleOCR-VL (%@)" : {
+    "Couldn't load close reading (%@)" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PaddleOCR-VL 加载失败（%@）"
+            "value" : "仔细识别加载失败（%@）"
           }
         }
       }
     },
-    "Couldn't load the PaddleOCR model: %@" : {
+    "Couldn't load close reading: %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PaddleOCR 模型加载失败：%@"
+            "value" : "仔细识别加载失败：%@"
           }
         }
       }
     },
-    "Couldn't load the PaddleOCR-VL model: %@" : {
+    "Couldn't load quick reading: %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PaddleOCR-VL 模型加载失败：%@"
-          }
-        }
-      }
-    },
-    "Couldn't load the PaddleOCR-VL vision encoder: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 视觉编码器加载失败：%@"
+            "value" : "快速识别加载失败：%@"
           }
         }
       }
@@ -2533,6 +2603,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法加载图片文件"
+          }
+        }
+      }
+    },
+    "Couldn't load the image part of close reading: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别的图像部分加载失败：%@"
           }
         }
       }
@@ -2553,6 +2633,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法从 %@ 中解析字符字典"
+          }
+        }
+      }
+    },
+    "Couldn't start close reading: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仔细识别启动失败：%@"
           }
         }
       }
@@ -2747,12 +2837,12 @@
         }
       }
     },
-    "Differs a lot from the %@ result (%@ character overlap); please check" : {
+    "Differs a lot from the other reading (%@ character overlap); please check" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "与%@的结果差异较大（字符重合 %@），请核对"
+            "value" : "与另一次识别的结果差异较大（字符重合 %@），请核对"
           }
         }
       }
@@ -2907,22 +2997,22 @@
         }
       }
     },
-    "Download the PaddleOCR-VL model in Settings first" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要先在设置中下载 PaddleOCR-VL 模型"
-          }
-        }
-      }
-    },
     "Download to get the most out of this mode" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载以下模型，充分发挥此模式的效果"
+          }
+        }
+      }
+    },
+    "Download “Tables, formulas and charts” in Settings first" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要先在设置中下载“表格、公式和图表”"
           }
         }
       }
@@ -4059,12 +4149,12 @@
         }
       }
     },
-    "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure (PaddleOCR-VL, or PP-OCRv6 with layout analysis on); others fall back to plain text." : {
+    "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure; others fall back to plain text." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保留标题层级、图片位置与表格。只有做过版面分析的结果才有这些结构（PaddleOCR-VL，或开启了版面分析的 PP-OCRv6）；没有的会退回纯文本。"
+            "value" : "保留标题层级、图片位置与表格。只有做过版面分析的结果才有这些结构；没有的会退回纯文本。"
           }
         }
       }
@@ -4119,12 +4209,22 @@
         }
       }
     },
-    "Layout analysis found text here, but PP-OCRv6 read nothing" : {
+    "Layout analysis found text here, but quick reading found nothing" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "版面分析认为这里有文字，但 PP-OCRv6 没有读出内容"
+            "value" : "版面分析认为这里有文字，但快速识别没有读出内容"
+          }
+        }
+      }
+    },
+    "Layout analysis isn't downloaded, so this whole page was read by quick reading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未下载版面分析，本页全部用快速识别读取"
           }
         }
       }
@@ -4959,12 +5059,12 @@
         }
       }
     },
-    "Only tables whose structure was recognized by PaddleOCR-VL (or the VL layer in Smart Layering) can be exported to Excel. Tables PP-OCRv6 read as plain text have no cell information." : {
+    "Only tables whose structure was recognized by close reading can be exported to Excel. Tables quick reading read as plain text have no cell information." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只有由 PaddleOCR-VL（或智能分层中的 VL 层）识别出结构的表格才能导出到 Excel；PP-OCRv6 按普通文字读出的表格没有单元格信息。"
+            "value" : "只有经仔细识别读出结构的表格才能导出到 Excel；快速识别按普通文字读出的表格没有单元格信息。"
           }
         }
       }
@@ -5179,26 +5279,6 @@
         }
       }
     },
-    "PP-OCRv6 average confidence %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PP-OCRv6 平均置信度 %@"
-          }
-        }
-      }
-    },
-    "PP-OCRv6 found no text here; reading it with PaddleOCR-VL instead" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PP-OCRv6 在此区域没有检测到文字，改由 PaddleOCR-VL 读取"
-          }
-        }
-      }
-    },
     "PP-OCRv6 model. One model covers 50 languages and outputs line boxes with confidence" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5215,16 +5295,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PP-OCRv6。一个模型可读 50 种语言：简体中文、繁体中文、英语、日语，以及 46 种拉丁字母语言。"
-          }
-        }
-      }
-    },
-    "PaddleOCR inference failed: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR 推理失败：%@"
           }
         }
       }
@@ -5255,116 +5325,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PaddleOCR-VL 1.6 逐块读取版面分析在页面上找到的内容。请下载版面分析，以及两个模型中的任意一个。"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL can't process this image (error %d)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 无法处理这张图片（错误码 %d）"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL couldn't read this region: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 无法读取此区域：%@"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL couldn't read this region; kept the %@ result" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 无法读取此区域，保留了 %@ 的结果"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL inference failed (error %d)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 推理失败（错误码 %d）"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL inference was interrupted; content may be incomplete" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 推理中断，内容可能不完整"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL isn't installed, so this region (%@) was read as plain text and its structure wasn't restored" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未安装 PaddleOCR-VL，%@按普通文字识别，结构未还原"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL read less than half as much text as PP-OCRv6; something may be missing" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 读出的文字比 PP-OCRv6 少一半以上，可能漏读"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL read nothing" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 没有读出内容"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL read nothing; kept the %@ result" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 没有读出内容，保留了 %@ 的结果"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL read nothing; kept the original result" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 没有读出内容，保留了原结果"
-          }
-        }
-      }
-    },
-    "PaddleOCR-VL reread failed: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 重读失败：%@"
           }
         }
       }
@@ -5737,6 +5697,76 @@
         }
       }
     },
+    "Quick reading" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别"
+          }
+        }
+      }
+    },
+    "Quick reading average confidence %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别平均置信度 %@"
+          }
+        }
+      }
+    },
+    "Quick reading failed: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别失败：%@"
+          }
+        }
+      }
+    },
+    "Quick reading found no text here, so close reading reads it instead" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别在此区域没有检测到文字，改由仔细识别读取"
+          }
+        }
+      }
+    },
+    "Quick reading has low confidence in %lld of %lld lines" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别有 %lld/%lld 行置信度过低"
+          }
+        }
+      }
+    },
+    "Quick reading returned output of an unexpected shape: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速识别的输出形状异常：%@"
+          }
+        }
+      }
+    },
+    "Quick reading's dictionary file is missing, so results can't be decoded." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少快速识别的字典文件，无法解码识别结果。"
+          }
+        }
+      }
+    },
     "Quit OCRFlow" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5767,12 +5797,22 @@
         }
       }
     },
-    "Read again with PaddleOCR-VL using a higher output limit; if the result differs you can pick one (⌥⌘R)" : {
+    "Read again closely with a higher output limit; if the result differs you can pick one (⌥⌘R)" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用 PaddleOCR-VL 以更大的输出上限重新读取，结果不同时可以二选一（⌥⌘R）"
+            "value" : "用仔细识别以更大的输出上限重新读取，结果不同时可以二选一（⌥⌘R）"
+          }
+        }
+      }
+    },
+    "Read this block again closely" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用仔细识别重新读取这一块"
           }
         }
       }
@@ -6063,12 +6103,12 @@
         }
       }
     },
-    "Recognize This File Again with PaddleOCR-VL" : {
+    "Recognize This File Again with Close Reading" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用 PaddleOCR-VL 重新识别此文件"
+            "value" : "用仔细识别重新识别此文件"
           }
         }
       }
@@ -6113,16 +6153,6 @@
         }
       }
     },
-    "Recognize this block again with PaddleOCR-VL" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 PaddleOCR-VL 重新识别这一块"
-          }
-        }
-      }
-    },
     "Recognize this page again; other pages stay as they are" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6133,12 +6163,12 @@
         }
       }
     },
-    "Recognize with PaddleOCR-VL Only" : {
+    "Recognize with Close Reading Only" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只用 PaddleOCR-VL 识别"
+            "value" : "只用仔细识别"
           }
         }
       }
@@ -6559,6 +6589,16 @@
         }
       }
     },
+    "Reread closely on request" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按要求仔细重读"
+          }
+        }
+      }
+    },
     "Reread low-confidence regions with PaddleOCR-VL" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6589,32 +6629,32 @@
         }
       }
     },
-    "Reread with PaddleOCR-VL on request" : {
+    "Rereading closely will replace the edited text." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手动要求 PaddleOCR-VL 重读"
+            "value" : "仔细重读会替换修改后的文字。"
           }
         }
       }
     },
-    "Rereading with PaddleOCR-VL will replace the edited text." : {
+    "Rereading closely…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用 PaddleOCR-VL 重读会替换修改后的文字。"
+            "value" : "正在仔细重读…"
           }
         }
       }
     },
-    "Rereading with PaddleOCR-VL…" : {
+    "Rereading failed: %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在用 PaddleOCR-VL 重读…"
+            "value" : "重读失败：%@"
           }
         }
       }
@@ -7407,12 +7447,12 @@
         }
       }
     },
-    "Smart Layering, the default engine, uses a layout model to find tables, formulas and columns, and PaddleOCR-VL to read them. Without these, every page is read as plain lines of text." : {
+    "Smart Layering, the default engine, uses layout analysis to find tables, formulas and columns, and close reading to read them. Without these, every page is read as plain lines of text." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "默认的“智能分层”引擎先用版面模型找出表格、公式和分栏，再交给 PaddleOCR-VL 识别。没有这两个模型时，每一页都只会按普通文字行识别。"
+            "value" : "默认的“智能分层”引擎先用版面分析找出表格、公式和分栏，再交给仔细识别读取。没有这两项下载时，每一页都只会按普通文字行识别。"
           }
         }
       }
@@ -7887,52 +7927,12 @@
         }
       }
     },
-    "The PDF text layer has no text here; reading the image with PP-OCRv6 instead" : {
+    "The PDF text layer has no text here, so quick reading reads the image instead" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PDF 文字层在此区域没有文字，改用 PP-OCRv6 识别图像"
-          }
-        }
-      }
-    },
-    "The PaddleOCR dictionary file is missing, so results can't be decoded." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缺少 PaddleOCR 字典文件，无法解码识别结果。"
-          }
-        }
-      }
-    },
-    "The PaddleOCR model isn't loaded" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR 模型未加载"
-          }
-        }
-      }
-    },
-    "The PaddleOCR-VL model isn't loaded" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR-VL 模型未加载"
-          }
-        }
-      }
-    },
-    "The built-in PP-OCRv6 models read Chinese, English, Japanese and 46 more languages, offline." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "内置的 PP-OCRv6 模型可离线识别简繁中文、英文、日文等 50 种语言。"
+            "value" : "PDF 文字层在此区域没有文字，改用快速识别读取图像"
           }
         }
       }
@@ -7943,6 +7943,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "内置模型可识别简繁中文、英文、日文和 46 种拉丁字母语言。韩文、俄文、阿拉伯文、泰文、希腊文和天城文需要单独下载模型。"
+          }
+        }
+      }
+    },
+    "The built-in models read Chinese, English, Japanese and 46 more languages, offline." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置模型可离线识别简繁中文、英文、日文等 50 种语言。"
           }
         }
       }
@@ -8007,16 +8017,6 @@
         }
       }
     },
-    "The layout model isn't installed, so this page was read with PP-OCRv6 only, without per-region routing" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未安装版面分析模型，本页只用 PP-OCRv6 识别，未做分区路由"
-          }
-        }
-      }
-    },
     "The layout model returned no detections" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8033,6 +8033,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型没有词表"
+          }
+        }
+      }
+    },
+    "The model isn't loaded" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型未加载"
           }
         }
       }
@@ -8067,7 +8077,7 @@
         }
       }
     },
-    "The paragraph has %lld inline formulas, so PaddleOCR-VL reads it as LaTeX" : {
+    "The paragraph has %lld inline formulas, so close reading reads it as LaTeX" : {
       "localizations" : {
         "en" : {
           "variations" : {
@@ -8075,13 +8085,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "The paragraph has %lld inline formula, so PaddleOCR-VL reads it as LaTeX"
+                  "value" : "The paragraph has %lld inline formula, so close reading reads it as LaTeX"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "The paragraph has %lld inline formulas, so PaddleOCR-VL reads it as LaTeX"
+                  "value" : "The paragraph has %lld inline formulas, so close reading reads it as LaTeX"
                 }
               }
             }
@@ -8090,12 +8100,12 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "段落含 %lld 处行内公式，交由 PaddleOCR-VL 识别为 LaTeX"
+            "value" : "段落含 %lld 处行内公式，交由仔细识别读成 LaTeX"
           }
         }
       }
     },
-    "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it" : {
+    "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so close reading reads it" : {
       "localizations" : {
         "en" : {
           "variations" : {
@@ -8103,13 +8113,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "The paragraph has %lld inline formula, which the PDF text layer can't represent, so PaddleOCR-VL reads it"
+                  "value" : "The paragraph has %lld inline formula, which the PDF text layer can't represent, so close reading reads it"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it"
+                  "value" : "The paragraph has %lld inline formulas, which the PDF text layer can't represent, so close reading reads it"
                 }
               }
             }
@@ -8118,7 +8128,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "段落含 %lld 处行内公式，PDF 文字层表达不了公式结构，交由 PaddleOCR-VL 识别"
+            "value" : "段落含 %lld 处行内公式，PDF 文字层表达不了公式结构，交由仔细识别读取"
           }
         }
       }
@@ -8609,16 +8619,6 @@
         }
       }
     },
-    "Unexpected PaddleOCR model output shape: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PaddleOCR 模型输出形状异常：%@"
-          }
-        }
-      }
-    },
     "Unknown error" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8709,12 +8709,12 @@
         }
       }
     },
-    "Vertical text goes to PaddleOCR-VL" : {
+    "Vertical text goes to close reading" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "竖排文字交由 PaddleOCR-VL 识别"
+            "value" : "竖排文字交由仔细识别"
           }
         }
       }
@@ -9019,12 +9019,12 @@
         }
       }
     },
-    "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from PaddleOCR-VL; tables PP-OCRv6 read as text are not exported." : {
+    "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from close reading; tables quick reading read as text are not exported." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "把识别出结构的表格写成 Excel 工作簿，每个表格一个工作表，合并单元格保持合并，纯数字写成数值。表格结构来自 PaddleOCR-VL，PP-OCRv6 读成文字的表格不会导出。"
+            "value" : "把识别出结构的表格写成 Excel 工作簿，每个表格一个工作表，合并单元格保持合并，纯数字写成数值。表格结构来自仔细识别，快速识别读成文字的表格不会导出。"
           }
         }
       }
@@ -9169,16 +9169,6 @@
         }
       }
     },
-    "the other engine" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "另一引擎"
-          }
-        }
-      }
-    },
     "“%@” has manual edits" : {
       "localizations" : {
         "zh-Hans" : {
@@ -9225,6 +9215,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”在这个文件里的第 %lld 处，共 %lld 处（⌘G 下一处，⇧⌘G 上一处）"
+          }
+        }
+      }
+    },
+    "“Tables, formulas and charts” isn't downloaded, so this region (%@) was read as plain text and its structure wasn't restored" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未下载“表格、公式和图表”，此区域（%@）按普通文字识别，结构未还原"
           }
         }
       }

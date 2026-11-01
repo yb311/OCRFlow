@@ -74,46 +74,46 @@ enum ReviewReason: Hashable, Codable {
     var message: String {
         switch self {
         case let .structureNotRestored(label):
-            return String(localized: "PaddleOCR-VL isn't installed, so this region (\(label.label)) was read as plain text and its structure wasn't restored")
+            return String(localized: "“Tables, formulas and charts” isn't downloaded, so this region (\(label.label)) was read as plain text and its structure wasn't restored")
         case .layoutTextUnread:
-            return String(localized: "Layout analysis found text here, but PP-OCRv6 read nothing")
+            return String(localized: "Layout analysis found text here, but quick reading found nothing")
         case let .lowConfidence(finding):
             return String(localized: "\(finding.description); worth checking")
-        case let .vlFailed(error, kept, hadFallback):
+        case let .vlFailed(error, _, hadFallback):
             return hadFallback
-                ? String(localized: "PaddleOCR-VL couldn't read this region; kept the \(Self.name(of: kept)) result")
-                : String(localized: "PaddleOCR-VL couldn't read this region: \(error)")
-        case let .vlReadNothing(kept, hadFallback):
+                ? String(localized: "Close reading couldn't read this region; kept the earlier reading")
+                : String(localized: "Close reading couldn't read this region: \(error)")
+        case let .vlReadNothing(_, hadFallback):
             return hadFallback
-                ? String(localized: "PaddleOCR-VL read nothing; kept the \(Self.name(of: kept)) result")
-                : String(localized: "PaddleOCR-VL read nothing")
+                ? String(localized: "Close reading read nothing; kept the earlier reading")
+                : String(localized: "Close reading read nothing")
         case let .outputLimit(tokens):
             return String(localized: "Output hit the \(tokens) token limit; content may be incomplete")
         case .repetition:
             return String(localized: "The model repeated itself and was cut off; something may be missing")
         case .interrupted:
-            return String(localized: "PaddleOCR-VL inference was interrupted; content may be incomplete")
+            return String(localized: "Close reading was interrupted; content may be incomplete")
         case .noTableStructure:
             return String(localized: "No table structure was recognized; only the text was read")
         case .readLessThanHalf:
-            return String(localized: "PaddleOCR-VL read less than half as much text as PP-OCRv6; something may be missing")
-        case let .disagrees(other, overlap):
-            return String(localized: "Differs a lot from the \(Self.name(of: other)) result (\((Double(overlap) / 100).percentText) character overlap); please check")
+            return String(localized: "Close reading read less than half as much text as quick reading; something may be missing")
+        case let .disagrees(_, overlap):
+            return String(localized: "Differs a lot from the other reading (\((Double(overlap) / 100).percentText) character overlap); please check")
         case let .tableCellsMisordered(pairs):
-            return String(localized: "\(pairs) pairs of cells in the table are ordered differently from the layout PP-OCRv6 saw; content may be in the wrong rows or columns. Please check")
+            return String(localized: "\(pairs) pairs of cells in the table are in a different order from their text on the page; content may be in the wrong rows or columns. Please check")
         case let .tableTextMissing(count, examples):
             let quoted = examples.map { "“\($0)”" }.joined(separator: String(localized: ", "))
-            return String(localized: "\(count) pieces of text PP-OCRv6 read inside the table (\(quoted)\(count > examples.count ? String(localized: " etc.") : "")) are missing from it. Cells may have been skipped or misplaced; please check")
+            return String(localized: "\(count) pieces of text quick reading found inside the table (\(quoted)\(count > examples.count ? String(localized: " etc.") : "")) are missing from it. Cells may have been skipped or misplaced; please check")
         case .rereading:
-            return String(localized: "Rereading with PaddleOCR-VL…")
+            return String(localized: "Rereading closely…")
         case .rereadReadNothing:
-            return String(localized: "PaddleOCR-VL read nothing; kept the original result")
+            return String(localized: "Close reading read nothing; kept the original result")
         case .rereadDiffers:
             return String(localized: "The reread differs from the original. Choose which one to keep")
         case let .rereadFailed(error):
-            return String(localized: "PaddleOCR-VL reread failed: \(error)")
+            return String(localized: "Rereading failed: \(error)")
         case .layoutModelMissing:
-            return String(localized: "The layout model isn't installed, so this page was read with PP-OCRv6 only, without per-region routing")
+            return String(localized: "Layout analysis isn't downloaded, so this whole page was read by quick reading")
         case let .pdfTextLayer(verdict):
             return String(localized: "This page's text comes from the PDF text layer (\(verdict.description))")
         case .pdfNativeBody:
@@ -121,7 +121,7 @@ enum ReviewReason: Hashable, Codable {
         case let .pageFailed(page, error):
             return String(localized: "Page \(page + 1) failed: \(error ?? String(localized: "Unknown error"))")
         case let .structureReadAsPlainText(loadError):
-            return String(localized: "This page has tables or formulas, but it was read as plain text: \(String(localized: "Couldn't load PaddleOCR-VL (\(loadError))"))")
+            return String(localized: "This page has tables or formulas, but it was read as plain text: \(String(localized: "Couldn't load close reading (\(loadError))"))")
         case let .pageOutputLimit(tokens):
             return String(localized: "Page output hit the \(tokens) token limit; content may be incomplete")
         }
@@ -134,10 +134,6 @@ enum ReviewReason: Hashable, Codable {
         case .outputLimit, .pageOutputLimit: return true
         default:                             return false
         }
-    }
-
-    private static func name(of source: PPTextSource?) -> String {
-        source?.label ?? String(localized: "the other engine")
     }
 }
 
@@ -162,9 +158,9 @@ enum LowConfidence: Hashable, Codable {
     var description: String {
         switch self {
         case let .lines(unsure, total):
-            return String(localized: "\(unsure) of \(total) PP-OCRv6 lines have low confidence")
+            return String(localized: "Quick reading has low confidence in \(unsure) of \(total) lines")
         case let .average(percent):
-            return String(localized: "PP-OCRv6 average confidence \((Double(percent) / 100).percentText)")
+            return String(localized: "Quick reading average confidence \((Double(percent) / 100).percentText)")
         }
     }
 }
@@ -189,19 +185,19 @@ enum RoutingReason: Hashable, Codable {
     var message: String {
         switch self {
         case .verticalText:
-            return String(localized: "Vertical text goes to PaddleOCR-VL")
+            return String(localized: "Vertical text goes to close reading")
         case let .inlineFormulas(count):
-            return String(localized: "The paragraph has \(count) inline formulas, so PaddleOCR-VL reads it as LaTeX")
+            return String(localized: "The paragraph has \(count) inline formulas, so close reading reads it as LaTeX")
         case .ppFoundNothing:
-            return String(localized: "PP-OCRv6 found no text here; reading it with PaddleOCR-VL instead")
+            return String(localized: "Quick reading found no text here, so close reading reads it instead")
         case let .lowConfidence(finding):
-            return String(localized: "\(finding.description); reread with PaddleOCR-VL")
+            return String(localized: "\(finding.description); reread closely")
         case let .pdfInlineFormulas(count):
-            return String(localized: "The paragraph has \(count) inline formulas, which the PDF text layer can't represent, so PaddleOCR-VL reads it")
+            return String(localized: "The paragraph has \(count) inline formulas, which the PDF text layer can't represent, so close reading reads it")
         case .pdfNoText:
-            return String(localized: "The PDF text layer has no text here; reading the image with PP-OCRv6 instead")
+            return String(localized: "The PDF text layer has no text here, so quick reading reads the image instead")
         case .rereadOnRequest:
-            return String(localized: "Reread with PaddleOCR-VL on request")
+            return String(localized: "Reread closely on request")
         }
     }
 }

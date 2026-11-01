@@ -45,8 +45,8 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
         case .auto:           return String(localized: "Smart Layering")
         case .visionFast:     return String(localized: "Vision Fast")
         case .visionAccurate: return String(localized: "Vision Accurate")
-        case .paddleOCR:      return "PP-OCRv6"
-        case .paddleVL:       return "PaddleOCR-VL"
+        case .paddleOCR:      return String(localized: "Quick reading")
+        case .paddleVL:       return String(localized: "Close reading")
         }
     }
 
@@ -837,7 +837,7 @@ final class OCRViewModel {
             return rereadBlockNow(itemID: itemID, page: page, blockIndex: blockIndex)
         }
         prompt = UserPrompt(title: String(localized: "This region has manual edits"),
-                            message: String(localized: "Rereading with PaddleOCR-VL will replace the edited text."),
+                            message: String(localized: "Rereading closely will replace the edited text."),
                             confirmation: .init(label: String(localized: "Reread")) { [weak self] in
                                 self?.rereadBlockNow(itemID: itemID, page: page, blockIndex: blockIndex)
                             })

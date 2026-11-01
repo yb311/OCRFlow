@@ -328,13 +328,13 @@ enum DocumentRecognizer {
             preconditionFailure("Apple Vision is not one of the PaddleOCR engines")
         case .paddleVL:
             guard let vlPipeline = engines.vlPipeline else {
-                throw VLError.backendFailed(String(localized: "The PaddleOCR-VL model isn't loaded"))
+                throw VLError.backendFailed(String(localized: "The model isn't loaded"))
             }
             return try vlPipeline.parse(image: image, config: settings.vlConfig,
                                         progress: progress, isCancelled: isCancelled)
         case .paddleOCR:
             guard let paddle = engines.paddle else {
-                throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
+                throw PPOCRError.sessionFailed(String(localized: "The model isn't loaded"))
             }
             var config = settings.paddleConfig
             if drawnByPDF { config.useDocOrientation = false }
@@ -349,7 +349,7 @@ enum DocumentRecognizer {
                                 doubtBelow: settings.layered.escalationConfidence)
         case .auto:
             guard let layered = engines.layered else {
-                throw PPOCRError.sessionFailed(String(localized: "The PaddleOCR model isn't loaded"))
+                throw PPOCRError.sessionFailed(String(localized: "The model isn't loaded"))
             }
             var page = try layered.read(image: image, progress: progress, isCancelled: isCancelled)
             page.notes += unavailableNotes(engines, page: page)

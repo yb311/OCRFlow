@@ -49,14 +49,14 @@ struct WelcomeView: View {
                 point("lock", "Everything stays on your Mac",
                       "Recognition runs locally. Files and text are never uploaded.")
                 point("checkmark.circle", "Ready to use now",
-                      "The built-in PP-OCRv6 models read Chinese, English, Japanese and 46 more languages, offline.")
+                      "The built-in models read Chinese, English, Japanese and 46 more languages, offline.")
             }
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Recommended: tables, formulas and complex layouts")
                         .font(.headline)
-                    Text("Smart Layering, the default engine, uses a layout model to find tables, formulas and columns, and PaddleOCR-VL to read them. Without these, every page is read as plain lines of text.")
+                    Text("Smart Layering, the default engine, uses layout analysis to find tables, formulas and columns, and close reading to read them. Without these, every page is read as plain lines of text.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -20,8 +20,8 @@ enum PPTextSource: String, Sendable, Codable {
     /// Who read it, as the result pane names them.
     var label: String {
         switch self {
-        case .visionLanguageModel: return "PaddleOCR-VL"
-        case .plainOCR:            return "PP-OCRv6"
+        case .visionLanguageModel: return String(localized: "Close reading")
+        case .plainOCR:            return String(localized: "Quick reading")
         case .pdfTextLayer:        return String(localized: "PDF text layer")
         }
     }

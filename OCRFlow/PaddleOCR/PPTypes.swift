@@ -274,15 +274,15 @@ enum PPOCRError: LocalizedError {
         case let .modelsMissing(tier, missing, path):
             return String(localized: "Missing model files for \(tier.label): \(missing.formatted(.list(type: .and))). Download them in Model Manager, or put the files in \(path) and try again.")
         case .dictionaryMissing:
-            return String(localized: "The PaddleOCR dictionary file is missing, so results can't be decoded.")
+            return String(localized: "Quick reading's dictionary file is missing, so results can't be decoded.")
         case let .charsetMismatch(expected, actual):
             return String(localized: "The recognition model and dictionary don't match: the model outputs \(actual) classes, the dictionary has \(expected). Make sure the dictionary next to the model is from the same release.")
         case let .sessionFailed(msg):
-            return String(localized: "Couldn't load the PaddleOCR model: \(msg)")
+            return String(localized: "Couldn't load quick reading: \(msg)")
         case let .inferenceFailed(msg):
-            return String(localized: "PaddleOCR inference failed: \(msg)")
+            return String(localized: "Quick reading failed: \(msg)")
         case let .unexpectedOutputShape(msg):
-            return String(localized: "Unexpected PaddleOCR model output shape: \(msg)")
+            return String(localized: "Quick reading returned output of an unexpected shape: \(msg)")
         case .imageDecodeFailed:
             return String(localized: "Couldn't decode the image pixels")
         }

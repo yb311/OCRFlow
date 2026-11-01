@@ -202,15 +202,15 @@ enum VLError: LocalizedError {
         case let .modelsMissing(variant, missing, path):
             return String(localized: "Missing \(variant.label) model files: \(missing.formatted(.list(type: .and))). Download them in Model Manager, or put the files in \(path) and try again.")
         case let .backendFailed(msg):
-            return String(localized: "Couldn't load the PaddleOCR-VL model: \(msg)")
+            return String(localized: "Couldn't load close reading: \(msg)")
         case let .contextFailed(msg):
-            return String(localized: "Couldn't create the PaddleOCR-VL context: \(msg)")
+            return String(localized: "Couldn't start close reading: \(msg)")
         case let .multimodalFailed(msg):
-            return String(localized: "Couldn't load the PaddleOCR-VL vision encoder: \(msg)")
+            return String(localized: "Couldn't load the image part of close reading: \(msg)")
         case let .tokenizeFailed(code):
-            return String(localized: "PaddleOCR-VL can't process this image (error \(code))")
+            return String(localized: "Close reading can't process this image (error \(code))")
         case let .evalFailed(code):
-            return String(localized: "PaddleOCR-VL inference failed (error \(code))")
+            return String(localized: "Close reading failed (error \(code))")
         case .imageDecodeFailed:
             return String(localized: "Couldn't decode the image pixels")
         case let .layoutModelMissing(path):

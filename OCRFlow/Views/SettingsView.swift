@@ -1033,13 +1033,13 @@ struct SettingsView: View {
     private var exportFormatHint: String {
         switch vm.exportFormat {
         case .markdown:
-            return String(localized: "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure (PaddleOCR-VL, or PP-OCRv6 with layout analysis on); others fall back to plain text.")
+            return String(localized: "Keeps heading levels, image positions and tables. Only results with layout analysis have this structure; others fall back to plain text.")
         case .plainText:
             return String(localized: "Writes only the recognized text, with no structure.")
         case .json:
             return String(localized: "Writes, page by page, each line's text, four-point coordinates and confidence, plus each layout region's type, reading order, position, which engine read it and why it needs review — for further processing by other programs.")
         case .excel:
-            return String(localized: "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from PaddleOCR-VL; tables PP-OCRv6 read as text are not exported.")
+            return String(localized: "Writes tables with recognized structure to an Excel workbook, one sheet per table, keeping merged cells merged and writing plain numbers as numbers. Table structure comes from close reading; tables quick reading read as text are not exported.")
         case .searchablePDF:
             return String(localized: "Keeps each page as it looks (PDF pages stay vector, not re-rasterized) and lays the recognized text over it as an invisible layer, so it can be searched and copied in Preview, Spotlight and elsewhere. Pages that already have a text layer are left alone.")
         }

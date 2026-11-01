@@ -496,8 +496,8 @@ struct ReviewDetailView: View {
                 .keyboardShortcut("r", modifiers: [.command, .option])
                 .disabled(rereading || !canReread)
                 .help(canReread
-                      ? "Read again with PaddleOCR-VL using a higher output limit; if the result differs you can pick one (⌥⌘R)"
-                      : "Download the PaddleOCR-VL model in Settings first")
+                      ? "Read again closely with a higher output limit; if the result differs you can pick one (⌥⌘R)"
+                      : "Download “Tables, formulas and charts” in Settings first")
             }
 
             Spacer()

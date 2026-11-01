@@ -108,8 +108,8 @@ struct SidebarView: View {
                                 }
                             }
                             if count == 1, vm.canReadWithVL(item) {
-                                Button(item.status == .pending ? "Recognize with PaddleOCR-VL Only"
-                                                               : "Recognize This File Again with PaddleOCR-VL") {
+                                Button(item.status == .pending ? "Recognize with Close Reading Only"
+                                                               : "Recognize This File Again with Close Reading") {
                                     vm.readWithVL(id: item.id)
                                 }
                                 .disabled(vm.isProcessing)

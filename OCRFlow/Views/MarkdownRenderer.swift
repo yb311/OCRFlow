@@ -705,7 +705,7 @@ struct MarkdownDocumentView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .help("Recognize this block again with PaddleOCR-VL")
+                    .help("Read this block again closely")
                 }
             }
             .buttonStyle(.borderless)
