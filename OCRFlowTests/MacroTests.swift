@@ -267,6 +267,50 @@ struct MacroTests {
         #expect(clear == Array((long.height - 10)..<long.height))
     }
 
+    /// An area that takes in the bottom of a window, and the desktop under
+    /// it: the window's rounded corners, and its border, drawn faintly over
+    /// the lines that scroll under it. At the bottom of the picture once, not
+    /// a line across it at every join.
+    @Test func aWindowsEdgeAtTheBottomIsNotJoinedOnAtEveryStrip() throws {
+        let page = longPage()
+        var layout = Layout()
+        layout.footer = 8
+        func edged(_ offset: Int) -> CGImage {
+            let plain = frame(of: page, at: offset, layout)
+            let context = context(width: plain.width, height: plain.height)
+            context.draw(plain, in: CGRect(x: 0, y: 0, width: plain.width, height: plain.height))
+            // Desktop, the border over the page's last rows, the corners.
+            context.setFillColor(CGColor(red: 0.4, green: 0.3, blue: 0.45, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: plain.width, height: layout.footer))
+            for corner in [0, plain.width - 8] {
+                context.fill(CGRect(x: corner, y: layout.footer, width: 8, height: 10))
+            }
+            context.setFillColor(CGColor(gray: 0.3, alpha: 0.6))
+            context.fill(CGRect(x: 0, y: layout.footer, width: plain.width, height: 2))
+            return context.makeImage()!
+        }
+        // Rows with the border's grey across them, where the page is blank.
+        let border = pixels(edged(0))[(layout.height - layout.footer - 1) * layout.width * 4 + 12 * 4]
+        func borders(in long: CGImage) -> Int {
+            let bytes = pixels(long)
+            let rowBytes = bytes.count / long.height
+            return (0..<long.height).filter { y in
+                (0..<long.width).filter { bytes[y * rowBytes + $0 * 4] == border }.count > 20
+            }.count
+        }
+
+        let stitcher = LiveStitcher()
+        let offsets = Array(stride(from: 0, through: 600, by: 20))
+        for offset in offsets { _ = stitcher.add(edged(offset)) }
+        let long = try #require(stitcher.finish().first)
+        #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
+        #expect(borders(in: long) == 2)
+
+        let joined = try #require(ScrollStitcher.stitch([0, 290, 580, 870].map(edged))?.first)
+        #expect(joined.height == layout.header + 870 + layout.middle + layout.footer)
+        #expect(borders(in: joined) == 2)
+    }
+
     /// The same frame twice, a step back up, a jump too far: passed over,
     /// and joining goes on from the next that carries on.
     @Test func passesOverFramesThatDoNotCarryOn() throws {

@@ -104,15 +104,21 @@ enum ScrollStitcher {
         guard let first = frame(candidates[0]) else { return nil }
         var last = Gray(first)
         var taken: [(index: Int, shift: Int)] = [(candidates[0], 0)]
+        var still: [Int] = []
         for index in candidates.dropFirst() {
             guard let image = frame(index) else { return nil }
             let next = Gray(image)
             guard let shift = shift(from: last, to: next, top: top, bottom: bottom, near: taken.last?.shift) else { continue }
+            if shift > 0 { still.append(stillRows(from: last, to: next, shift: shift, top: top, bottom: bottom)) }
             taken.append((index, shift))
             last = next
         }
+        // And a window's edge above them — leaving room for the furthest
+        // move to be cut from above it.
+        let farthest = taken.map(\.shift).max() ?? 0
+        let foot = still.isEmpty ? bottom : min(bottom + shared(still), height - top - farthest)
         guard taken.count > 1,
-              let parts = compose(taken: taken, height: height, top: top, bottom: bottom,
+              let parts = compose(taken: taken, height: height, top: top, bottom: foot,
                                   maxHeight: maxHeight, picture: frame) else { return nil }
         return (parts, taken.last?.index == count - 1)
     }
@@ -269,6 +275,35 @@ enum ScrollStitcher {
         var count = 0
         while count < limit, a.difference(row: start + count * step, from: b, row: start + count * step) < 4 {
             count += 1
+        }
+        return count
+    }
+
+    /// How many rows above the `bottom` ones stay put while the rest moves
+    /// `shift` rows on from `a` to `b` — at most a few dozen.
+    ///
+    /// A window's own edge at the bottom of the area: its rounded corners,
+    /// and a border drawn faintly over what scrolls under it. Lines passing
+    /// under the border change it too much for `sameRows`; but in places it
+    /// is just as it was and not what moved there, which a row that scrolls
+    /// never is. Left to scroll, every strip would bring the edge with it, a
+    /// line across the picture at each join.
+    static func stillRows(from a: Gray, to b: Gray, shift: Int, top: Int, bottom: Int) -> Int {
+        let width = a.width
+        let limit = min(96, a.height / 8)
+        var count = 0
+        a.values.withUnsafeBufferPointer { av in
+            b.values.withUnsafeBufferPointer { bv in
+                while count < limit {
+                    let y = a.height - bottom - 1 - count
+                    guard y - shift >= top else { break }
+                    let row = y * width, moved = (y - shift) * width
+                    guard (0..<width).contains(where: { x in
+                        abs(av[row + x] - bv[row + x]) <= 8 && abs(av[row + x] - bv[moved + x]) > 24
+                    }) else { break }
+                    count += 1
+                }
+            }
         }
         return count
     }

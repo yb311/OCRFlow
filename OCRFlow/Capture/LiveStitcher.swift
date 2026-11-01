@@ -62,7 +62,7 @@ final class LiveStitcher: @unchecked Sendable {
         }
         guard frame.width == first.width, frame.height == first.height else { return .lost }
         let gray = ScrollStitcher.Gray(frame)
-        let edges = edges ?? (ScrollStitcher.sameRows(lastGray, gray, from: 0, by: 1, upTo: height / 2),
+        var edges = edges ?? (ScrollStitcher.sameRows(lastGray, gray, from: 0, by: 1, upTo: height / 2),
                               max(corners, ScrollStitcher.sameRows(lastGray, gray, from: height - 1, by: -1,
                                                                    upTo: height / 2 - 1)))
         // Close to the last distance first: cheap, and right nearly always.
@@ -93,7 +93,11 @@ final class LiveStitcher: @unchecked Sendable {
         }
         guard shift > 0 else { return .unchanged }
 
-        if self.edges == nil { self.edges = edges }
+        if self.edges == nil {
+            edges.bottom += ScrollStitcher.stillRows(from: lastGray, to: gray, shift: shift,
+                                                     top: edges.top, bottom: edges.bottom)
+            self.edges = edges
+        }
         let end = height - edges.bottom
         guard let slice = Self.copy(frame, rows: (end - shift)..<end) else { return .lost }
         slices.append(slice)
