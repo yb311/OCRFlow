@@ -488,7 +488,7 @@ extension LiveCaptureTests {
         click(CGPoint(x: bar.frame.maxX - fromRight, y: top - bar.frame.midY))
     }
 
-    /// Auto Scroll, beside the area, over what has been joined.
+    /// Auto Scroll, in the middle of the area.
     private func clickAutoScroll() throws {
         let button = try XCTUnwrap(NSApp.windows.first {
             $0.isVisible && ($0.contentView.map { String(describing: type(of: $0)) } ?? "").contains("AutoScrollButton")

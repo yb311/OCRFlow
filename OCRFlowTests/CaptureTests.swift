@@ -112,44 +112,39 @@ struct CaptureTests {
 
     // MARK: - Long screenshot controls
 
-    /// The button and the preview are one column: the same left edge, the
-    /// same width, the button's top level with the area's, the preview
-    /// under it — beside the area, never over it.
-    @MainActor @Test func theScrollControlsAreOneColumnBesideTheArea() {
+    /// The button in the middle of the area; the preview beside it, its
+    /// top level with the area's, as tall — never over it.
+    @MainActor @Test func theScrollButtonIsInTheMiddleAndThePreviewBeside() {
         let screen = CGRect(x: 0, y: 0, width: 1920, height: 1050)
         let area = CGRect(x: 300, y: 200, width: 659, height: 600)
-        let column = CaptureMarks.scrollColumnFrames(for: area, on: screen, buttonHeight: 32)
-        #expect(column.button.minX == column.preview.minX)
-        #expect(column.button.width == column.preview.width)
-        #expect(column.button.width == CaptureMarks.columnWidth)
-        #expect(column.button.maxY == area.maxY)
-        #expect(column.preview.maxY == column.button.minY - 8)
-        #expect(column.preview.minY == area.minY)
+        let frames = CaptureMarks.scrollFrames(for: area, on: screen, buttonSize: CGSize(width: 130, height: 32))
+        #expect(abs(frames.button.midX - area.midX) <= 0.5 && abs(frames.button.midY - area.midY) <= 0.5)
+        #expect(frames.button.size == CGSize(width: 130, height: 32))
+        #expect(frames.preview.width == CaptureMarks.columnWidth)
+        #expect(frames.preview.maxY == area.maxY && frames.preview.minY == area.minY)
         // More room to the right: there.
-        #expect(column.button.minX == area.maxX + 8)
-        #expect(!column.button.intersects(area) && !column.preview.intersects(area))
+        #expect(frames.preview.minX == area.maxX + 8)
+        #expect(!frames.preview.intersects(area))
     }
 
-    @MainActor @Test func theScrollControlsGoWhereThereIsRoom() {
+    @MainActor @Test func theScrollPreviewGoesWhereThereIsRoom() {
         let screen = CGRect(x: 0, y: 0, width: 1920, height: 1050)
+        let button = CGSize(width: 130, height: 32)
         // Near the right edge: to the left.
         let right = CGRect(x: 1200, y: 100, width: 700, height: 800)
-        let left = CaptureMarks.scrollColumnFrames(for: right, on: screen, buttonHeight: 32)
-        #expect(left.button.maxX == right.minX - 8)
-        // Little room either side: narrower, still on screen, still a column.
+        #expect(CaptureMarks.scrollFrames(for: right, on: screen, buttonSize: button).preview.maxX == right.minX - 8)
+        // Little room either side: narrower, still on screen.
         let wide = CGRect(x: 100, y: 100, width: 1720, height: 800)
-        let narrow = CaptureMarks.scrollColumnFrames(for: wide, on: screen, buttonHeight: 32)
-        #expect(narrow.button.width == CaptureMarks.minimumColumnWidth)
-        #expect(narrow.button.width == narrow.preview.width && narrow.button.minX == narrow.preview.minX)
-        #expect(screen.contains(narrow.button) && screen.contains(narrow.preview))
-        // A short area: the preview keeps a usable height, below the button.
+        let narrow = CaptureMarks.scrollFrames(for: wide, on: screen, buttonSize: button).preview
+        #expect(narrow.width == CaptureMarks.minimumColumnWidth)
+        #expect(screen.contains(narrow))
+        // A short area: the preview keeps a usable height, from its top.
         let short = CGRect(x: 300, y: 500, width: 400, height: 60)
-        let low = CaptureMarks.scrollColumnFrames(for: short, on: screen, buttonHeight: 32)
-        #expect(low.preview.height == CaptureMarks.minimumPreviewHeight)
-        #expect(low.preview.maxY == low.button.minY - 8)
+        let low = CaptureMarks.scrollFrames(for: short, on: screen, buttonSize: button).preview
+        #expect(low.height == CaptureMarks.minimumPreviewHeight && low.maxY == short.maxY)
         // At the top of the screen: below its top edge.
         let top = CGRect(x: 300, y: 600, width: 400, height: 450)
-        #expect(CaptureMarks.scrollColumnFrames(for: top, on: screen, buttonHeight: 32).button.maxY == screen.maxY - 8)
+        #expect(CaptureMarks.scrollFrames(for: top, on: screen, buttonSize: button).preview.maxY == screen.maxY - 8)
     }
 
     // MARK: - Naming

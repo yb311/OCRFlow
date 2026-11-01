@@ -98,9 +98,11 @@ final class CaptureBar {
 /// of buttons. Each its own panel, over everything.
 @MainActor
 enum CaptureMarks {
-    static func panel(_ frame: CGRect, key: Bool = false) -> NSPanel {
-        let panel = key ? KeyPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            : NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    static func panel(_ frame: CGRect, key: Bool = false, passesWheel: Bool = false) -> NSPanel {
+        let style: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+        let panel = key ? KeyPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
+            : passesWheel ? WheelThroughPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
+            : NSPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         // Shown while another app is in front: during a long screenshot the
@@ -185,29 +187,27 @@ enum CaptureMarks {
         return frame
     }
 
-    /// A long screenshot's own controls, beside the area on whichever side
-    /// has more room: the button that scrolls for the user on top, what has
-    /// been joined under it, one column — the same left edge, the same
-    /// width — its top level with the area's. Nothing goes over the area,
-    /// where the pointer and the wheel are the user's, unless the screen
-    /// has no room beside it.
+    /// A long screenshot's own controls: the button that scrolls for the
+    /// user in the middle of the area, where the eye already is; what has
+    /// been joined beside it, on whichever side has more room, its top level
+    /// with the area's. The button lets the wheel through to what is under it.
     ///
     /// `screen` is the visible part of the screen the area is on.
-    static func scrollColumnFrames(for area: CGRect, on screen: CGRect,
-                                   buttonHeight: CGFloat) -> (button: CGRect, preview: CGRect) {
-        let gap: CGFloat = 8, spacing: CGFloat = 8
+    static func scrollFrames(for area: CGRect, on screen: CGRect,
+                             buttonSize: CGSize) -> (button: CGRect, preview: CGRect) {
+        let gap: CGFloat = 8
+        let button = CGRect(x: (area.midX - buttonSize.width / 2).rounded(), y: (area.midY - buttonSize.height / 2).rounded(),
+                            width: buttonSize.width, height: buttonSize.height)
         let room = (left: area.minX - screen.minX - 2 * gap, right: screen.maxX - area.maxX - 2 * gap)
         let right = room.right >= room.left
         // As wide as the preview needs to be read; narrower only for want of
-        // room, never so narrow that the button's name no longer fits.
+        // room, never so narrow it can no longer be.
         let width = min(columnWidth, max(minimumColumnWidth, right ? room.right : room.left))
         let x = right ? min(area.maxX + gap, screen.maxX - gap - width) : max(area.minX - gap - width, screen.minX + gap)
         let top = min(area.maxY, screen.maxY - gap)
-        let button = CGRect(x: x, y: top - buttonHeight, width: width, height: buttonHeight)
         let bottom = max(area.minY, screen.minY + gap)
-        let previewHeight = max(button.minY - spacing - bottom, minimumPreviewHeight)
-        let preview = CGRect(x: x, y: button.minY - spacing - previewHeight, width: width, height: previewHeight)
-        return (button, preview)
+        let height = max(top - bottom, minimumPreviewHeight)
+        return (button, CGRect(x: x, y: top - height, width: width, height: height))
     }
 
     static let columnWidth: CGFloat = 240
@@ -245,6 +245,46 @@ enum CaptureMarks {
 /// A panel that can take the keyboard without making OCRFlow the active app.
 final class KeyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+}
+
+/// A panel over something being scrolled: the wheel turned over it goes
+/// through to what is beneath. The first turn makes it see-through, and it
+/// takes clicks again once the wheel has been still a moment.
+final class WheelThroughPanel: NSPanel {
+    private var wheelMonitor: Any?
+    private var still: Timer?
+
+    override func sendEvent(_ event: NSEvent) {
+        guard event.type == .scrollWheel else { return super.sendEvent(event) }
+        ignoresMouseEvents = true
+        // See-through, its turns go to other apps: seen from there.
+        wheelMonitor = wheelMonitor ?? NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
+            MainActor.assumeIsolated { self?.turning() }
+        }
+        turning()
+    }
+
+    override func orderOut(_ sender: Any?) {
+        stopWatching()
+        super.orderOut(sender)
+    }
+
+    private func turning() {
+        still?.invalidate()
+        still = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.ignoresMouseEvents = false
+                self?.stopWatching()
+            }
+        }
+    }
+
+    private func stopWatching() {
+        still?.invalidate()
+        still = nil
+        if let wheelMonitor { NSEvent.removeMonitor(wheelMonitor) }
+        wheelMonitor = nil
+    }
 }
 
 /// The outline around what was chosen.

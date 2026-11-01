@@ -31,6 +31,8 @@ final class ScrollingCapture {
     private var scroller: SmoothScroller?
     private var lastGrowth = ContinuousClock.now
     private var lostFrames = 0
+    /// Where Auto Scroll sends the wheel: in the area, clear of its button.
+    private var wheelPoint = CGPoint.zero
     /// How far it has been scrolled, in pixels of the picture.
     private(set) var grown = 0
 
@@ -163,7 +165,7 @@ final class ScrollingCapture {
     /// stops: the pointer and the scrolling are theirs again.
     private func toggleAutomatic(_ target: CaptureTarget, in frame: CGRect) {
         if state.automatic { return stopAutomatic() }
-        let scroller = SmoothScroller(at: Self.scrollPoint(in: frame), speed: Self.autoSpeed, distance: nil,
+        let scroller = SmoothScroller(at: wheelPoint, speed: Self.autoSpeed, distance: nil,
                                       yields: true, isBehind: { [stream] in stream?.isBehind ?? false })
         self.scroller = scroller
         lastGrowth = .now
@@ -189,9 +191,11 @@ final class ScrollingCapture {
         takeoverMonitor = nil
     }
 
-    /// Where to scroll: the middle.
-    private static func scrollPoint(in frame: CGRect) -> CGPoint {
-        CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.midY)
+    /// Where to scroll: the middle; or, with `button` there, halfway
+    /// between it and the bottom.
+    private static func scrollPoint(in frame: CGRect, under button: CGRect? = nil) -> CGPoint {
+        let y = button.map { (frame.minY + $0.minY) / 2 } ?? frame.midY
+        return CGPoint(x: frame.midX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - y)
     }
 
     /// The pointer moved to `point`, then a scroll of `distance` points
@@ -262,25 +266,26 @@ final class ScrollingCapture {
             self?.finish = picked
         }, beside: area)
 
-        // Beside it, the button that scrolls for the user and under it what
-        // has been joined.
+        // In the middle, the button that scrolls for the user; beside it,
+        // what has been joined.
         let buttonHost = FirstMouseHostingView(rootView: AutoScrollButton(state: state))
-        let column = CaptureMarks.scrollColumnFrames(for: area, on: CaptureMarks.screenFrame(for: area),
-                                                     buttonHeight: buttonHost.fittingSize.height)
+        let frames = CaptureMarks.scrollFrames(for: area, on: CaptureMarks.screenFrame(for: area),
+                                               buttonSize: buttonHost.fittingSize)
+        wheelPoint = Self.scrollPoint(in: area, under: frames.button)
         // The panels keep the frames given here, whatever the content would
-        // rather be: the button fills the column, whichever name it shows.
+        // rather be: the button stays put, whichever name it shows.
         buttonHost.sizingOptions = []
-        let button = CaptureMarks.panel(column.button)
+        let button = CaptureMarks.panel(frames.button, passesWheel: true)
         button.contentView = buttonHost
         let previewHost = NSHostingView(rootView: JoinedPreview(state: state))
         previewHost.sizingOptions = []
-        let preview = CaptureMarks.panel(column.preview)
+        let preview = CaptureMarks.panel(frames.preview)
         preview.ignoresMouseEvents = true
         preview.contentView = previewHost
 
         panels = shades + [size, preview, button, bar]
         panels.forEach { $0.orderFrontRegardless() }
-        return column.preview
+        return frames.preview
     }
 
     /// Escape lets it go, from any app. Only the user's own: OCRFlow's
@@ -497,19 +502,25 @@ private struct AutoScrollButton: View {
 
     var body: some View {
         Button { state.onAutomatic() } label: {
-            Label(state.automatic ? "Stop Scrolling" : "Auto Scroll",
-                  systemImage: state.automatic ? "pause.fill" : "arrow.down")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(.black.opacity(0.78), in: Capsule())
-                .contentShape(Capsule())
+            // As wide as the longer name, so it stays put when it changes.
+            ZStack {
+                name(!state.automatic).hidden()
+                name(state.automatic)
+            }
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.black.opacity(0.78), in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help("Scroll by hand at your own pace, or let OCRFlow scroll. Stop wherever you want the picture to end.")
+    }
+
+    private func name(_ automatic: Bool) -> some View {
+        Label(automatic ? "Stop Scrolling" : "Auto Scroll", systemImage: automatic ? "pause.fill" : "arrow.down")
     }
 }
 
@@ -519,7 +530,7 @@ private struct JoinedPreview: View {
 
     private static let spacing: CGFloat = 6
 
-    /// Right under the button, growing down as the page does until the
+    /// From the area's top, growing down as the page does until the
     /// column is full; from then on the newest part stays at the bottom,
     /// since what was just scrolled to is what the user wants to see joined.
     /// It glides up as it grows, as the page itself moves, rather than
