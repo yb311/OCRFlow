@@ -23,7 +23,7 @@ enum ScreenCapture {
             }
         } catch {
             // Not over the alert.
-            CaptureOverlay.closeLingering()
+            await CaptureOverlay.closeLingering()
             report(error)
             return nil
         }

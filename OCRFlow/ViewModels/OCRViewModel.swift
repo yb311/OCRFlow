@@ -1294,7 +1294,7 @@ final class OCRViewModel {
             // until the user has chosen what to do.
             guard let taken = await ScreenCapture.choose(lingering: true),
                   let area = ScreenCapture.frame(of: taken.target) else {
-                CaptureOverlay.closeLingering()
+                await CaptureOverlay.closeLingering()
                 return
             }
             var images = [taken.image]
@@ -1304,15 +1304,16 @@ final class OCRViewModel {
                 // screenshot's own marks are up over it — straight away when
                 // a permission is asked for first, so the question is seen.
                 if InputControl.isAllowedQuietly {
-                    Task { CaptureOverlay.closeLingering() }
+                    Task { await CaptureOverlay.closeLingering() }
                 } else {
-                    CaptureOverlay.closeLingering()
+                    await CaptureOverlay.closeLingering()
                 }
                 let (parts, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
                 if !parts.isEmpty { images = parts }
                 finish = picked
             } else {
-                CaptureOverlay.closeLingering()
+                // Recognizing shows OCRFlow's window: it stays in front.
+                await CaptureOverlay.closeLingering(givingBack: finish != .recognize)
             }
             switch finish {
             case .recognize: recognizeCaptures(images)

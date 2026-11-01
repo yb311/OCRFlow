@@ -17,10 +17,10 @@ final class CaptureOverlay {
     }
 
     /// Nil when the user cancels. `lingering`: once something is chosen,
-    /// the held screen stays, dimmed around it, until `closeLingering()` —
-    /// or a moment, unless `keepLingering()` — so what comes next shows over
-    /// it with no flash of the live screen between, and nothing beneath can
-    /// be clicked meanwhile.
+    /// the held screen stays, dimmed around it, and OCRFlow in front, until
+    /// `closeLingering()` — or a moment, unless `keepLingering()` — so what
+    /// comes next shows over it with no flash of the live screen between,
+    /// and nothing beneath can be clicked meanwhile.
     static func choose(from shots: [CGDirectDisplayID: CGImage], lingering: Bool = false) async -> Choice? {
         let overlay = CaptureOverlay(shots: shots)
         overlay.lingering = lingering
@@ -37,9 +37,26 @@ final class CaptureOverlay {
     private static var lingeringOverlay: CaptureOverlay?
 
     /// Takes away the held screen kept after a choice.
-    static func closeLingering() {
+    ///
+    /// OCRFlow stays the active app while it lingers — the bar's keys are
+    /// its own, and recognizing opens its window, which an app in the
+    /// background may not bring forward. `givingBack`: the app that was in
+    /// front gets its place back first, and the held screen stays over the
+    /// change — Stage Manager bringing that app's windows back — until it
+    /// has come forward, or a moment has passed. Without, OCRFlow stays in
+    /// front, for its own window to show.
+    static func closeLingering(givingBack: Bool = true) async {
         guard let overlay = lingeringOverlay else { return }
         lingeringOverlay = nil
+        if givingBack, let app = overlay.previousApp, !app.isActive {
+            app.activate()
+            for _ in 0..<20 where !app.isActive {
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            if UserDefaults(suiteName: "com.apple.WindowManager")?.bool(forKey: "GloballyEnabled") == true {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+        }
         overlay.panels.forEach { $0.orderOut(nil) }
         overlay.panels.removeAll()
     }
@@ -81,8 +98,9 @@ final class CaptureOverlay {
     private var lastSpot: (window: CGWindowID, spot: Spot)?
     private var panels: [OverlayWindow] = []
     private var continuation: CheckedContinuation<Choice?, Never>?
-    /// Given back its place once the choice is made: what comes next — the
-    /// bar of buttons, a long screenshot, a recording — happens there.
+    /// Given back its place once the choice is made — or, when the held
+    /// screen lingers, once that is taken away: a long screenshot or a
+    /// recording happens there.
     private var previousApp: NSRunningApplication?
     private var lingering = false
     /// Not closed after a moment: what came next is up over it.
@@ -231,7 +249,6 @@ final class CaptureOverlay {
         guard let continuation else { return }
         self.continuation = nil
         NSCursor.pop()
-        previousApp?.activate()
         if choice != nil, lingering, let area {
             // Kept until what comes next is up — or a moment, unless that
             // asks for more.
@@ -242,9 +259,10 @@ final class CaptureOverlay {
             Self.lingeringOverlay = self
             Task {
                 try? await Task.sleep(for: .seconds(2))
-                if Self.lingeringOverlay === self, !kept { Self.closeLingering() }
+                if Self.lingeringOverlay === self, !kept { await Self.closeLingering() }
             }
         } else {
+            previousApp?.activate()
             for panel in panels { panel.orderOut(nil) }
             panels.removeAll()
         }
