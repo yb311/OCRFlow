@@ -61,6 +61,9 @@ enum StepPlayer {
 enum InputControl {
     private static let requestedKey = "inputControl.requested"
 
+    /// Without asking.
+    static var isAllowedQuietly: Bool { AXIsProcessTrusted() }
+
     static func isAllowed() -> Bool {
         if AXIsProcessTrusted() { return true }
         // The first time, the system asks. After that it no longer does, so

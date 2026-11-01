@@ -18,6 +18,10 @@ enum CaptureFinish: Sendable {
 /// screenshot, cancel, save, copy. Recognizing is one choice among others; a
 /// screenshot is often wanted as a picture.
 ///
+/// Over the held screen, when the choice left it up: the screen stays as it
+/// was while choosing, and nothing beneath answers until the bar is done
+/// with. The caller takes the held screen away afterwards.
+///
 /// Return copies, Space saves, Escape or a right-click lets it go, and a
 /// double-click on what was chosen copies it.
 @MainActor
@@ -41,18 +45,17 @@ final class CaptureBar {
     private var monitors: [Any] = []
 
     private func show(around area: CGRect) {
-        // As it looked while being chosen: the rest of the screen dimmed.
-        let shades = CaptureMarks.shades(around: area)
+        // As it looked while being chosen: the held screen, dimmed around
+        // it and with its size, or the same drawn over the live one.
+        let held = CaptureOverlay.keepLingering()
+        let shades = held ? [] : CaptureMarks.shades(around: area) + [CaptureMarks.sizeLabel(for: area)]
         let catcher = CaptureMarks.outline(area, catchesClicks: true)
         (catcher.contentView as? OutlineView)?.onDoubleClick = { [weak self] in self?.finish(.copy) }
-        let size = CaptureMarks.sizeLabel(for: area)
         let bar = CaptureMarks.bar(CaptureActionsBar(items: [.recognize, .longCapture, .cancel, .save, .copy]) {
             [weak self] in self?.finish($0)
         }, beside: area)
-        panels = shades + [catcher, size, bar]
+        panels = shades + [catcher, bar]
         panels.forEach { $0.orderFrontRegardless() }
-        // Up over the held screen, which can go now.
-        CaptureOverlay.closeLingering()
 
         // The keys come here without OCRFlow coming forward: the bar is a
         // panel that takes the keyboard while another app stays active, as
@@ -132,39 +135,72 @@ enum CaptureMarks {
         return outline
     }
 
-    /// Above the top-left corner — or inside it, at the top of the screen.
+    // MARK: Size and bar, placed alike everywhere
+
+    static let sizeFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+    static let sizePadding = CGSize(width: 6, height: 3)
+
+    static func sizeText(for area: CGRect) -> String {
+        "\(Int(area.width.rounded())) × \(Int(area.height.rounded()))"
+    }
+
+    /// Above the top-left corner, its left edge on the area's — or just
+    /// inside the corner, at the top of the screen.
+    static func sizeLabelFrame(size: CGSize, for area: CGRect) -> CGRect {
+        let gap: CGFloat = 4
+        let screen = wholeScreen(for: area)
+        let y = area.maxY + gap + size.height <= screen.maxY ? area.maxY + gap : area.maxY - size.height - gap
+        let x = min(max(area.minX, screen.minX + gap), screen.maxX - size.width - gap)
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    /// The size of the area, as the held screen shows it while choosing.
     static func sizeLabel(for area: CGRect) -> NSPanel {
-        let host = NSHostingView(rootView: Text(verbatim: "\(Int(area.width.rounded())) × \(Int(area.height.rounded()))")
-            .font(.system(size: 11, weight: .medium).monospacedDigit())
+        let host = NSHostingView(rootView: Text(verbatim: sizeText(for: area))
+            .font(Font(sizeFont))
             .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .padding(.horizontal, sizePadding.width)
+            .padding(.vertical, sizePadding.height)
             .background(.black.opacity(0.7), in: Capsule()))
-        let size = host.fittingSize
-        let screen = screenFrame(for: area)
-        let y = area.maxY + 4 + size.height <= screen.maxY ? area.maxY + 4 : area.maxY - size.height - 4
-        let label = panel(CGRect(x: area.minX, y: y, width: size.width, height: size.height))
+        let label = panel(sizeLabelFrame(size: host.fittingSize, for: area))
         label.ignoresMouseEvents = true
         label.contentView = host
         return label
     }
 
-    /// Under the area at its right edge; above it when there is no room
-    /// below; inside it, at the bottom, when it fills the screen.
+    /// Under the area, its right edge on the area's. Without room below,
+    /// above it — over the size, when the two would meet; without room
+    /// there either, inside it at the bottom.
+    static func barFrame(size: CGSize, for area: CGRect, labelSize: CGSize = CGSize(width: 80, height: 20)) -> CGRect {
+        let gap: CGFloat = 8
+        let screen = wholeScreen(for: area)
+        let x = min(max(area.maxX - size.width, screen.minX + gap), screen.maxX - size.width - gap)
+        var frame = CGRect(x: x, y: area.minY - gap - size.height, width: size.width, height: size.height)
+        if frame.minY >= screen.minY + gap { return frame }
+        frame.origin.y = area.maxY + gap
+        let label = sizeLabelFrame(size: labelSize, for: area)
+        if frame.intersects(label.insetBy(dx: -4, dy: -4)) { frame.origin.y = max(frame.minY, label.maxY + 4) }
+        if frame.maxY <= screen.maxY - gap { return frame }
+        frame.origin.y = max(area.minY, screen.minY) + gap
+        return frame
+    }
+
     static func bar(_ content: some View, beside area: CGRect) -> NSPanel {
         let host = FirstMouseHostingView(rootView: content)
-        let size = host.fittingSize
-        let gap: CGFloat = 8
-        let screen = screenFrame(for: area)
-        let x = min(max(area.maxX - size.width, screen.minX + gap), screen.maxX - size.width - gap)
-        let y: CGFloat
-        if area.minY - gap - size.height >= screen.minY { y = area.minY - gap - size.height }
-        else if area.maxY + gap + size.height <= screen.maxY - 24 { y = area.maxY + gap + 24 }
-        else { y = max(area.minY, screen.minY) + gap }
-        let bar = panel(CGRect(x: x, y: y, width: size.width, height: size.height), key: true)
+        let text = sizeText(for: area).size(withAttributes: [.font: sizeFont])
+        let labelSize = CGSize(width: ceil(text.width) + 2 * sizePadding.width, height: ceil(text.height) + 2 * sizePadding.height)
+        let bar = panel(barFrame(size: host.fittingSize, for: area, labelSize: labelSize), key: true)
         bar.hasShadow = true
         bar.contentView = host
         return bar
+    }
+
+    /// The whole of the screen the area is on, menu bar and Dock included:
+    /// over the held screen they are only a picture.
+    static func wholeScreen(for area: CGRect) -> CGRect {
+        let center = CGPoint(x: area.midX, y: area.midY)
+        return (NSScreen.screens.first { NSMouseInRect(center, $0.frame, false) }
+            ?? NSScreen.screens.first { $0.frame.intersects(area) } ?? NSScreen.main ?? NSScreen.screens[0]).frame
     }
 
     static func screenFrame(for area: CGRect) -> CGRect {
@@ -262,7 +298,7 @@ struct CaptureActionsBar: View {
         switch item {
         case .recognize: "Recognize the text"
         case .longCapture: "Long screenshot: scroll on from here"
-        case .save: "Save… (Space)"
+        case .save: "Save (Space)"
         case .copy: "Copy to the clipboard (Return)"
         case .done: "Done"
         case .cancel: "Cancel (Esc or right-click)"

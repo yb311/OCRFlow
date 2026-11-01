@@ -1,21 +1,23 @@
 import AppKit
 import ServiceManagement
 
-/// Shows or hides the app's Dock icon.
+/// The app's Dock icon, there only while one of its windows is open.
 ///
-/// Hidden means "only while a window is open", not "never": an app with no
-/// Dock icon also has no menus at the top of the screen and drops behind
-/// other apps' windows, which would leave a document window half usable.
-/// So the icon comes back with the first window and leaves with the last.
+/// Screenshots live in the menu bar and need no window; recognizing images
+/// happens in the main window. Closing it leaves only the menu bar icon. An
+/// app with no Dock icon also has no menus at the top of the screen and
+/// drops behind other apps' windows, which would leave a window half usable,
+/// so the icon comes back with the first window.
 @MainActor
 final class DockIcon {
     static let shared = DockIcon()
 
-    var hidden = false {
-        didSet { if hidden != oldValue { update() } }
-    }
-
     private var observers: [NSObjectProtocol] = []
+
+    /// Watches the windows from now on.
+    func start() {
+        update()
+    }
 
     private init() {
         let center = NotificationCenter.default
@@ -35,7 +37,7 @@ final class DockIcon {
     }
 
     private func update() {
-        let policy: NSApplication.ActivationPolicy = hidden && !hasOpenWindow ? .accessory : .regular
+        let policy: NSApplication.ActivationPolicy = hasOpenWindow ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
         // Coming back from .accessory, the menus at the top only show for an

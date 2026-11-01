@@ -32,13 +32,15 @@ struct SettingsView: View {
     @State private var folderRole = WatchFolderRole.watched
 
     private enum WatchFolderRole {
-        case watched, output
+        case watched, output, screenshots
     }
 
     var body: some View {
         TabView {
             generalTab
                 .tabItem { Label("General", systemImage: "gearshape") }
+            screenshotTab
+                .tabItem { Label("Screenshot", systemImage: "camera.viewfinder") }
             recognitionTab
                 .tabItem { Label("Recognition", systemImage: "text.viewfinder") }
             textTab
@@ -55,10 +57,12 @@ struct SettingsView: View {
             switch folderRole {
             case .watched: vm.watchFolder = url
             case .output:  vm.watchOutputFolder = url
+            case .screenshots: vm.screenshotFolder = url
             }
         }
         .fileDialogMessage(folderRole == .output ? "Choose an output folder for results"
-                                                 : "Choose a folder to watch (including its subfolders)")
+                           : folderRole == .screenshots ? "Choose where screenshots are saved"
+                           : "Choose a folder to watch (including its subfolders)")
         .fileDialogConfirmationLabel("Choose")
     }
 
@@ -830,19 +834,8 @@ struct SettingsView: View {
                 .fixedSize()
             }
 
-            settingSection("Menu Bar & Dock") {
+            settingSection("Startup") {
                 VStack(alignment: .leading, spacing: 10) {
-                    toggleRow(isOn: $vm.showInMenuBar,
-                              title: "Show in menu bar",
-                              subtitle: "Capture, open files and reach settings from the icon at the top of the screen")
-                    toggleRow(isOn: $vm.showInDock,
-                              title: "Show in Dock",
-                              subtitle: "When off, OCRFlow starts in the menu bar, and its Dock icon only appears while one of its windows is open")
-                        // Hiding both would leave no way back into the app.
-                        .disabled(!vm.showInMenuBar)
-                    if !vm.showInMenuBar {
-                        hint("To hide the Dock icon, show OCRFlow in the menu bar first.")
-                    }
                     toggleRow(isOn: Binding(get: { opensAtLogin }, set: { setOpensAtLogin($0) }),
                               title: "Open at login",
                               subtitle: "Starts with your Mac, so capturing is ready straight away")
@@ -875,21 +868,6 @@ struct SettingsView: View {
                               title: "Skip completed files",
                               subtitle: "When you click Start Recognition again, files already recognized are not processed again")
                     translationRow
-                }
-            }
-
-            settingSection("Screenshot") {
-                VStack(alignment: .leading, spacing: 10) {
-                    toggleRow(isOn: $vm.globalCaptureShortcut,
-                              title: "Capture with \(GlobalHotKey.captureTitle) from any app",
-                              subtitle: "Drag out part of the screen or click a window, then choose what to do with it: copy, save, recognize the text, or scroll on for a long screenshot")
-                    if vm.globalCaptureShortcut, vm.captureShortcutTaken {
-                        Label("Another app is already using \(GlobalHotKey.captureTitle)", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(.orange)
-                    }
-                    toggleRow(isOn: $vm.showFloatingButton,
-                              title: "Show floating capture button",
-                              subtitle: "A small round button above all windows. Click to capture; point at it for Queue Screenshots and Record Actions. Drag to move it, right-click for more")
                 }
             }
 
@@ -938,6 +916,59 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(String(localized: "The recognition engine, model choices, all parameters, and text and export options return to their initial values. Downloaded models and files in the list are not affected."))
+            }
+        }
+    }
+
+    // MARK: - Tab: Screenshot
+
+    /// Screenshots live in the menu bar and need no window; what is set
+    /// here is theirs alone.
+    private var screenshotTab: some View {
+        settingsScroll {
+            settingSection("Taking Screenshots") {
+                VStack(alignment: .leading, spacing: 10) {
+                    toggleRow(isOn: $vm.globalCaptureShortcut,
+                              title: "Capture with \(GlobalHotKey.captureTitle) from any app",
+                              subtitle: "Drag out part of the screen or click a window, then choose what to do with it: copy, save, recognize the text, or scroll on for a long screenshot")
+                    if vm.globalCaptureShortcut, vm.captureShortcutTaken {
+                        Label("Another app is already using \(GlobalHotKey.captureTitle)", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    toggleRow(isOn: $vm.showFloatingButton,
+                              title: "Show floating capture button",
+                              subtitle: "A small round button above all windows. Click to capture; point at it for Queue Screenshots and Record Actions. Drag to move it, right-click for more")
+                }
+            }
+
+            settingSection("Saving") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text("Save to").font(.callout)
+                        Text(FileManager.default.displayName(atPath: vm.screenshotDestination.path(percentEncoded: false)))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(vm.screenshotDestination.path(percentEncoded: false))
+                        Spacer(minLength: 0)
+                        if vm.screenshotFolder != nil {
+                            Button("Desktop") { vm.screenshotFolder = nil }.controlSize(.small)
+                        }
+                        Button("Choose…") { chooseFolder(.screenshots) }.controlSize(.small)
+                    }
+                    Picker("Format", selection: $vm.screenshotFormat) {
+                        Text(verbatim: "PNG").tag(ScreenshotFormat.png)
+                        Text(verbatim: "JPEG").tag(ScreenshotFormat.jpeg)
+                        Text(verbatim: "HEIC").tag(ScreenshotFormat.heic)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    toggleRow(isOn: $vm.savesPagesAsPDF,
+                              title: "Save several pages as one PDF",
+                              subtitle: "What a recording or a queue of screenshots took, saved together. When off, each page is saved as a picture")
+                    hint("Saving — Space or the save button after a screenshot — puts it here straight away, without asking. PNG keeps every pixel; JPEG and HEIC are smaller.")
+                }
             }
         }
     }

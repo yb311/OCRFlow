@@ -209,6 +209,7 @@
       }
     },
     "%@%@ at %@, %@" : {
+      "comment" : "A click by position in its window: modifier keys, the kind of click, x, y",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -216,8 +217,7 @@
             "value" : "%1$@%2$@位置 %3$@, %4$@"
           }
         }
-      },
-      "comment" : "A click by position in its window: modifier keys, the kind of click, x, y"
+      }
     },
     "%@%@ “%@”" : {
       "localizations" : {
@@ -837,26 +837,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 个区域"
-          }
-        }
-      }
-    },
-    "%lld screenshots taken" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已截取 %lld 张"
-          }
-        }
-      }
-    },
-    "%lld taken" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已截 %lld 张"
           }
         }
       }
@@ -1811,16 +1791,6 @@
         }
       }
     },
-    "Capture, open files and reach settings from the icon at the top of the screen" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在屏幕顶部的图标里截图、打开文件和进入设置"
-          }
-        }
-      }
-    },
     "Captured while recording. It comes first in the next run; deleting this step deletes it too." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2021,6 +1991,16 @@
         }
       }
     },
+    "Choose where screenshots are saved" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择截图的保存位置"
+          }
+        }
+      }
+    },
     "Choose where to export the originals of %lld files" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2065,16 +2045,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择导出位置，%lld 个文件将各自保存为 .%@，并保留原文件夹结构"
-          }
-        }
-      }
-    },
-    "Choose where to save the screenshots" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择截图的保存位置"
           }
         }
       }
@@ -2823,6 +2793,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消选择所有文件（Esc 或 ⇧⌘A）"
+          }
+        }
+      }
+    },
+    "Desktop" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "桌面"
           }
         }
       }
@@ -3789,6 +3769,16 @@
         }
       }
     },
+    "Format" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "格式"
+          }
+        }
+      }
+    },
     "Formula number" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4439,16 +4429,6 @@
         }
       }
     },
-    "Menu Bar & Dock" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "菜单栏与程序坞"
-          }
-        }
-      }
-    },
     "Merge into one line (no line breaks)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5079,12 +5059,12 @@
         }
       }
     },
-    "Only save the pictures…" : {
+    "Only save, without recognizing" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只保存图片…"
+            "value" : "只保存，不识别"
           }
         }
       }
@@ -7197,12 +7177,12 @@
         }
       }
     },
-    "Save Here" : {
+    "Save (Space)" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存到这里"
+            "value" : "保存（空格）"
           }
         }
       }
@@ -7217,6 +7197,36 @@
         }
       }
     },
+    "Save several pages as one PDF" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多页合并保存为一个 PDF"
+          }
+        }
+      }
+    },
+    "Save to" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存到"
+          }
+        }
+      }
+    },
+    "Saved to “%@”" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存到“%@”"
+          }
+        }
+      }
+    },
     "Save…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7227,12 +7237,12 @@
         }
       }
     },
-    "Save… (Space)" : {
+    "Saving" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存…（空格）"
+            "value" : "保存"
           }
         }
       }
@@ -7243,6 +7253,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存后文本、Markdown 与导出都会跟着变"
+          }
+        }
+      }
+    },
+    "Saving — Space or the save button after a screenshot — puts it here straight away, without asking. PNG keeps every pixel; JPEG and HEIC are smaller." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图后按空格或点保存按钮，会直接存到这里，不再询问。PNG 无损；JPEG 和 HEIC 文件更小。"
           }
         }
       }
@@ -7507,16 +7527,6 @@
         }
       }
     },
-    "Show in Dock" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在程序坞中显示"
-          }
-        }
-      }
-    },
     "Show in Document" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7543,16 +7553,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在列表中显示"
-          }
-        }
-      }
-    },
-    "Show in menu bar" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在菜单栏中显示"
           }
         }
       }
@@ -7797,6 +7797,16 @@
         }
       }
     },
+    "Startup" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动"
+          }
+        }
+      }
+    },
     "Steps" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7933,6 +7943,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表格、公式、图表、印章，以及置信度低的区域；未安装时只标记待复核"
+          }
+        }
+      }
+    },
+    "Taking Screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取"
           }
         }
       }
@@ -8643,16 +8663,6 @@
         }
       }
     },
-    "To hide the Dock icon, show OCRFlow in the menu bar first." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要隐藏程序坞图标，请先在菜单栏中显示 OCRFlow。"
-          }
-        }
-      }
-    },
     "To repeat your clicks and key presses, turn on OCRFlow in Privacy & Security → Accessibility. What you do is only watched while you show it how to turn a page, and is never stored." : {
       "localizations" : {
         "zh-Hans" : {
@@ -9179,6 +9189,26 @@
         }
       }
     },
+    "What a recording or a queue of screenshots took, saved together. When off, each page is saved as a picture" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制或队列截图得到的多页一起保存时。关闭后每页各存为一张图片"
+          }
+        }
+      }
+    },
+    "What becomes of the screenshots?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些截图怎么处理？"
+          }
+        }
+      }
+    },
     "What frames a page rather than being part of it. Ticked items go into the results; the rest are left out. Footnotes are kept by default." : {
       "localizations" : {
         "zh-Hans" : {
@@ -9215,16 +9245,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每次运行结束时，由你选择识别、只保存还是丢弃。"
-          }
-        }
-      }
-    },
-    "When off, OCRFlow starts in the menu bar, and its Dock icon only appears while one of its windows is open" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭后，OCRFlow 启动时只出现在菜单栏，程序坞图标仅在打开其窗口时出现"
           }
         }
       }
@@ -9519,12 +9539,12 @@
         }
       }
     },
-    "“%@” took %lld screenshots" : {
+    "“%@” is done" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@”截取了 %2$lld 张"
+            "value" : "“%@”已完成"
           }
         }
       }

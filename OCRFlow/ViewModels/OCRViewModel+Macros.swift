@@ -80,13 +80,9 @@ extension OCRViewModel {
                 return
             }
             // What becomes of them, asked now: it depends on what was taken.
-            let choice = await ResultChoice.ask(String(localized: "“\(macro.name)” took \(count) screenshots"),
+            let choice = await ResultChoice.ask(String(localized: "“\(macro.name)” is done"),
                                                 options: [.recognize, .save, .discard])
-            var folder: URL?
-            if choice == .save {
-                folder = ResultChoice.chooseFolder(String(localized: "Choose where to save the screenshots"))
-                if folder == nil { return }
-            }
+            let folder = choice == .save ? screenshotDestination : nil
             var files: [URL] = []
             if choice != .discard {
                 for pages in runs where !pages.isEmpty {
@@ -94,8 +90,8 @@ extension OCRViewModel {
                 }
             }
             macros.discardRecordedCaptures(of: macro)
-            if folder != nil {
-                if !files.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(files) }
+            if let folder {
+                reportSaved(files, in: folder)
             } else {
                 deliver(files)
             }

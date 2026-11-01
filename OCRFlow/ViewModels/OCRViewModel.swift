@@ -173,9 +173,14 @@ struct OCRSettings: Codable, Equatable {
     var autoTranslate = false
     var translationTarget = DocumentTranslation.defaultTarget
     var globalCaptureShortcut = true
-    var showInMenuBar = true
-    var showInDock = true
     var showFloatingButton = false
+    /// Where screenshots are saved, without asking each time. Nil: the
+    /// desktop, where the Mac's own screenshots go.
+    var screenshotFolderPath: String?
+    var screenshotFormat: ScreenshotFormat = .png
+    /// Several pages saved at once — a recording, a queue — as one PDF, or a
+    /// picture each.
+    var savesPagesAsPDF = true
 }
 
 extension OCRSettings {
@@ -217,9 +222,10 @@ extension OCRSettings {
         autoTranslate = value(.autoTranslate, fallback.autoTranslate)
         translationTarget = value(.translationTarget, fallback.translationTarget)
         globalCaptureShortcut = value(.globalCaptureShortcut, fallback.globalCaptureShortcut)
-        showInMenuBar = value(.showInMenuBar, fallback.showInMenuBar)
-        showInDock = value(.showInDock, fallback.showInDock)
         showFloatingButton = value(.showFloatingButton, fallback.showFloatingButton)
+        screenshotFolderPath = try? container.decodeIfPresent(String.self, forKey: .screenshotFolderPath)
+        screenshotFormat = value(.screenshotFormat, fallback.screenshotFormat)
+        savesPagesAsPDF = value(.savesPagesAsPDF, fallback.savesPagesAsPDF)
         keptAuxiliary = value(.keptAuxiliary, fallback.keptAuxiliary)
     }
 }
@@ -432,9 +438,10 @@ final class OCRViewModel {
                     autoTranslate: autoTranslate,
                     translationTarget: translationTarget,
                     globalCaptureShortcut: globalCaptureShortcut,
-                    showInMenuBar: showInMenuBar,
-                    showInDock: showInDock,
-                    showFloatingButton: showFloatingButton)
+                    showFloatingButton: showFloatingButton,
+                    screenshotFolderPath: screenshotFolder?.path(percentEncoded: false),
+                    screenshotFormat: screenshotFormat,
+                    savesPagesAsPDF: savesPagesAsPDF)
     }
 
     private func persistSettings() {
@@ -491,10 +498,10 @@ final class OCRViewModel {
         autoTranslate = settings.autoTranslate
         translationTarget = settings.translationTarget
         globalCaptureShortcut = settings.globalCaptureShortcut
-        showInMenuBar = settings.showInMenuBar
-        // Without either, nothing would be left to bring the app back with.
-        showInDock = settings.showInDock || !settings.showInMenuBar
         showFloatingButton = settings.showFloatingButton
+        screenshotFolder = settings.screenshotFolderPath.map { URL(filePath: $0, directoryHint: .isDirectory) }
+        screenshotFormat = settings.screenshotFormat
+        savesPagesAsPDF = settings.savesPagesAsPDF
     }
 
     func resetAllSettings() {
@@ -1094,26 +1101,25 @@ final class OCRViewModel {
         if capture.register() { captureHotKeys.append(capture) } else { captureShortcutTaken = true }
     }
 
+    // MARK: - Saving screenshots
+
+    /// Where screenshots are saved; nil for the desktop.
+    var screenshotFolder: URL? {
+        didSet { persistSettings() }
+    }
+    var screenshotFormat = ScreenshotFormat.png {
+        didSet { persistSettings() }
+    }
+    var savesPagesAsPDF = true {
+        didSet { persistSettings() }
+    }
+    /// Where a screenshot saved now goes.
+    var screenshotDestination: URL {
+        screenshotFolder ?? URL.desktopDirectory
+    }
+
     // MARK: - Presence
 
-    /// An icon at the top of the screen with the app's main actions.
-    var showInMenuBar = true {
-        didSet {
-            persistSettings()
-            // Taking it out of the menu bar must not leave the app with no
-            // way back in.
-            if !showInMenuBar, !showInDock { showInDock = true }
-        }
-    }
-    /// When off, the Dock icon only shows while one of the app's windows is
-    /// open.
-    var showInDock = true {
-        didSet {
-            persistSettings()
-            if !showInDock, !showInMenuBar { showInMenuBar = true }
-            if !isRestoringSettings { updatePresence() }
-        }
-    }
     /// A small round button above every other window that captures on click.
     var showFloatingButton = false {
         didSet { persistSettings(); if !isRestoringSettings { updatePresence() } }
@@ -1121,7 +1127,6 @@ final class OCRViewModel {
     @ObservationIgnored private var floatingButton: FloatingCaptureButton?
 
     private func updatePresence() {
-        DockIcon.shared.hidden = !showInDock
         if showFloatingButton {
             if floatingButton == nil { floatingButton = FloatingCaptureButton(model: self) }
         } else {
@@ -1284,8 +1289,9 @@ final class OCRViewModel {
         isCapturing = true
         Task {
             defer { isCapturing = false }
-            // The held screen stays until the bar is up over it: no flash of
-            // the live screen between the two.
+            // The held screen stays while the bar is up over it: no flash of
+            // the live screen between the two, and nothing beneath answers
+            // until the user has chosen what to do.
             guard let taken = await ScreenCapture.choose(lingering: true),
                   let area = ScreenCapture.frame(of: taken.target) else {
                 CaptureOverlay.closeLingering()
@@ -1294,9 +1300,19 @@ final class OCRViewModel {
             var images = [taken.image]
             var finish = await CaptureBar.choose(around: area)
             if finish == .longCapture {
+                // Scrolling needs the live screen: it goes once the long
+                // screenshot's own marks are up over it — straight away when
+                // a permission is asked for first, so the question is seen.
+                if InputControl.isAllowedQuietly {
+                    Task { CaptureOverlay.closeLingering() }
+                } else {
+                    CaptureOverlay.closeLingering()
+                }
                 let (parts, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
                 if !parts.isEmpty { images = parts }
                 finish = picked
+            } else {
+                CaptureOverlay.closeLingering()
             }
             switch finish {
             case .recognize: recognizeCaptures(images)
@@ -1337,22 +1353,29 @@ final class OCRViewModel {
         HUDPanel.toast(String(localized: "Copied"))
     }
 
-    /// Where the user says, now. A very long picture in parts goes beside
-    /// the first, numbered.
+    /// Into the screenshots folder of the settings — the desktop unless
+    /// changed — with nothing to ask. A very long picture in parts is
+    /// numbered.
     private func saveCaptures(_ images: [CGImage]) {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = String(localized: "Screenshot \(Self.captureDate())") + ".png"
-        panel.canCreateDirectories = true
-        guard OwnWindows.whileModal({ panel.runModal() }) == .OK, let url = panel.url else { return }
-        let stem = url.deletingPathExtension().lastPathComponent
+        let folder = screenshotDestination
+        let stem = String(localized: "Screenshot \(Self.captureDate())")
+        let format = screenshotFormat
         var saved: [URL] = []
         for (index, image) in images.enumerated() {
-            let target = index == 0 ? url
-                : Self.freeURL(in: url.deletingLastPathComponent(), named: "\(stem) \(index + 1)", extension: "png")
-            if ScrollingCapture.write(image, to: target) { saved.append(target) }
+            let url = Self.freeURL(in: folder, named: index == 0 ? stem : "\(stem) \(index + 1)",
+                                   extension: format.pathExtension)
+            if format.write(image, to: url) { saved.append(url) }
         }
-        if saved.isEmpty { HUDPanel.toast(String(localized: "Could not save the screenshot")) }
+        reportSaved(saved, in: folder)
+    }
+
+    /// Said briefly, where they went.
+    func reportSaved(_ files: [URL], in folder: URL) {
+        if files.isEmpty {
+            HUDPanel.toast(String(localized: "Could not save the screenshot"))
+        } else {
+            HUDPanel.toast(String(localized: "Saved to “\(FileManager.default.displayName(atPath: folder.path(percentEncoded: false)))”"))
+        }
     }
 
     /// Screenshots taken one after another until Escape: dragging takes an
@@ -1368,15 +1391,14 @@ final class OCRViewModel {
             defer { try? FileManager.default.removeItem(at: folder) }
             let options: [ResultChoice.Option] = pages.count > 1
                 ? [.recognizeTogether, .recognizeEach, .save, .discard] : [.recognize, .save, .discard]
-            switch await ResultChoice.ask(String(localized: "\(pages.count) screenshots taken"), options: options) {
+            switch await ResultChoice.ask(String(localized: "What becomes of the screenshots?"), options: options) {
             case .recognizeTogether:
                 deliver(await captureFiles(from: pages, as: .document, named: nil))
             case .recognizeEach, .recognize:
                 deliver(await captureFiles(from: pages, as: .images, named: nil))
             case .save:
-                guard let target = ResultChoice.chooseFolder(String(localized: "Choose where to save the screenshots")) else { return }
-                let saved = await captureFiles(from: pages, as: .images, named: nil, into: target)
-                if !saved.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(saved) }
+                let folder = screenshotDestination
+                reportSaved(await captureFiles(from: pages, as: .document, named: nil, into: folder), in: folder)
             case .discard:
                 break
             }
@@ -1395,7 +1417,8 @@ final class OCRViewModel {
     /// each. The files given are left where they are.
     ///
     /// Into the library's screenshots folder, to be read, or, given a
-    /// `folder`, saved there as they are — a document then as a PDF.
+    /// `folder`, saved there as the settings say: pictures in the chosen
+    /// format, a document as one PDF or a picture a page.
     /// `name` heads the file names; by default they say what they are.
     func captureFiles(from pages: [URL], as output: Macro.Output, named name: String?,
                       into folder: URL? = nil) async -> [URL] {
@@ -1406,9 +1429,20 @@ final class OCRViewModel {
             folder.map { Self.freeURL(in: $0, named: label, extension: pathExtension) }
                 ?? newCaptureURL(named: label, extension: pathExtension)
         }
+        let format = screenshotFormat
+        /// To be read, as it is; to be saved, in the format of the settings.
         func copy(_ page: URL, _ label: String) -> URL? {
-            let url = destination(label, page.pathExtension)
-            return (try? FileManager.default.copyItem(at: page, to: url)) == nil ? nil : url
+            guard folder != nil else {
+                let url = destination(label, page.pathExtension)
+                return (try? FileManager.default.copyItem(at: page, to: url)) == nil ? nil : url
+            }
+            guard let image = PageImages.wholeImage(at: page) else { return nil }
+            return write(image, label)
+        }
+        func write(_ image: CGImage, _ label: String) -> URL? {
+            let url = destination(label, folder == nil ? "png" : format.pathExtension)
+            let written = folder == nil ? ScrollingCapture.write(image, to: url) : format.write(image, to: url)
+            return written ? url : nil
         }
         switch output {
         case .images:
@@ -1416,16 +1450,16 @@ final class OCRViewModel {
         case .longImage where pages.count > 1:
             let joined = await Task.detached { [pages] in ScrollStitcher.stitch(pages) }.value
             if let joined {
-                return joined.compactMap { image in
-                    let url = destination(label(String(localized: "Long Screenshot \(date)")), "png")
-                    return ScrollingCapture.write(image, to: url) ? url : nil
-                }
+                return joined.compactMap { write($0, label(String(localized: "Long Screenshot \(date)"))) }
             }
             // Not one scrolled view after all: pages, then.
             return await captureFiles(from: pages, as: .document, named: name, into: folder)
         case .document, .longImage:
             if pages.count == 1, folder == nil || LongImagePages.pages(of: pages[0]) == nil {
                 return [copy(pages[0], label(String(localized: "Screenshot \(date)")))].compactMap { $0 }
+            }
+            if folder != nil, !savesPagesAsPDF {
+                return pages.compactMap { copy($0, label(String(localized: "Screenshot \(date)"))) }
             }
             // A long picture among them is cut into pages of a usual shape,
             // as it would be read.

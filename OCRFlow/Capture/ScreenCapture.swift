@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// Capturing the screen, from asking for permission to the finished picture.
 @MainActor
@@ -21,6 +22,8 @@ enum ScreenCapture {
                 return (try await ScreenGrabber.capture(.window(id)), .window(id))
             }
         } catch {
+            // Not over the alert.
+            CaptureOverlay.closeLingering()
             report(error)
             return nil
         }
@@ -126,5 +129,45 @@ enum ScreenCapture {
             let top = NSScreen.screens.first?.frame.maxY ?? 0
             return CGRect(x: rect.minX, y: top - rect.maxY, width: rect.width, height: rect.height)
         }
+    }
+}
+
+/// The kind of file a screenshot is saved as.
+enum ScreenshotFormat: String, Codable, CaseIterable, Identifiable, Sendable {
+    case png
+    case jpeg
+    case heic
+
+    var id: String { rawValue }
+
+    var type: UTType {
+        switch self {
+        case .png: .png
+        case .jpeg: .jpeg
+        case .heic: .heic
+        }
+    }
+
+    var pathExtension: String { type.preferredFilenameExtension ?? rawValue }
+
+    /// Written as this kind of file. JPEG keeps no transparency, so what is
+    /// see-through — a window's rounded corners — is white, not black.
+    nonisolated func write(_ image: CGImage, to url: URL) -> Bool {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil)
+        else { return false }
+        var image = image
+        if self == .jpeg, image.alphaInfo != .none, image.alphaInfo != .noneSkipFirst, image.alphaInfo != .noneSkipLast,
+           let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                   space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) {
+            let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+            context.setFillColor(.white)
+            context.fill(bounds)
+            context.draw(image, in: bounds)
+            if let flat = context.makeImage() { image = flat }
+        }
+        let options = self == .png ? nil : [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
+        CGImageDestinationAddImage(destination, image, options)
+        return CGImageDestinationFinalize(destination)
     }
 }

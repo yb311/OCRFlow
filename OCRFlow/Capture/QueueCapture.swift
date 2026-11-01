@@ -121,7 +121,6 @@ final class QueueCapture {
         let url = folder.appending(path: String(format: "%04d.png", taken.count + 1))
         guard ScrollingCapture.write(image, to: url) else { return }
         taken.append(url)
-        state.count = taken.count
         ScreenCapture.flash(target)
     }
 
@@ -190,7 +189,6 @@ private final class SelectionView: NSView {
 @MainActor
 @Observable
 private final class QueueState {
-    var count = 0
     @ObservationIgnored var onEnd: () -> Void = {}
 }
 
@@ -203,10 +201,6 @@ private struct QueueView: View {
                 Image(systemName: "square.stack.3d.down.right").foregroundStyle(Color.accentColor)
                 Text("Queue Screenshots").font(.headline)
                 Spacer(minLength: 0)
-                Text("\(state.count) taken")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
             }
             Text("Drag out an area to take it. Clicks, scrolling and keys work as usual — turn the page, then drag again. Press Esc to finish.")
                 .font(.caption)

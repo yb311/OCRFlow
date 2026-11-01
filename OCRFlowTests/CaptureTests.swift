@@ -109,4 +109,35 @@ struct CaptureTests {
             #expect(image.height == size.1)
         }
     }
+
+    // MARK: - Saving
+
+    /// Each format is written as what it says; JPEG, which keeps no
+    /// transparency, shows what was see-through as white.
+    @Test func screenshotsAreSavedInTheChosenFormat() throws {
+        let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let context = CGContext(data: nil, width: 40, height: 40, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(),
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 10, y: 10, width: 20, height: 20))
+        let image = context.makeImage()!
+        for format in ScreenshotFormat.allCases {
+            let url = folder.appending(path: "shot").appendingPathExtension(format.pathExtension)
+            #expect(format.write(image, to: url))
+            let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
+            #expect(CGImageSourceGetType(source) as String? == format.type.identifier)
+            if format == .jpeg {
+                let read = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+                let pixel = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+                pixel.draw(read, in: CGRect(x: 0, y: 0, width: 40, height: 40))
+                let corner = pixel.data!.assumingMemoryBound(to: UInt8.self)[0]
+                #expect(corner > 240, "corner \(corner)")
+            }
+        }
+    }
 }

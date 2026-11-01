@@ -99,19 +99,26 @@ final class FloatingCaptureButton {
     // MARK: - Opening out
 
     private func expand() {
-        guard !state.expanded, !state.dragging else { return }
+        guard extras.isHidden, !state.dragging else { return }
         let screen = (NSScreen.screens.first { $0.frame.intersects(resting) } ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
         state.upward = resting.minY - Self.extrasHeight < screen.minY
         state.trailing = resting.midX > screen.midX
         layOut(open: true)
-        // Laid out, then shown opening: the buttons spring out of the main one.
-        state.expanded = true
+        extras.layoutSubtreeIfNeeded()
+        // Laid out closed at the new size first, then opened on a later
+        // pass: the buttons spring straight out of the main one, rather than
+        // sliding in from the side as the panel widens.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard let self, !self.extras.isHidden, !self.state.dragging else { return }
+            self.state.expanded = true
+        }
         watchPointer()
     }
 
     private func collapse() {
         watchTask?.cancel()
-        guard state.expanded else { return }
+        guard state.expanded || !extras.isHidden else { return }
         state.expanded = false
         state.hoveredExtra = nil
         layOut(open: false)
@@ -120,7 +127,7 @@ final class FloatingCaptureButton {
     /// Rests the main button at `frame`.
     private func rest(at frame: NSRect) {
         resting = frame
-        layOut(open: state.expanded)
+        layOut(open: !extras.isHidden)
     }
 
     /// The panel around the main button: just the button, or, `open`, with
@@ -155,7 +162,7 @@ final class FloatingCaptureButton {
             var away = 0
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(80))
-                guard let self, self.state.expanded else { return }
+                guard let self, !self.extras.isHidden else { return }
                 let pointer = NSEvent.mouseLocation
                 let circles = self.circles()
                 self.state.hoveredExtra = circles.dropFirst().firstIndex { $0.insetBy(dx: -3, dy: -3).contains(pointer) }
@@ -519,6 +526,12 @@ struct FloatingExtras: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// From the middle of the main button to the middle of an extra one.
+    private static func distance(_ index: Int) -> CGFloat {
+        (FloatingCaptureButton.diameter + FloatingCaptureButton.extraDiameter) / 2 + FloatingCaptureButton.gap
+            + CGFloat(index) * (FloatingCaptureButton.extraDiameter + FloatingCaptureButton.gap)
+    }
+
     /// The main button's place, and its name while the pointer is on it.
     private var mainRow: some View {
         row("Capture Screenshot", named: state.expanded && state.hovered && state.hoveredExtra == nil) {
@@ -552,8 +565,9 @@ struct FloatingExtras: View {
             .animation(.snappy(duration: 0.15), value: hovered)
             .accessibilityLabel(Text(name))
         }
-        // Springing out of the main button as it opens.
-        .offset(y: state.expanded ? 0 : (state.upward ? 1 : -1) * CGFloat(index + 1) * 36)
+        // Springing straight out of the main button as it opens: from its
+        // middle, up or down.
+        .offset(y: state.expanded ? 0 : (state.upward ? 1 : -1) * Self.distance(index))
         .scaleEffect(state.expanded ? 1 : 0.6)
         .opacity(state.expanded ? 1 : 0)
         .animation(.spring(response: 0.32, dampingFraction: 0.78).delay(Double(index) * 0.03), value: state.expanded)

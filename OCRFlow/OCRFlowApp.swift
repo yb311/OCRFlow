@@ -81,10 +81,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    /// Settled before anything is on screen, so a hidden Dock icon does not
-    /// flash up at launch.
+    /// Settled before anything is on screen, so the Dock icon does not
+    /// flash up at launch when no window opens.
     func applicationWillFinishLaunching(_ notification: Notification) {
-        DockIcon.shared.hidden = !(OCRViewModel.savedSettings?.showInDock ?? true)
+        DockIcon.shared.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -116,10 +116,6 @@ struct OCRFlowApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
         .defaultSize(width: 1100, height: 700)
-        // With the Dock icon hidden the app lives in the menu bar and starts
-        // there without a window, as menu bar apps do. Windows left open at
-        // the last quit still come back.
-        .defaultLaunchBehavior(viewModel.showInDock ? .automatic : .suppressed)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
@@ -219,11 +215,9 @@ struct OCRFlowApp: App {
                 .environment(viewModel)
         }
 
-        // Written only on a real change: the menu bar extra writes its
-        // binding back on every update, and each write would announce a
-        // change and start the next update.
-        MenuBarExtra(isInserted: Binding(get: { viewModel.showInMenuBar },
-                                         set: { if viewModel.showInMenuBar != $0 { viewModel.showInMenuBar = $0 } })) {
+        // Always there: screenshots live in the menu bar, and with no window
+        // open it is the way back in.
+        MenuBarExtra {
             MenuBarMenu()
                 .environment(viewModel)
         } label: {

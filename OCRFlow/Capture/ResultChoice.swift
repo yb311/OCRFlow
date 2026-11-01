@@ -13,7 +13,7 @@ enum ResultChoice {
         case recognizeEach
         /// Read, as the macro puts them together.
         case recognize
-        /// Saved where the user picks, not read.
+        /// Saved where the settings say, not read.
         case save
         case discard
     }
@@ -30,17 +30,6 @@ enum ResultChoice {
             }
             panel = HUDPanel.show(view, avoiding: nil)
         }
-    }
-
-    /// A folder for saving into, chosen now. Nil when cancelled.
-    static func chooseFolder(_ message: String) -> URL? {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.message = message
-        panel.prompt = String(localized: "Save Here")
-        return OwnWindows.whileModal { panel.runModal() } == .OK ? panel.url : nil
     }
 }
 
@@ -70,7 +59,7 @@ private struct ResultChoiceView: View {
         case .recognizeTogether: "Recognize as one document"
         case .recognizeEach: "Recognize each on its own"
         case .recognize: "Recognize the text"
-        case .save: "Only save the pictures…"
+        case .save: "Only save, without recognizing"
         case .discard: "Discard"
         }
     }

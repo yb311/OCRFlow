@@ -17,9 +17,10 @@ final class CaptureOverlay {
     }
 
     /// Nil when the user cancels. `lingering`: once something is chosen,
-    /// the held screen stays until `closeLingering()` — or a moment — so
-    /// what comes next can show over it with no flash of the live screen
-    /// between.
+    /// the held screen stays, dimmed around it, until `closeLingering()` —
+    /// or a moment, unless `keepLingering()` — so what comes next shows over
+    /// it with no flash of the live screen between, and nothing beneath can
+    /// be clicked meanwhile.
     static func choose(from shots: [CGDirectDisplayID: CGImage], lingering: Bool = false) async -> Choice? {
         let overlay = CaptureOverlay(shots: shots)
         overlay.lingering = lingering
@@ -32,13 +33,23 @@ final class CaptureOverlay {
 
     /// Kept alive while it waits.
     private static var current: CaptureOverlay?
-    /// Still showing after the choice, until what comes next is up.
-    private static var lingeringPanels: [NSPanel] = []
+    /// Still showing after the choice, until what comes next is done.
+    private static var lingeringOverlay: CaptureOverlay?
 
     /// Takes away the held screen kept after a choice.
     static func closeLingering() {
-        lingeringPanels.forEach { $0.orderOut(nil) }
-        lingeringPanels = []
+        guard let overlay = lingeringOverlay else { return }
+        lingeringOverlay = nil
+        overlay.panels.forEach { $0.orderOut(nil) }
+        overlay.panels.removeAll()
+    }
+
+    /// Keeps the held screen up until `closeLingering()`, for as long as it
+    /// takes. False when there is none.
+    @discardableResult
+    static func keepLingering() -> Bool {
+        lingeringOverlay?.kept = true
+        return lingeringOverlay != nil
     }
 
     /// What pointing picks out.
@@ -74,6 +85,11 @@ final class CaptureOverlay {
     /// bar of buttons, a long screenshot, a recording — happens there.
     private var previousApp: NSRunningApplication?
     private var lingering = false
+    /// Not closed after a moment: what came next is up over it.
+    private var kept = false
+    /// What was chosen, in screen coordinates, shown bright on the held
+    /// screen while it lingers. Nothing more can be chosen then.
+    private(set) var settled: CGRect?
 
     /// Where a drag started, and the screen it is kept to.
     private var dragStart: (point: NSPoint, screen: NSScreen)?
@@ -210,26 +226,34 @@ final class CaptureOverlay {
         redraw()
     }
 
-    private func finish(_ choice: Choice?) {
+    /// `area`: what was chosen, in screen coordinates.
+    private func finish(_ choice: Choice?, area: CGRect? = nil) {
         guard let continuation else { return }
         self.continuation = nil
         NSCursor.pop()
         previousApp?.activate()
-        if choice != nil, lingering {
-            // Kept until what comes next is up — or a moment, at most.
-            let held = panels.map { $0 as NSPanel }
-            Self.lingeringPanels = held
+        if choice != nil, lingering, let area {
+            // Kept until what comes next is up — or a moment, unless that
+            // asks for more.
+            settled = area
+            selection = nil
+            highlight = nil
+            redraw()
+            Self.lingeringOverlay = self
             Task {
-                try? await Task.sleep(for: .milliseconds(500))
-                if Self.lingeringPanels.first === held.first { Self.closeLingering() }
+                try? await Task.sleep(for: .seconds(2))
+                if Self.lingeringOverlay === self, !kept { Self.closeLingering() }
             }
         } else {
             for panel in panels { panel.orderOut(nil) }
+            panels.removeAll()
         }
-        panels.removeAll()
         Self.current = nil
         continuation.resume(returning: choice)
     }
+
+    /// Choosing is over; the held screen may still be up.
+    fileprivate var isChoosing: Bool { continuation != nil }
 
     private func redraw() {
         for panel in panels { panel.marks.needsDisplay = true }
@@ -240,19 +264,19 @@ final class CaptureOverlay {
     /// Nothing is picked out before the pointer first moves: the whole
     /// screen is dimmed, as on being asked to choose.
     fileprivate func pointerMoved(to pointer: NSPoint) {
-        guard dragStart == nil else { return }
+        guard isChoosing, dragStart == nil else { return }
         highlight = spot(at: pointer)?.frame
             ?? NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) }?.frame
         redraw()
     }
 
     fileprivate func pressed(at pointer: NSPoint) {
-        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) else { return }
+        guard isChoosing, let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) else { return }
         dragStart = (pointer, screen)
     }
 
     fileprivate func dragged(to pointer: NSPoint) {
-        guard let dragStart else { return }
+        guard isChoosing, let dragStart else { return }
         let frame = dragStart.screen.frame
         var pointer = pointer
         // Kept to the screen the drag started on.
@@ -274,17 +298,18 @@ final class CaptureOverlay {
         selection = nil
         // Big enough to hold any text; anything smaller was meant as a click.
         if let dragged, dragged.width >= 4, dragged.height >= 4 {
-            finish(region(dragged.integral, on: start.screen))
+            finish(region(dragged.integral, on: start.screen), area: dragged.integral)
         } else if let spot = spot(at: start.point) {
             // A window by itself; the menu bar, the Dock and the like as
             // they were on the held screen.
             if spot.ordinary, let id = spot.id {
-                finish(.window(id))
+                finish(.window(id), area: spot.frame)
             } else {
-                finish(region(spot.frame.intersection(start.screen.frame).integral, on: start.screen))
+                let area = spot.frame.intersection(start.screen.frame).integral
+                finish(region(area, on: start.screen), area: area)
             }
         } else {
-            finish(region(start.screen.frame, on: start.screen))
+            finish(region(start.screen.frame, on: start.screen), area: start.screen.frame)
         }
     }
 
@@ -373,7 +398,9 @@ private final class OverlayMarks: NSView {
                                        owner: self))
     }
 
-    override func cursorUpdate(with event: NSEvent) { NSCursor.crosshair.set() }
+    override func cursorUpdate(with event: NSEvent) {
+        (overlay?.isChoosing ?? false ? NSCursor.crosshair : NSCursor.arrow).set()
+    }
     override func mouseMoved(with event: NSEvent) { overlay?.pointerMoved(to: pointer(of: event)) }
     override func mouseDown(with event: NSEvent) { overlay?.pressed(at: pointer(of: event)) }
     override func mouseDragged(with event: NSEvent) { overlay?.dragged(to: pointer(of: event)) }
@@ -398,32 +425,27 @@ private final class OverlayMarks: NSView {
         // What a release would take — the area dragged out, or the window
         // under the pointer — stands out bright; everything else, on every
         // screen, is dimmed. Before the pointer has moved, all of it is.
-        guard let chosen = overlay.selection ?? overlay.highlight else {
+        // Once chosen, it stays so while the bar of buttons is up.
+        guard let chosen = overlay.settled ?? overlay.selection ?? overlay.highlight else {
             CaptureShade.draw(in: bounds, around: .null)
             return
         }
         let cut = local(chosen)
         CaptureShade.draw(in: bounds, around: cut)
         guard cut.intersects(bounds) else { return }
-        label(for: chosen, below: cut)
-    }
-
-    /// The size, under the selection's bottom-right corner — or inside it
-    /// when that would go off the screen.
-    private func label(for selection: CGRect, below rect: CGRect) {
-        let text = "\(Int(selection.width)) × \(Int(selection.height))" as NSString
+        // The size, where it stays once the bar shows.
+        let text = CaptureMarks.sizeText(for: chosen) as NSString
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+            .font: CaptureMarks.sizeFont,
             .foregroundColor: NSColor.white,
         ]
         let size = text.size(withAttributes: attributes)
-        let box = CGSize(width: size.width + 12, height: size.height + 6)
-        var origin = CGPoint(x: rect.maxX - box.width, y: rect.minY - box.height - 6)
-        if origin.y < bounds.minY + 4 { origin.y = rect.minY + 6 }
-        origin.x = min(max(origin.x, bounds.minX + 4), bounds.maxX - box.width - 4)
-        let pill = CGRect(origin: origin, size: box)
+        let box = CGSize(width: ceil(size.width) + 2 * CaptureMarks.sizePadding.width,
+                         height: ceil(size.height) + 2 * CaptureMarks.sizePadding.height)
+        let pill = local(CaptureMarks.sizeLabelFrame(size: box, for: chosen))
         NSColor.black.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: pill, xRadius: box.height / 2, yRadius: box.height / 2).fill()
-        text.draw(at: CGPoint(x: pill.minX + 6, y: pill.minY + 3), withAttributes: attributes)
+        text.draw(at: CGPoint(x: pill.minX + CaptureMarks.sizePadding.width, y: pill.minY + CaptureMarks.sizePadding.height),
+                  withAttributes: attributes)
     }
 }
