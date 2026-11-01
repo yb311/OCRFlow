@@ -49,10 +49,7 @@ final class CaptureOverlay {
         guard let overlay = lingeringOverlay else { return }
         lingeringOverlay = nil
         if givingBack, let app = overlay.previousApp, !app.isActive {
-            app.activate()
-            for _ in 0..<20 where !app.isActive {
-                try? await Task.sleep(for: .milliseconds(30))
-            }
+            await Activation.bringForward(app)
             if UserDefaults(suiteName: "com.apple.WindowManager")?.bool(forKey: "GloballyEnabled") == true {
                 try? await Task.sleep(for: .milliseconds(150))
             }
@@ -121,9 +118,10 @@ final class CaptureOverlay {
         windows = Self.windowsFrontToBack()
     }
 
-    /// Every window on screen but OCRFlow's, of any kind below the screen
-    /// saver's — app windows, menus, the menu bar and its icons, the Dock's
-    /// layer — front to back.
+    /// Every window on screen below the screen saver's — app windows, menus,
+    /// the menu bar and its icons, the Dock's layer — front to back.
+    /// OCRFlow's own ordinary windows are among them, as they are in the
+    /// held screen; what of it floats over other windows is not.
     private static func windowsFrontToBack() -> [Layer] {
         let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
@@ -132,7 +130,7 @@ final class CaptureOverlay {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         return list.compactMap { info in
             guard let layer = info[kCGWindowLayer as String] as? Int, layer < 1000,
-                  let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID,
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID || layer == 0,
                   (info[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   let id = info[kCGWindowNumber as String] as? CGWindowID,
                   let bounds = info[kCGWindowBounds as String] as? NSDictionary,
@@ -153,9 +151,14 @@ final class CaptureOverlay {
         if let lastSpot, here.first?.id == lastSpot.window, NSMouseInRect(point, lastSpot.spot.frame, false) {
             return lastSpot.spot
         }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
         for window in here {
             let spot: Spot?
-            if let frame = Self.outermost(at: point, of: window.pid) {
+            if window.pid == ownPID {
+                // Its own window, whole: OCRFlow cannot ask itself through
+                // Accessibility while it waits on the answer.
+                spot = Spot(id: window.id, ordinary: true, frame: window.frame)
+            } else if let frame = Self.outermost(at: point, of: window.pid) {
                 let whole = abs(frame.minX - window.frame.minX) + abs(frame.minY - window.frame.minY)
                     + abs(frame.width - window.frame.width) + abs(frame.height - window.frame.height) < 4
                 spot = Spot(id: whole ? window.id : nil, ordinary: whole && window.ordinary, frame: frame)
@@ -262,7 +265,7 @@ final class CaptureOverlay {
                 if Self.lingeringOverlay === self, !kept { await Self.closeLingering() }
             }
         } else {
-            previousApp?.activate()
+            if let previousApp { Activation.handOver(to: previousApp) }
             for panel in panels { panel.orderOut(nil) }
             panels.removeAll()
         }

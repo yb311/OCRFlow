@@ -102,7 +102,7 @@ private struct MacroDetailView: View {
             }
 
             Section("Repeat") {
-                Picker("Repeat", selection: repetitionKind) {
+                Picker("How often", selection: repetitionKind) {
                     Text("Once").tag(RepetitionKind.once)
                     Text("A number of times").tag(RepetitionKind.times)
                     Text("Until the screen stops changing").tag(RepetitionKind.untilUnchanged)
@@ -137,14 +137,16 @@ private struct MacroDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Result") {
+            Section {
                 Picker("Captures become", selection: $macro.output) {
                     Text("One document").tag(Macro.Output.document)
                     Text("One long picture").tag(Macro.Output.longImage)
                     Text("Separate pictures").tag(Macro.Output.images)
                 }
+            } header: {
+                Text("Result")
+            } footer: {
                 Text("When a run ends, you choose whether they are recognized, only saved, or discarded.")
-                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }

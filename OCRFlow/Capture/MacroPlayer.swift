@@ -20,6 +20,10 @@ final class MacroPlayer {
     private var userMonitor: Any?
     /// Windows already put back where they were recorded, this run.
     private var restored: Set<CGWindowID> = []
+    /// An app a step happened in that has no window open now.
+    private(set) var missingApp: String?
+    /// Stopped by the user, rather than come to its end.
+    var wasStopped: Bool { stopRequested }
 
     /// Where what the capture steps take is written, as it is taken: a long
     /// run's screenfuls do not fit in memory. The caller removes it.
@@ -28,6 +32,8 @@ final class MacroPlayer {
     /// The size of what each capture step took first: the rest keep it, so
     /// they can be joined.
     private var sizes: [UUID: CGSize] = [:]
+    /// Where the last capture step took its picture.
+    private var pixelsPerPoint: CGFloat = 1
 
     /// What the capture steps took, as files in `folder`: one list for each
     /// address, or one in all.
@@ -118,7 +124,7 @@ final class MacroPlayer {
         images.compactMap { image in
             written += 1
             let url = folder.appending(path: String(format: "%04d.png", written))
-            return ScrollingCapture.write(image, to: url) ? url : nil
+            return ScreenshotFormat.png.write(image, to: url, pixelsPerPoint: pixelsPerPoint) ? url : nil
         }
     }
 
@@ -180,6 +186,7 @@ final class MacroPlayer {
             case (nil, nil): target = nil
             }
             guard let target else { return nil }
+            pixelsPerPoint = ScreenCapture.pixelsPerPoint(of: target)
             await settle(target, waitForChange: false)
             if let distance = area.scrollDistance {
                 // Scrolled on as far as when recorded, and joined.
@@ -208,7 +215,19 @@ final class MacroPlayer {
             // Not open: the app is started and given a moment.
             await launch(bundleID)
         }
-        guard let window = ScreenWindows.find(place) else { return nil }
+        guard var window = ScreenWindows.find(place) else {
+            missingApp = place.appName
+            return nil
+        }
+        // Its app in front first, as when it was recorded: steps land on the
+        // window, captures see it. In Stage Manager a window in the strip at
+        // the side is only a small picture of itself until then, and moves
+        // to the middle as its app comes forward.
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != window.pid,
+           let app = NSRunningApplication(processIdentifier: window.pid) {
+            await Activation.bringForward(app)
+            window = await settled(window)
+        }
         let moved = abs(window.frame.minX - place.frame.minX) + abs(window.frame.minY - place.frame.minY)
             + abs(window.frame.width - place.frame.width) + abs(window.frame.height - place.frame.height)
         guard !restored.contains(window.id), moved > 2 else { return window }
@@ -217,6 +236,19 @@ final class MacroPlayer {
         _ = await Task.detached { ElementLocator.move(windowOf: pid, at: current, to: recorded) }.value
         try? await Task.sleep(for: .milliseconds(250))
         return ScreenWindows.all().first { $0.id == window.id } ?? window
+    }
+
+    /// The window once it has stopped moving — or after a second and a
+    /// half, however it is.
+    private func settled(_ window: ScreenWindow) async -> ScreenWindow {
+        var last = window
+        for _ in 0..<30 {
+            try? await Task.sleep(for: .milliseconds(50))
+            guard let now = ScreenWindows.all().first(where: { $0.id == window.id }) else { return last }
+            if now.frame == last.frame { return now }
+            last = now
+        }
+        return last
     }
 
     private func app(of place: WindowPlace?) -> pid_t? {

@@ -16,17 +16,60 @@ enum ResultChoice {
         /// Saved where the settings say, not read.
         case save
         case discard
+
+        /// In OCRFlow's window, once read.
+        var showsWhatWasRead: Bool {
+            self == .recognize || self == .recognizeTogether || self == .recognizeEach
+        }
     }
 
-    static func ask(_ title: String, options: [Option]) async -> Option {
+    /// `comesForward`: the choices after which OCRFlow is the app in front —
+    /// by default those that show what was read in its window. It asks to
+    /// come forward on the click itself: activation is cooperative, and an
+    /// app the user has just clicked is let come forward, where one that
+    /// asks later, from the background, may not be.
+    static func ask(_ title: String, options: [Option],
+                    comesForward: @escaping (Option) -> Bool = { $0.showsWhatWasRead }) async -> Option {
         await withCheckedContinuation { continuation in
             var panel: NSPanel?
             var answered = false
             let view = ResultChoiceView(title: title, options: options) { option in
                 guard !answered else { return }
                 answered = true
+                if comesForward(option) { NSApp.activate() }
                 panel?.orderOut(nil)
                 continuation.resume(returning: option)
+            }
+            panel = HUDPanel.show(view, avoiding: nil)
+        }
+    }
+}
+
+extension ResultChoice {
+    /// Something gone wrong, said where the choice would have been asked,
+    /// until the user has read it.
+    static func tell(_ title: String, _ message: String) async {
+        await withCheckedContinuation { continuation in
+            var panel: NSPanel?
+            var answered = false
+            let view = VStack(alignment: .leading, spacing: 8) {
+                Label(title, systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline)
+                    .symbolRenderingMode(.multicolor)
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button("OK") {
+                        guard !answered else { return }
+                        answered = true
+                        panel?.orderOut(nil)
+                        continuation.resume()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
             }
             panel = HUDPanel.show(view, avoiding: nil)
         }

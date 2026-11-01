@@ -50,8 +50,7 @@ enum StepPlayer {
     static func bringForward(_ pid: pid_t?) async {
         guard let pid, NSWorkspace.shared.frontmostApplication?.processIdentifier != pid,
               let app = NSRunningApplication(processIdentifier: pid) else { return }
-        app.activate()
-        try? await Task.sleep(for: .milliseconds(250))
+        await Activation.bringForward(app)
     }
 }
 

@@ -23,13 +23,16 @@ struct OwnWindows {
         return own
     }
 
+    /// Whether OCRFlow was the app in front when they were tucked away.
+    var wasInFront: Bool { previousApp == nil }
+
     /// Back where they were, back to front, and the app that was in front in
     /// front again.
     func restore() {
         for (window, below) in tucked.reversed() {
             if let below { window.order(.below, relativeTo: below) } else { window.orderFront(nil) }
         }
-        previousApp?.activate()
+        if let previousApp { Activation.handOver(to: previousApp) }
     }
 
     /// Runs something modal — a save panel, an alert — with OCRFlow in front
@@ -47,5 +50,35 @@ struct OwnWindows {
             as? [[String: Any]] ?? []
         // Listed front to back: the last ordinary one is the nearest.
         return list.last { $0[kCGWindowLayer as String] as? Int == 0 }?[kCGWindowNumber as String] as? Int
+    }
+}
+
+/// Bringing another app to the front, as macOS asks since 14: activation is
+/// cooperative. The app in front hands it over — `yieldActivation(to:)` —
+/// and the other takes it, `activate(from:options:)`; an app that is not in
+/// front can only ask, and the system decides.
+@MainActor
+enum Activation {
+    /// Asks for `app` to come to the front, handing over OCRFlow's place
+    /// when OCRFlow has it.
+    static func handOver(to app: NSRunningApplication) {
+        guard !app.isActive else { return }
+        if NSApp.isActive {
+            NSApp.yieldActivation(to: app)
+            app.activate(from: .current, options: [])
+        } else {
+            app.activate()
+        }
+    }
+
+    /// The same, and waits until it is in front — or a second has gone by.
+    /// True when it is.
+    @discardableResult
+    static func bringForward(_ app: NSRunningApplication) async -> Bool {
+        handOver(to: app)
+        for _ in 0..<50 where !app.isActive {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return app.isActive
     }
 }

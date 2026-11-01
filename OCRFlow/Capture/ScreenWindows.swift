@@ -99,11 +99,25 @@ enum ScreenWindows {
             pids = Set(NSWorkspace.shared.runningApplications.filter { $0.localizedName == place.appName }
                 .map(\.processIdentifier))
         }
-        let windows = all().filter { pids.contains($0.pid) && $0.layer == 0 }
-        if let title = place.title, let same = windows.first(where: { $0.title == title }) { return same }
-        // Of the rest, one the same size is likely the same window.
-        return windows.first { abs($0.frame.width - place.frame.width) < 2 && abs($0.frame.height - place.frame.height) < 2 }
-            ?? windows.first
+        return pick(all().filter { pids.contains($0.pid) && $0.layer == 0 }, for: place)
+    }
+
+    /// Of an app's windows, front to back, the one a step happened in: the
+    /// one with its title — of several, the nearest its size — or else one
+    /// its size, or else the frontmost.
+    ///
+    /// Size counts even among those with the title: in Stage Manager the
+    /// window server lists an app's windows in the strip at the side as
+    /// they are drawn there, a thumbnail the size of a stamp.
+    nonisolated static func pick(_ windows: [ScreenWindow], for place: WindowPlace) -> ScreenWindow? {
+        func distance(_ window: ScreenWindow) -> CGFloat {
+            abs(window.frame.width - place.frame.width) + abs(window.frame.height - place.frame.height)
+        }
+        if let title = place.title {
+            let same = windows.filter { $0.title == title }
+            if let nearest = same.min(by: { distance($0) < distance($1) }) { return nearest }
+        }
+        return windows.first { distance($0) < 4 } ?? windows.first
     }
 
     /// A rectangle in event coordinates as a capture target: the display it

@@ -29,7 +29,9 @@ extension OCRViewModel {
             macro.repetition = captures > 0 ? .untilUnchanged : .once
             macro.output = captures > 0 && onlyScrolls ? .longImage : .document
             macros.macros.append(macro)
-            for (step, image) in recorded.captures { macros.keep(image, for: step) }
+            for (step, capture) in recorded.captures {
+                macros.keep(capture.image, for: step, pixelsPerPoint: capture.pixelsPerPoint)
+            }
             selectedMacroID = macro.id
             showMacros?()
         }
@@ -77,11 +79,18 @@ extension OCRViewModel {
             let count = runs.reduce(0) { $0 + $1.count }
             guard count > 0 else {
                 macros.discardRecordedCaptures(of: macro)
+                // Said, rather than nothing at all happening.
+                let captures = macro.steps.contains { if case .capture = $0.action { true } else { false } }
+                if captures, !player.wasStopped { Self.reportNothingCaptured(macro.name, missingApp: player.missingApp) }
                 return
             }
             // What becomes of them, asked now: it depends on what was taken.
-            let choice = await ResultChoice.ask(String(localized: "“\(macro.name)” is done"),
-                                                options: [.recognize, .save, .discard])
+            // Run from OCRFlow's own window, OCRFlow comes back to the front
+            // whatever the choice.
+            let title = player.wasStopped ? String(localized: "“\(macro.name)” was stopped. Screenshots taken: \(count)")
+                : String(localized: "“\(macro.name)” is done. Screenshots taken: \(count)")
+            let choice = await ResultChoice.ask(title, options: [.recognize, .save, .discard],
+                                                comesForward: { own.wasInFront || $0.showsWhatWasRead })
             let folder = choice == .save ? screenshotDestination : nil
             var files: [URL] = []
             if choice != .discard {
@@ -96,6 +105,16 @@ extension OCRViewModel {
                 deliver(files)
             }
         }
+    }
+
+    /// Why a run took nothing, as far as is known.
+    /// In a panel over every app, as the choice would have been: an alert
+    /// would need OCRFlow in front, which another app may now be.
+    private static func reportNothingCaptured(_ name: String, missingApp: String?) {
+        let message = missingApp.map {
+            String(localized: "No window of “\($0)” is open. Open the window the actions were recorded in, then run them again.")
+        } ?? String(localized: "Check that the window the actions were recorded in is open and not covered, then run them again.")
+        Task { await ResultChoice.tell(String(localized: "“\(name)” took no screenshots"), message) }
     }
 
     /// A step that captures what the user chooses, added to the end of a

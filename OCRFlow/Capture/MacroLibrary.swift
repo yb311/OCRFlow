@@ -41,9 +41,9 @@ final class MacroLibrary {
     // MARK: - Captures taken while recording
 
     /// Keeps what a capture step took while it was recorded.
-    func keep(_ image: CGImage, for step: UUID) {
+    func keep(_ image: CGImage, for step: UUID, pixelsPerPoint: CGFloat) {
         try? FileManager.default.createDirectory(at: capturesFolder, withIntermediateDirectories: true)
-        _ = ScrollingCapture.write(image, to: captureFile(for: step))
+        _ = ScreenshotFormat.png.write(image, to: captureFile(for: step), pixelsPerPoint: pixelsPerPoint)
         capturesChanged += 1
     }
 

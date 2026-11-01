@@ -10,12 +10,18 @@ final class MacroRecording {
     private let state = MacroRecordState()
     private var panel: NSPanel?
     /// What each capture took while recording, in order.
-    private var taken: [CGImage] = []
+    private var taken: [Capture] = []
 
     struct Recorded {
         var steps: [MacroStep]
         /// What each capture step took while recording, by step.
-        var captures: [UUID: CGImage]
+        var captures: [UUID: Capture]
+    }
+
+    /// A picture, and the pixels a point of the screen it was taken on.
+    struct Capture {
+        var image: CGImage
+        var pixelsPerPoint: CGFloat
     }
 
     /// The steps and what was captured, or nil when cancelled.
@@ -79,7 +85,7 @@ final class MacroRecording {
             }
         }
         recorder.addCapture(area, in: step.window)
-        taken.append(image)
+        taken.append(Capture(image: image, pixelsPerPoint: ScreenCapture.pixelsPerPoint(of: chosen.target)))
     }
 
     /// A step that takes the same again: the same window, or the same part
@@ -132,7 +138,7 @@ struct MacroRecordView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(state.actions == 0 ? "Waiting for you…" : "Recorded: \(state.actions)")
+            Text(state.actions == 0 ? "Waiting for you…" : "Steps recorded: \(state.actions)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
