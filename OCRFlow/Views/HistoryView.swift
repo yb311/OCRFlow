@@ -97,8 +97,8 @@ struct HistoryView: View {
                     .truncationMode(.middle)
                     .help(entry.path)
                 HStack(spacing: 6) {
-                    Text(entry.recognizedAt, format: .dateTime)
-                    if let engine = entry.engine { Text(verbatim: "·"); Text(engine.shortLabel) }
+                    // Written out as the list writes it, with the year and the time.
+                    Text(entry.recognizedAt, format: .dateTime.year().month().day().hour().minute())
                     if entry.pages > 1 { Text(verbatim: "·"); Text("\(entry.pages) pages") }
                 }
                 .font(.caption)

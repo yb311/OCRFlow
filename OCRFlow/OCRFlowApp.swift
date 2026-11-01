@@ -85,6 +85,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// flash up at launch when no window opens.
     func applicationWillFinishLaunching(_ notification: Notification) {
         DockIcon.shared.start()
+        // One window of each kind: tabs would only add Show Tab Bar and
+        // Merge All Windows to the menus.
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -146,7 +149,17 @@ struct OCRFlowApp: App {
                     viewModel.recordMacro()
                 }
 
-                Button("Recorded Actions…") {
+                if !viewModel.macros.macros.isEmpty {
+                    Menu("Run Recorded Actions") {
+                        ForEach(viewModel.macros.macros) { macro in
+                            Button(macro.name) { viewModel.runMacro(id: macro.id) }
+                                .disabled(macro.steps.isEmpty)
+                        }
+                    }
+                    .disabled(viewModel.isCapturing)
+                }
+
+                Button("Manage Recorded Actions…") {
                     openWindow(id: MacroEditorView.windowID)
                 }
             }
@@ -245,13 +258,15 @@ struct OCRFlowApp: App {
                 .environment(viewModel)
         }
         .defaultSize(width: 620, height: 560)
+        // Reached from the Help menu; not listed again in the Window menu.
+        .commandsRemoved()
 
         // Its own window rather than a sheet on top of the settings sheet:
         // downloading gigabytes of models is a task in its own right.
         Window("Model Manager", id: ModelManagerView.windowID) {
             ModelManagerView(downloader: viewModel.modelDownloader)
         }
-        .defaultSize(width: 620, height: 580)
+        .windowResizability(.contentMinSize)
     }
 }
 

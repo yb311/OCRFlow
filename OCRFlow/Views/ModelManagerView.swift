@@ -10,6 +10,8 @@ struct ModelManagerView: View {
 
     @Bindable var downloader: PPModelDownloader
 
+    @State private var contentHeight: CGFloat?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -19,8 +21,10 @@ struct ModelManagerView: View {
                 languageSection
             }
             .padding(20)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-        .frame(minWidth: 560, minHeight: 420)
+        // Opens as tall as what it lists, and can be made smaller or larger.
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 320, idealHeight: contentHeight)
     }
 
     // MARK: - Sections
@@ -35,7 +39,7 @@ struct ModelManagerView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                caption("Models come from Hugging Face. Apart from the community-uploaded Q4 quantization of PaddleOCR-VL, all are from official PaddlePaddle repositories. Switch to the mirror if the connection is poor.")
+                caption("Models are downloaded from Hugging Face. If downloading is slow, switch to the mirror.")
                 Button {
                     PPModelStore.ensureUserModelsDirectory()
                     NSWorkspace.shared.open(PPModelStore.userModelsDirectory)
@@ -48,37 +52,41 @@ struct ModelManagerView: View {
     }
 
     private var tierSection: some View {
-        section("PP-OCRv6 Models") {
+        section("Text Recognition") {
             VStack(alignment: .leading, spacing: 12) {
+                caption("PP-OCRv6. One model reads 50 languages: Simplified and Traditional Chinese, English, Japanese and 46 Latin-script languages.")
                 ForEach(PPModelTier.allCases) { tier in
                     if tier.isBundled {
-                        bundledRow(tier)
+                        row(title: tier.label, detail: tier.hint) {
+                            Label("Built in", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
                     } else {
-                        entryRow(PPModelCatalog.mediumTier, title: tier.label)
+                        entryRow(PPModelCatalog.mediumTier, title: tier.label, detail: PPModelCatalog.mediumTier.detail)
                     }
                 }
-                caption("A single PP-OCRv6 model covers 50 languages: Simplified Chinese, Traditional Chinese, English, Japanese, and 46 Latin-script languages.")
             }
         }
     }
 
     private var vlSection: some View {
-        section("PaddleOCR-VL 1.6") {
+        section("Tables, Formulas and Charts") {
             VStack(alignment: .leading, spacing: 12) {
-                caption("A 0.9B vision-language model. The official pipeline has two stages: a layout model splits the page and decides the reading order, then the VL model reads each block, so the layout model is required. Either set of weights will do.")
+                caption("PaddleOCR-VL 1.6 reads the blocks that layout analysis finds on a page. Download layout analysis and one of the two models.")
                 ForEach(PPModelCatalog.vlEntries) { entry in
-                    entryRow(entry, title: entry.name)
+                    entryRow(entry, title: entry.name, detail: entry.detail)
                 }
             }
         }
     }
 
     private var languageSection: some View {
-        section("Other Language Recognizers") {
+        section("Other Languages") {
             VStack(alignment: .leading, spacing: 12) {
-                caption("PP-OCRv6 has no models for the scripts below, so PP-OCRv5 single-language recognizers are used instead. Text detection is language-independent: once installed, the PP-OCRv6 detector still locates the text.")
+                caption("For scripts the built-in model can't read. Once one is downloaded, choose it as the recognition language in Settings.")
                 ForEach(PPModelCatalog.languageRecognizers) { entry in
-                    entryRow(entry, title: entry.name)
+                    entryRow(entry, title: entry.name, detail: nil)
                 }
             }
         }
@@ -86,37 +94,37 @@ struct ModelManagerView: View {
 
     // MARK: - Rows
 
-    private func bundledRow(_ tier: PPModelTier) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+    /// A name and what it is on the left; on the right, where it stands and
+    /// what can be done — the same place in every row.
+    private func row<Trailing: View>(title: String, detail: String?,
+                                     @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(tier.label).font(.callout)
-                Text(tier.hint).font(.caption).foregroundStyle(.secondary)
+                Text(title).font(.callout)
+                if let detail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
-            Label("Built in", systemImage: "checkmark.seal.fill")
-                .font(.caption)
-                .foregroundStyle(.green)
+            HStack(spacing: 8) { trailing() }
         }
     }
 
-    private func entryRow(_ entry: PPModelCatalog.Entry, title: String) -> some View {
+    private func entryRow(_ entry: PPModelCatalog.Entry, title: String, detail: String?) -> some View {
         let isDownloading = downloader.isDownloading(entry)
         let isInstalled = entry.isInstalled
+        let size = String(localized: "About \(sizeText(entry.approximateBytes))")
 
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.callout)
-                    Text("\(entry.detail) · About \(sizeText(entry.approximateBytes))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
+            row(title: title, detail: detail.map { "\($0) · \(size)" } ?? size) {
                 if isDownloading {
                     Button("Cancel") { downloader.cancel(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 } else if isInstalled {
+                    Label("Installed", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
                     Button("Delete") { downloader.remove(entry) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -130,10 +138,6 @@ struct ModelManagerView: View {
             if isDownloading {
                 ProgressView(value: downloader.progress[entry.id] ?? 0)
                     .progressViewStyle(.linear)
-            } else if isInstalled {
-                Label("Installed", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
             }
 
             if let error = downloader.errors[entry.id] {

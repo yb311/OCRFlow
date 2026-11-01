@@ -44,10 +44,9 @@ struct SettingsView: View {
             advancedTab
                 .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
         }
-        // A settings window sizes itself to its content, and a flexible frame
-        // makes it pick something shorter than the panes actually need. Fixed,
-        // and tall enough that the longest pane scrolls as little as possible.
-        .frame(width: 560, height: 640)
+        // One width for every tab; each its own height, as a settings window
+        // changes size from tab to tab.
+        .frame(width: 560)
     }
 
     // MARK: - Tab: Recognition
@@ -181,7 +180,7 @@ struct SettingsView: View {
         case .auto:
             settingSection("Reading Order & Layout") {
                 VStack(alignment: .leading, spacing: 10) {
-                    componentRow("PP-DocLayoutV3 layout analysis",
+                    componentRow("Layout analysis",
                                  detail: "Finds columns, headings, tables and figures and the order to read them in. Without it, pages are read by column estimate only",
                                  ready: VLModelStore.isLayoutModelInstalled)
                     if !VLModelStore.isLayoutModelInstalled {
@@ -213,7 +212,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     toggleRow(isOn: $vm.vlConfig.useLayoutDetection,
                               title: "Analyze layout first, then read block by block",
-                              subtitle: "The official PaddleOCR pipeline: split the layout, decide the reading order, prompt each block appropriately, then assemble Markdown. When off, the whole page goes to the model at once — much faster, but content gets missed.")
+                              subtitle: "Finds the blocks on a page and the order to read them in, then reads each block on its own. When off, the whole page is read at once — much faster, but parts can be missed")
                     if !VLModelStore.isLayoutModelInstalled {
                         inlineDownloadRow(PPModelCatalog.layoutModel)
                     }
@@ -326,7 +325,7 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: entry.isInstalled ? "checkmark.circle.fill" : "arrow.down.circle")
                     .foregroundStyle(entry.isInstalled ? Color.green : Color.secondary)
-                Text(entry.name).font(.callout)
+                Text(entry.purpose).font(.callout)
                 Text("About \(Self.sizeText(entry.approximateBytes))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -508,7 +507,7 @@ struct SettingsView: View {
                             ForEach(missing) { entry in
                                 inlineDownloadRow(entry)
                             }
-                            hint("Once downloaded, choose the language in the menu above. Text detection is still done by PP-OCRv6.")
+                            hint("Once downloaded, choose the language in the menu above.")
                         }
                         .padding(.top, 6)
                     }
@@ -541,7 +540,7 @@ struct SettingsView: View {
                     inlineDownloadRow(PPModelCatalog.mediumTier)
                 }
                 Divider().padding(.vertical, 2)
-                modelManagerLink("Manage All Models…")
+                modelManagerLink("Model Manager…")
                 hint("Switching tiers resets the detection thresholds to that tier's official defaults.")
             }
         }
@@ -555,10 +554,8 @@ struct SettingsView: View {
                     }
                 }
                 Stepper(value: $vm.paddleConfig.threadCount, in: 0...16) {
-                    Text(vm.paddleConfig.threadCount == 0
-                         ? "Threads: Auto"
-                         : "Threads: \(vm.paddleConfig.threadCount)")
-                        .font(.callout)
+                    valueLabel("Threads", value: vm.paddleConfig.threadCount == 0
+                               ? String(localized: "Auto") : "\(vm.paddleConfig.threadCount)")
                 }
             }
         }
@@ -587,7 +584,7 @@ struct SettingsView: View {
                                     range: 1.0...3.0, step: 0.1,
                                     hint: "Raise it to avoid clipping stroke edges; too high and neighboring text merges")
                         Stepper(value: $vm.paddleConfig.recBatchSize, in: 1...32) {
-                            Text("Recognition batch size: \(vm.paddleConfig.recBatchSize)").font(.callout)
+                            valueLabel("Recognition batch size", value: "\(vm.paddleConfig.recBatchSize)")
                         }
                         valueSlider("Minimum confidence", value: $vm.paddleConfig.dropScore,
                                     range: 0...0.95, step: 0.05,
@@ -672,7 +669,7 @@ struct SettingsView: View {
                 valueSlider("Candidate range (top-p)", value: $vm.vlConfig.topP,
                             range: 0.1...1.0, step: 0.05,
                             hint: "Only applies when temperature is above 0: samples from the candidates whose cumulative probability reaches this value")
-                hint("These match PaddleOCR's three official sampling parameters, with the same defaults (1.00 / 0.00 / 1.0).")
+                hint("These match PaddleOCR's three official sampling parameters, with the same defaults (1.00 / 0.00 / 1.00).")
             }
         }
 
@@ -682,10 +679,10 @@ struct SettingsView: View {
                           title: "Use GPU (Metal)",
                           subtitle: "Runs all layers on the GPU, several times faster than CPU alone (recommended)")
                 Stepper(value: $vm.vlConfig.contextTokens, in: 2048...32768, step: 2048) {
-                    Text("Context length: \(vm.vlConfig.contextTokens)").font(.callout)
+                    valueLabel("Context length", value: String(localized: "\(vm.vlConfig.contextTokens) tokens"))
                 }
                 Stepper(value: $vm.vlConfig.maxOutputTokens, in: 128...4096, step: 128) {
-                    Text("Max output per block: \(vm.vlConfig.maxOutputTokens) tokens").font(.callout)
+                    valueLabel("Max output per block", value: String(localized: "\(vm.vlConfig.maxOutputTokens) tokens"))
                 }
                 hint("The context must fit one block's visual tokens plus its output. The per-block output limit keeps one block from stalling the whole page.")
                 Divider().padding(.vertical, 2)
@@ -724,8 +721,9 @@ struct SettingsView: View {
 
                     if vm.exportFormat == .markdown {
                         Divider()
-                        Toggle("Save images when exporting Markdown", isOn: $vm.exportFigures)
-                        hint("Images go into an .assets folder named after the .md file and are referenced by relative path. When off, image positions keep only an empty placeholder.")
+                        toggleRow(isOn: $vm.exportFigures,
+                                  title: "Save images when exporting Markdown",
+                                  subtitle: "Images go into an .assets folder named after the .md file and are referenced by relative path. When off, image positions keep only an empty placeholder")
                     }
 
                     if vm.exportLayout == .combined, vm.exportFormat != .json {
@@ -740,10 +738,11 @@ struct SettingsView: View {
                     }
 
                     if vm.exportFormat != .json {
-                        Toggle("Include file names when exporting", isOn: $vm.exportIncludeFilename)
-                        hint(vm.exportFormat == .markdown
-                             ? "When on, each file's content starts with a level-1 heading."
-                             : "When on, each file's content starts with a “=== file name ===” line.")
+                        toggleRow(isOn: $vm.exportIncludeFilename,
+                                  title: "Include file names when exporting",
+                                  subtitle: vm.exportFormat == .markdown
+                                      ? "When on, each file's content starts with a level-1 heading"
+                                      : "When on, each file's content starts with a “=== file name ===” line")
                     }
                 }
             }
@@ -776,12 +775,7 @@ struct SettingsView: View {
                         Toggle(isOn: Binding(
                             get: { vm.keptAuxiliary.contains(label) },
                             set: { vm.setAuxiliary(label, kept: $0) })) {
-                            HStack(spacing: 6) {
-                                Text(label.label).font(.callout)
-                                Text(label.rawName)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
+                            Text(label.label).font(.callout)
                         }
                     }
                     Divider().padding(.vertical, 2)
@@ -1096,13 +1090,7 @@ struct SettingsView: View {
     }
 
     private func settingsScroll<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                content()
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
+        SettingsPage { content() }
     }
 
     /// Translating each result once it is recognized, and into what.
@@ -1224,6 +1212,19 @@ struct SettingsView: View {
         }
     }
 
+    /// A setting's name and, at the right, its value — as a slider's row
+    /// shows it.
+    private func valueLabel(_ title: LocalizedStringKey, value: String) -> some View {
+        HStack {
+            Text(title).font(.callout)
+            Spacer()
+            Text(verbatim: value)
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+    }
+
     @ViewBuilder
     private func valueSlider(_ title: LocalizedStringKey, value: Binding<Double>,
                              range: ClosedRange<Double>, step: Double,
@@ -1315,5 +1316,29 @@ private struct FlowLayout: Layout {
         }
         if !row.indices.isEmpty { rows.append(row) }
         return rows
+    }
+}
+
+/// A settings tab: scrolls when it is taller than the window allows, and is
+/// otherwise just as tall as it needs — the settings window takes each
+/// tab's height as it is shown, rather than one height for all.
+private struct SettingsPage<Content: View>: View {
+    @ViewBuilder let content: Content
+    @State private var contentHeight: CGFloat?
+
+    /// Beyond this, the tab scrolls.
+    private static var tallest: CGFloat { 640 }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                content
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: contentHeight.map { min($0, Self.tallest) })
     }
 }

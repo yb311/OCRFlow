@@ -72,7 +72,11 @@ final class FloatingCaptureButton {
         button.onDrop = { [weak self] in self?.settle() }
         button.onDragStart = { [weak self] in self?.collapse() }
         button.onHover = { [weak self] in self?.expand() }
-        button.makeMenu = { [weak model] in model.map(Self.menu(model:)) }
+        button.makeMenu = { [weak self, weak model] in
+            // Closed first: the menu opens where the others would be.
+            self?.collapse()
+            return model.map(Self.menu(model:))
+        }
 
         rest(at: frame(for: Parking.saved))
 
@@ -284,7 +288,7 @@ final class FloatingCaptureButton {
             run.submenu = list
             menu.addItem(run)
         }
-        menu.addItem(MenuAction.item(String(localized: "Recorded Actions…")) { [weak model] in
+        menu.addItem(MenuAction.item(String(localized: "Manage Recorded Actions…")) { [weak model] in
             model?.showMacros?()
         })
         menu.addItem(.separator())
@@ -292,7 +296,7 @@ final class FloatingCaptureButton {
             model?.showMainWindow?()
         })
         menu.addItem(.separator())
-        menu.addItem(MenuAction.item(String(localized: "Hide Floating Button")) { [weak model] in
+        menu.addItem(MenuAction.item(String(localized: "Hide Floating Capture Button")) { [weak model] in
             model?.showFloatingButton = false
         })
         return menu

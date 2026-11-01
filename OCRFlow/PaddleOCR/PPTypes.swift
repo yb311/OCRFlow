@@ -111,20 +111,20 @@ enum PPTextOrder: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .layout:  return String(localized: "Layout analysis (official pipeline, recommended)")
-        case .columns: return String(localized: "By column (geometric estimate)")
-        case .simple:  return String(localized: "Top to bottom (PaddleOCR's raw order)")
+        case .layout:  return String(localized: "Layout analysis (recommended)")
+        case .columns: return String(localized: "By column (estimated)")
+        case .simple:  return String(localized: "Line by line, top to bottom")
         }
     }
 
     var hint: String {
         switch self {
         case .layout:
-            return String(localized: "Uses PP-DocLayoutV3 to find columns, headings, figures and other regions and decide the reading order, then places the recognized lines into their regions. Matches PaddleOCR's official document-parsing pipeline and also yields layout structure and Markdown. Requires the layout model")
+            return String(localized: "Finds columns, headings, tables and figures and the order to read them in, and keeps headings and image positions for Markdown. Needs the layout analysis download")
         case .columns:
-            return String(localized: "Estimates columns from the gaps between lines, without a layout model. Usually right for multi-column print, but bylines and right-aligned numbers may land in the wrong place")
+            return String(localized: "Estimates columns from the gaps between lines. Usually right for multi-column print, but bylines and right-aligned numbers may land in the wrong place")
         case .simple:
-            return String(localized: "PaddleOCR's raw order: text on the same horizontal line reads left to right. Multi-column layouts get mixed across columns; suits receipts and forms with side-by-side pairs")
+            return String(localized: "Text on the same line reads left to right, whatever column it is in. Suits receipts and forms with labels and values side by side")
         }
     }
 

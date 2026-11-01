@@ -84,11 +84,11 @@ enum QualityPreset: String, CaseIterable, Identifiable {
     var hint: String {
         switch self {
         case .fast:
-            return String(localized: "PP-OCRv6 reads every page on its own. Fastest, but tables, formulas, charts and seals come out as plain text")
+            return String(localized: "Reads text only. The fastest, but tables, formulas, charts and seals come out as plain text.")
         case .balanced:
-            return String(localized: "Smart Layering: body text with PP-OCRv6, tables, formulas and doubtful regions with PaddleOCR-VL, native PDF text taken as is. Good results at a good speed (recommended)")
+            return String(localized: "Body text is read quickly; tables, formulas and passages it is unsure of get a closer reading, and text already in a PDF is taken as it is. Good results at a good speed (recommended).")
         case .accurate:
-            return String(localized: "Smart Layering with the largest installed models, higher detection resolution and more regions read twice. The best results, and the slowest")
+            return String(localized: "Like Balanced, with the largest installed models, finer text detection and more passages read twice. The best results, and the slowest.")
         }
     }
 

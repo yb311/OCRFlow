@@ -26,7 +26,7 @@ struct MenuBarMenu: View {
             }
             .disabled(vm.isCapturing)
         }
-        Button("Recorded Actions…") {
+        Button("Manage Recorded Actions…") {
             NSApp.activate()
             openWindow(id: MacroEditorView.windowID)
         }
