@@ -27,10 +27,6 @@ struct SettingsView: View {
     @State private var opensAtLogin = false
     @State private var loginItemNeedsApproval = false
     @State private var loginItemError: String?
-    @State private var isChoosingFolder = false
-    /// Which of the folder watch's folders is being chosen.
-    @State private var folderRole = WatchFolderRole.watched
-
     private enum WatchFolderRole {
         case watched, output, screenshots
     }
@@ -52,18 +48,6 @@ struct SettingsView: View {
         // makes it pick something shorter than the panes actually need. Fixed,
         // and tall enough that the longest pane scrolls as little as possible.
         .frame(width: 560, height: 640)
-        .fileImporter(isPresented: $isChoosingFolder, allowedContentTypes: [.folder]) { result in
-            guard case let .success(url) = result else { return }
-            switch folderRole {
-            case .watched: vm.watchFolder = url
-            case .output:  vm.watchOutputFolder = url
-            case .screenshots: vm.screenshotFolder = url
-            }
-        }
-        .fileDialogMessage(folderRole == .output ? "Choose an output folder for results"
-                           : folderRole == .screenshots ? "Choose where screenshots are saved"
-                           : "Choose a folder to watch (including its subfolders)")
-        .fileDialogConfirmationLabel("Choose")
     }
 
     // MARK: - Tab: Recognition
@@ -1078,9 +1062,21 @@ struct SettingsView: View {
         }
     }
 
+    /// In a sheet on the settings window.
     private func chooseFolder(_ role: WatchFolderRole) {
-        folderRole = role
-        isChoosingFolder = true
+        let message = switch role {
+        case .output: String(localized: "Choose an output folder for results")
+        case .screenshots: String(localized: "Choose where screenshots are saved")
+        case .watched: String(localized: "Choose a folder to watch (including its subfolders)")
+        }
+        Task {
+            guard let url = await FilePanel.chooseFolder(message: message, prompt: String(localized: "Choose")) else { return }
+            switch role {
+            case .watched: vm.watchFolder = url
+            case .output: vm.watchOutputFolder = url
+            case .screenshots: vm.screenshotFolder = url
+            }
+        }
     }
 
     // MARK: - Building blocks

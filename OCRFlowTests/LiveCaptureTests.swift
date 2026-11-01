@@ -156,7 +156,7 @@ final class LiveCaptureTests: XCTestCase {
                                                                   width: title.width * scale, height: title.height * scale)))
         if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"].map({ URL(fileURLWithPath: $0) }) {
             for (name, picture) in [("clean", clean), ("again", again), ("held", held)] {
-                _ = ScrollingCapture.write(picture, to: dump.appending(path: "\(name).png"))
+                _ = ScreenshotFormat.png.write(picture, to: dump.appending(path: "\(name).png"), pixelsPerPoint: 2)
             }
         }
         XCTAssertLessThan(try brightness(of: clean) - brightness(of: again), 0.02, "taken again, dimmed")
@@ -329,7 +329,7 @@ final class LiveCaptureTests: XCTestCase {
         // Read as a long screenshot is: in pages.
         let url = URL.temporaryDirectory.appending(path: "long-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: url) }
-        XCTAssertTrue(ScrollingCapture.write(joined[0], to: url))
+        XCTAssertTrue(ScreenshotFormat.png.write(joined[0], to: url, pixelsPerPoint: 2))
         let count = PageImages.frameCount(of: url)
         XCTAssertGreaterThan(count, 1)
         let text = try (0..<count).compactMap { PageImages.image(at: url, frame: $0) }.map { try self.text(in: $0) }
@@ -794,8 +794,8 @@ extension LiveCaptureTests {
         let long = try XCTUnwrap(parts.first)
         XCTAssertGreaterThan(long.height, first.height * 2)
         if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
-            _ = ScrollingCapture.write(long, to: URL(fileURLWithPath: dump).appending(path: "area.png"))
-            _ = ScrollingCapture.write(first, to: URL(fileURLWithPath: dump).appending(path: "area-first.png"))
+            _ = ScreenshotFormat.png.write(long, to: URL(fileURLWithPath: dump).appending(path: "area.png"), pixelsPerPoint: 2)
+            _ = ScreenshotFormat.png.write(first, to: URL(fileURLWithPath: dump).appending(path: "area-first.png"), pixelsPerPoint: 2)
         }
         // Not a row of the black panel in it.
         let gray = ScrollStitcher.Gray(long)
@@ -836,7 +836,7 @@ extension LiveCaptureTests {
         try await Task.sleep(for: .milliseconds(500))
         if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
             let picture = try await ScreenGrabber.capture(.window(CGWindowID(panel.windowNumber)))
-            _ = ScrollingCapture.write(picture, to: URL(fileURLWithPath: dump).appending(path: "floating.png"))
+            _ = ScreenshotFormat.png.write(picture, to: URL(fileURLWithPath: dump).appending(path: "floating.png"), pixelsPerPoint: 2)
         }
         XCTAssertEqual(panel.frame, opened, "still open over one of the others")
         move(to: CGPoint(x: resting.midX - 400, y: top - resting.midY))

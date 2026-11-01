@@ -205,21 +205,24 @@ struct TranslationSheet: View {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
             panel.nameFieldStringValue = "\(items[0].fileName)\(suffix).md"
-            guard panel.runModal() == .OK, let url = panel.url else { return }
-            do {
-                try document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
-            } catch {
-                exportProblem = UserPrompt(title: String(localized: "\(url.lastPathComponent) couldn't be exported"),
-                                           message: error.localizedDescription)
+            Task {
+                guard let url = await FilePanel.run(panel) else { return }
+                do {
+                    try document(for: items[0], bilingual: bilingual).write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    exportProblem = UserPrompt(title: String(localized: "\(url.lastPathComponent) couldn't be exported"),
+                                               message: error.localizedDescription)
+                }
             }
             return
         }
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = String(localized: "Export Here")
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        Task {
+            guard let folder = await FilePanel.chooseFolder(message: "", prompt: String(localized: "Export Here")) else { return }
+            write(bilingual: bilingual, suffix: suffix, into: folder)
+        }
+    }
+
+    private func write(bilingual: Bool, suffix: String, into folder: URL) {
         var failures: [String] = []
         for item in items where translations[item.id] != nil {
             let url = folder.appending(component: "\(item.fileName)\(suffix).md")

@@ -41,12 +41,17 @@ extension OCRViewModel {
             panel.nameFieldStringValue = "\(Self.exportStem(for: targets[0])).\(format.fileExtension)"
             panel.message = String(localized: "Export the results for “\(targets[0].fileName)”")
         } else {
-            panel.nameFieldStringValue = "OCRFlow_Results.\(format.fileExtension)"
+            panel.nameFieldStringValue = "\(String(localized: "OCRFlow Results")).\(format.fileExtension)"
             panel.message = String(localized: "Export results for \(targets.count) files (combined into one file)")
         }
         panel.prompt = String(localized: "Export")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            guard let url = await FilePanel.run(panel) else { return }
+            writeCombined(targets, format: format, to: url)
+        }
+    }
 
+    private func writeCombined(_ targets: [ImageItem], format: ExportFormat, to url: URL) {
         switch format {
         case .json:
             reportExportFailures([write(Self.jsonData(targets.map(exportPayload(for:))), to: url)].compactMap { $0 })
@@ -81,13 +86,15 @@ extension OCRViewModel {
             panel.nameFieldStringValue = item.url.lastPathComponent
             panel.message = String(localized: "Export the original of “\(item.fileName)”")
             panel.prompt = String(localized: "Export")
-            guard panel.runModal() == .OK, let url = panel.url else { return }
-            try? FileManager.default.removeItem(at: url)
-            do {
-                try FileManager.default.copyItem(at: item.url, to: url)
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            } catch {
-                reportExportFailures([String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")])
+            Task {
+                guard let url = await FilePanel.run(panel) else { return }
+                try? FileManager.default.removeItem(at: url)
+                do {
+                    try FileManager.default.copyItem(at: item.url, to: url)
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } catch {
+                    reportExportFailures([String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")])
+                }
             }
             return
         }
@@ -99,10 +106,12 @@ extension OCRViewModel {
         panel.allowsMultipleSelection = false
         panel.message = String(localized: "Choose where to export the originals of \(targets.count) files")
         panel.prompt = String(localized: "Export Here")
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        let (written, failures) = Self.writeOriginals(of: targets, into: folder)
-        reportExportFailures(failures)
-        if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+        Task {
+            guard let folder = await FilePanel.run(panel) else { return }
+            let (written, failures) = Self.writeOriginals(of: targets, into: folder)
+            reportExportFailures(failures)
+            if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+        }
     }
 
     /// Each item's original into `folder`: what was written, and what could
@@ -203,8 +212,10 @@ extension OCRViewModel {
         panel.allowsMultipleSelection = false
         panel.message = String(localized: "Choose where to export. \(targets.count) files will each be saved as .\(format.fileExtension), keeping the original folder structure")
         panel.prompt = String(localized: "Export Here")
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        writeSeparately(targets, format: format, into: folder, reveal: folder)
+        Task {
+            guard let folder = await FilePanel.run(panel) else { return }
+            writeSeparately(targets, format: format, into: folder, reveal: folder)
+        }
     }
 
     /// One result file per item, laid out under `folder` as the sources were.
@@ -531,5 +542,38 @@ extension OCRViewModel {
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+/// An open or save panel, as a sheet on the window the user is working in —
+/// where it belongs, and where the window gets the keys back as it closes —
+/// or, with no such window, on its own.
+@MainActor
+enum FilePanel {
+    /// What was chosen; nil when cancelled.
+    static func run(_ panel: NSSavePanel, for window: NSWindow? = NSApp.keyWindow ?? NSApp.mainWindow) async -> URL? {
+        let response: NSApplication.ModalResponse
+        if let window, window.isVisible, window.styleMask.contains(.titled) {
+            response = await panel.beginSheetModal(for: window)
+        } else {
+            NSApp.activate()
+            response = await withCheckedContinuation { continuation in
+                panel.begin { continuation.resume(returning: $0) }
+            }
+        }
+        return response == .OK ? panel.url : nil
+    }
+
+    /// A folder, chosen in a sheet on `window`.
+    static func chooseFolder(message: String, prompt: String,
+                             for window: NSWindow? = NSApp.keyWindow ?? NSApp.mainWindow) async -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = message
+        panel.prompt = prompt
+        return await run(panel, for: window)
     }
 }

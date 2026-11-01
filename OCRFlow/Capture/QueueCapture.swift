@@ -125,9 +125,11 @@ final class QueueCapture {
         guard rect.width >= 4, rect.height >= 4, let target = ScreenWindows.target(for: rect),
               let image = try? await ScreenCapture.grab(target) else { return }
         let url = folder.appending(path: String(format: "%04d.png", taken.count + 1))
-        guard ScrollingCapture.write(image, to: url) else { return }
+        guard ScreenshotFormat.png.write(image, to: url, pixelsPerPoint: ScreenCapture.pixelsPerPoint(of: target))
+        else { return }
         taken.append(url)
-        ScreenCapture.flash(target)
+        // Heard, not seen: nothing comes over what is being worked on.
+        ScreenCapture.playShutterSound()
     }
 
     /// The area being dragged out, outlined, in event coordinates.

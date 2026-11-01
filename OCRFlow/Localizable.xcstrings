@@ -405,16 +405,6 @@
         }
       }
     },
-    "%lld captured" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已截取 %lld 张"
-          }
-        }
-      }
-    },
     "%lld files couldn't be exported" : {
       "localizations" : {
         "en" : {
@@ -841,6 +831,16 @@
         }
       }
     },
+    "%lld screenshots taken. What becomes of them?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 %lld 张截图，怎么处理？"
+          }
+        }
+      }
+    },
     "%lld times" : {
       "localizations" : {
         "zh-Hans" : {
@@ -957,6 +957,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "0.9B 视觉语言模型，版面分析 + 逐块识别，输出 Markdown（较慢，需下载模型）"
+          }
+        }
+      }
+    },
+    "1 screenshot taken. What becomes of it?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 1 张截图，怎么处理？"
           }
         }
       }
@@ -1877,6 +1887,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动检查更新"
+          }
+        }
+      }
+    },
+    "Check that the window the actions were recorded in is open and not covered, then run them again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请确认录制时所在的窗口已打开、没有被遮住，再运行一次。"
           }
         }
       }
@@ -4009,6 +4029,16 @@
         }
       }
     },
+    "How often" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行次数"
+          }
+        }
+      }
+    },
     "If the same file (judged by content, regardless of name or location) was recognized with the same settings, the earlier result is reused. “Recognize Again” always reads afresh. The list and results are kept after quitting and are there next time." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4829,6 +4859,16 @@
         }
       }
     },
+    "No window of “%@” is open. Open the window the actions were recorded in, then run them again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”没有打开的窗口。请打开录制时所在的窗口，再运行一次。"
+          }
+        }
+      }
+    },
     "None" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4909,6 +4949,16 @@
         }
       }
     },
+    "OCRFlow Results" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCRFlow 识别结果"
+          }
+        }
+      }
+    },
     "OCRFlow needs Accessibility permission to turn pages" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4935,6 +4985,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OCRFlow 上次意外退出"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
           }
         }
       }
@@ -5679,16 +5739,6 @@
         }
       }
     },
-    "Pages %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "多页截图 %@"
-          }
-        }
-      }
-    },
     "Pages to Open" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5913,6 +5963,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "队列截图"
+          }
+        }
+      }
+    },
+    "Queue Screenshots %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "队列截图 %@"
           }
         }
       }
@@ -6499,16 +6559,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "录制的操作…"
-          }
-        }
-      }
-    },
-    "Recorded: %lld" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已录制：%lld"
           }
         }
       }
@@ -7813,6 +7863,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "步骤"
+          }
+        }
+      }
+    },
+    "Steps recorded: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已录制 %lld 步"
           }
         }
       }
@@ -9199,16 +9259,6 @@
         }
       }
     },
-    "What becomes of the screenshots?" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些截图怎么处理？"
-          }
-        }
-      }
-    },
     "What frames a page rather than being part of it. Ticked items go into the results; the rest are left out. Footnotes are kept by default." : {
       "localizations" : {
         "zh-Hans" : {
@@ -9539,12 +9589,32 @@
         }
       }
     },
-    "“%@” is done" : {
+    "“%@” is done. Screenshots taken: %lld" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”已完成"
+            "value" : "“%1$@”已完成，共截取 %2$lld 张"
+          }
+        }
+      }
+    },
+    "“%@” took no screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”没有截到画面"
+          }
+        }
+      }
+    },
+    "“%@” was stopped. Screenshots taken: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”已停止，共截取 %2$lld 张"
           }
         }
       }

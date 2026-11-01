@@ -110,10 +110,72 @@ struct CaptureTests {
         }
     }
 
+    // MARK: - Long screenshot controls
+
+    /// The button and the preview are one column: the same left edge, the
+    /// same width, the button's top level with the area's, the preview
+    /// under it — beside the area, never over it.
+    @MainActor @Test func theScrollControlsAreOneColumnBesideTheArea() {
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1050)
+        let area = CGRect(x: 300, y: 200, width: 659, height: 600)
+        let column = CaptureMarks.scrollColumnFrames(for: area, on: screen, buttonHeight: 32)
+        #expect(column.button.minX == column.preview.minX)
+        #expect(column.button.width == column.preview.width)
+        #expect(column.button.width == CaptureMarks.columnWidth)
+        #expect(column.button.maxY == area.maxY)
+        #expect(column.preview.maxY == column.button.minY - 8)
+        #expect(column.preview.minY == area.minY)
+        // More room to the right: there.
+        #expect(column.button.minX == area.maxX + 8)
+        #expect(!column.button.intersects(area) && !column.preview.intersects(area))
+    }
+
+    @MainActor @Test func theScrollControlsGoWhereThereIsRoom() {
+        let screen = CGRect(x: 0, y: 0, width: 1920, height: 1050)
+        // Near the right edge: to the left.
+        let right = CGRect(x: 1200, y: 100, width: 700, height: 800)
+        let left = CaptureMarks.scrollColumnFrames(for: right, on: screen, buttonHeight: 32)
+        #expect(left.button.maxX == right.minX - 8)
+        // Little room either side: narrower, still on screen, still a column.
+        let wide = CGRect(x: 100, y: 100, width: 1720, height: 800)
+        let narrow = CaptureMarks.scrollColumnFrames(for: wide, on: screen, buttonHeight: 32)
+        #expect(narrow.button.width == CaptureMarks.minimumColumnWidth)
+        #expect(narrow.button.width == narrow.preview.width && narrow.button.minX == narrow.preview.minX)
+        #expect(screen.contains(narrow.button) && screen.contains(narrow.preview))
+        // A short area: the preview keeps a usable height, below the button.
+        let short = CGRect(x: 300, y: 500, width: 400, height: 60)
+        let low = CaptureMarks.scrollColumnFrames(for: short, on: screen, buttonHeight: 32)
+        #expect(low.preview.height == CaptureMarks.minimumPreviewHeight)
+        #expect(low.preview.maxY == low.button.minY - 8)
+        // At the top of the screen: below its top edge.
+        let top = CGRect(x: 300, y: 600, width: 400, height: 450)
+        #expect(CaptureMarks.scrollColumnFrames(for: top, on: screen, buttonHeight: 32).button.maxY == screen.maxY - 8)
+    }
+
+    // MARK: - Naming
+
+    /// One alone keeps its name; several taken together are numbered in
+    /// order, the numbers padded so they sort as taken.
+    @Test func severalTakenTogetherAreNumberedInOrder() {
+        #expect(OCRViewModel.numberedNames("截图 2026-11-01 10.57.08", count: 1) == ["截图 2026-11-01 10.57.08"])
+        #expect(OCRViewModel.numberedNames("截图", count: 3) == ["截图 1", "截图 2", "截图 3"])
+        let twelve = OCRViewModel.numberedNames("截图", count: 12)
+        #expect(twelve.first == "截图 01" && twelve.last == "截图 12")
+        #expect(twelve == twelve.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+    }
+
+    @Test func jpegIsSavedAsJpg() {
+        #expect(ScreenshotFormat.jpeg.pathExtension == "jpg")
+        #expect(ScreenshotFormat.png.pathExtension == "png")
+        #expect(ScreenshotFormat.heic.pathExtension == "heic")
+    }
+
     // MARK: - Saving
 
-    /// Each format is written as what it says; JPEG, which keeps no
-    /// transparency, shows what was see-through as white.
+    /// Each format is written as what it says, at the resolution of the
+    /// screen it was taken on — 144 pixels an inch on a Retina one — and
+    /// JPEG as `.jpg`; JPEG, which keeps no transparency, shows what was
+    /// see-through as white.
     @Test func screenshotsAreSavedInTheChosenFormat() throws {
         let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -126,9 +188,13 @@ struct CaptureTests {
         let image = context.makeImage()!
         for format in ScreenshotFormat.allCases {
             let url = folder.appending(path: "shot").appendingPathExtension(format.pathExtension)
-            #expect(format.write(image, to: url))
+            #expect(format.write(image, to: url, pixelsPerPoint: 2))
             let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
             #expect(CGImageSourceGetType(source) as String? == format.type.identifier)
+            let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+            #expect(properties[kCGImagePropertyDPIWidth] as? Double == 144)
+            #expect(properties[kCGImagePropertyDPIHeight] as? Double == 144)
+            #expect(ScreenshotFormat.pixelsPerPoint(of: url) == 2)
             if format == .jpeg {
                 let read = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
                 let pixel = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,

@@ -1,4 +1,5 @@
 import AppKit
+import AudioToolbox
 import UniformTypeIdentifiers
 
 /// Capturing the screen, from asking for permission to the finished picture.
@@ -89,31 +90,28 @@ enum ScreenCapture {
         OwnWindows.whileModal { _ = alert.runModal() }
     }
 
-    // MARK: - Flash
+    // MARK: - Where it was taken
 
-    /// A brief flash over what was taken: a capture made without the
-    /// crosshair otherwise gives no sign that it happened.
-    static func flash(_ target: CaptureTarget) {
-        guard let rect = frame(of: target) else { return }
-        let panel = NSPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = .screenSaver
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.ignoresMouseEvents = true
-        panel.isOpaque = false
-        panel.hasShadow = false
-        panel.backgroundColor = NSColor.white.withAlphaComponent(0.45)
-        panel.isReleasedWhenClosed = false
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.35
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = 0
-        }
-        Task {
-            try? await Task.sleep(for: .seconds(0.4))
-            panel.orderOut(nil)
-        }
+    /// Pixels a point where the target is: what a picture of it was taken
+    /// at, and the resolution it is saved with.
+    static func pixelsPerPoint(of target: CaptureTarget) -> CGFloat {
+        guard let frame = frame(of: target) else { return NSScreen.main?.backingScaleFactor ?? 1 }
+        return CaptureMarks.backingScale(for: frame)
     }
+
+    /// The sound macOS makes as it takes a screenshot, played the way the
+    /// system plays its interface sounds — not at all when the user has
+    /// turned those off in Sound settings.
+    static func playShutterSound() {
+        AudioServicesPlaySystemSound(shutterSound)
+    }
+
+    private static let shutterSound: SystemSoundID = {
+        var sound: SystemSoundID = 0
+        let url = URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif")
+        AudioServicesCreateSystemSoundID(url as CFURL, &sound)
+        return sound
+    }()
 
     /// Where the target is now, in screen coordinates.
     static func frame(of target: CaptureTarget) -> CGRect? {
@@ -148,11 +146,15 @@ enum ScreenshotFormat: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var pathExtension: String { type.preferredFilenameExtension ?? rawValue }
+    /// JPEG as `.jpg`, as macOS names its own screenshots, rather than the
+    /// type's preferred `.jpeg`.
+    var pathExtension: String { self == .jpeg ? "jpg" : type.preferredFilenameExtension ?? rawValue }
 
-    /// Written as this kind of file. JPEG keeps no transparency, so what is
-    /// see-through — a window's rounded corners — is white, not black.
-    nonisolated func write(_ image: CGImage, to url: URL) -> Bool {
+    /// Written as this kind of file, with the resolution it was taken at —
+    /// 144 pixels an inch from a Retina screen — so it opens at the size it
+    /// was on screen. JPEG keeps no transparency, so what is see-through — a
+    /// window's rounded corners — is white, not black.
+    nonisolated func write(_ image: CGImage, to url: URL, pixelsPerPoint: CGFloat) -> Bool {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil)
         else { return false }
         var image = image
@@ -166,8 +168,18 @@ enum ScreenshotFormat: String, Codable, CaseIterable, Identifiable, Sendable {
             context.draw(image, in: bounds)
             if let flat = context.makeImage() { image = flat }
         }
-        let options = self == .png ? nil : [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
-        CGImageDestinationAddImage(destination, image, options)
+        var properties: [CFString: Any] = [kCGImagePropertyDPIWidth: 72 * pixelsPerPoint,
+                                           kCGImagePropertyDPIHeight: 72 * pixelsPerPoint]
+        if self != .png { properties[kCGImageDestinationLossyCompressionQuality] = 0.9 }
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         return CGImageDestinationFinalize(destination)
+    }
+
+    /// Pixels a point a picture was saved with — 1 when it does not say.
+    nonisolated static func pixelsPerPoint(of url: URL) -> CGFloat {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let dpi = properties[kCGImagePropertyDPIWidth] as? Double, dpi > 0 else { return 1 }
+        return CGFloat(dpi / 72)
     }
 }

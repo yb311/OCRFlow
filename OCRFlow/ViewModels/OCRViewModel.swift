@@ -1298,6 +1298,7 @@ final class OCRViewModel {
                 return
             }
             var images = [taken.image]
+            let pixelsPerPoint = ScreenCapture.pixelsPerPoint(of: taken.target)
             var finish = await CaptureBar.choose(around: area)
             if finish == .longCapture {
                 // Scrolling needs the live screen: it goes once the long
@@ -1316,20 +1317,20 @@ final class OCRViewModel {
                 await CaptureOverlay.closeLingering(givingBack: finish != .recognize)
             }
             switch finish {
-            case .recognize: recognizeCaptures(images)
-            case .copy: copyCaptures(images)
-            case .save: saveCaptures(images)
+            case .recognize: recognizeCaptures(images, pixelsPerPoint: pixelsPerPoint)
+            case .copy: copyCaptures(images, pixelsPerPoint: pixelsPerPoint)
+            case .save: saveCaptures(images, pixelsPerPoint: pixelsPerPoint)
             case .cancel, .longCapture, .done: break
             }
         }
     }
 
     /// Into the list, and read.
-    private func recognizeCaptures(_ images: [CGImage]) {
-        let date = Self.captureDate()
-        let files = images.compactMap { image -> URL? in
-            let url = newCaptureURL(named: String(localized: "Screenshot \(date)"), extension: "png")
-            return ScrollingCapture.write(image, to: url) ? url : nil
+    private func recognizeCaptures(_ images: [CGImage], pixelsPerPoint: CGFloat) {
+        let names = Self.numberedNames(String(localized: "Screenshot \(Self.captureDate())"), count: images.count)
+        let files = zip(images, names).compactMap { image, name -> URL? in
+            let url = newCaptureURL(named: name, extension: "png")
+            return ScreenshotFormat.png.write(image, to: url, pixelsPerPoint: pixelsPerPoint) ? url : nil
         }
         guard !files.isEmpty else { return }
         // Taken from another app: the result is what the user is waiting
@@ -1340,11 +1341,10 @@ final class OCRViewModel {
 
     /// At the size it looks on screen, as PNG for apps that take it and as a
     /// picture for the rest.
-    private func copyCaptures(_ images: [CGImage]) {
+    private func copyCaptures(_ images: [CGImage], pixelsPerPoint: CGFloat) {
         guard let image = images.first else { return }
-        let scale = NSScreen.main?.backingScaleFactor ?? 2
-        let picture = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale,
-                                                          height: CGFloat(image.height) / scale))
+        let picture = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / pixelsPerPoint,
+                                                          height: CGFloat(image.height) / pixelsPerPoint))
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects([picture])
@@ -1357,15 +1357,14 @@ final class OCRViewModel {
     /// Into the screenshots folder of the settings — the desktop unless
     /// changed — with nothing to ask. A very long picture in parts is
     /// numbered.
-    private func saveCaptures(_ images: [CGImage]) {
+    private func saveCaptures(_ images: [CGImage], pixelsPerPoint: CGFloat) {
         let folder = screenshotDestination
-        let stem = String(localized: "Screenshot \(Self.captureDate())")
+        let names = Self.numberedNames(String(localized: "Screenshot \(Self.captureDate())"), count: images.count)
         let format = screenshotFormat
         var saved: [URL] = []
-        for (index, image) in images.enumerated() {
-            let url = Self.freeURL(in: folder, named: index == 0 ? stem : "\(stem) \(index + 1)",
-                                   extension: format.pathExtension)
-            if format.write(image, to: url) { saved.append(url) }
+        for (image, name) in zip(images, names) {
+            let url = Self.freeURL(in: folder, named: name, extension: format.pathExtension)
+            if format.write(image, to: url, pixelsPerPoint: pixelsPerPoint) { saved.append(url) }
         }
         reportSaved(saved, in: folder)
     }
@@ -1392,7 +1391,9 @@ final class OCRViewModel {
             defer { try? FileManager.default.removeItem(at: folder) }
             let options: [ResultChoice.Option] = pages.count > 1
                 ? [.recognizeTogether, .recognizeEach, .save, .discard] : [.recognize, .save, .discard]
-            switch await ResultChoice.ask(String(localized: "What becomes of the screenshots?"), options: options) {
+            let title = pages.count > 1 ? String(localized: "\(pages.count) screenshots taken. What becomes of them?")
+                : String(localized: "1 screenshot taken. What becomes of it?")
+            switch await ResultChoice.ask(title, options: options) {
             case .recognizeTogether:
                 deliver(await captureFiles(from: pages, as: .document, named: nil))
             case .recognizeEach, .recognize:
@@ -1421,11 +1422,13 @@ final class OCRViewModel {
     /// `folder`, saved there as the settings say: pictures in the chosen
     /// format, a document as one PDF or a picture a page.
     /// `name` heads the file names; by default they say what they are.
+    /// Several of one kind are numbered in the order they were taken.
     func captureFiles(from pages: [URL], as output: Macro.Output, named name: String?,
                       into folder: URL? = nil) async -> [URL] {
         guard !pages.isEmpty else { return [] }
         let date = Self.captureDate()
         func label(_ fallback: String) -> String { name.map { "\($0) \(date)" } ?? fallback }
+        func labels(_ fallback: String, count: Int) -> [String] { Self.numberedNames(label(fallback), count: count) }
         func destination(_ label: String, _ pathExtension: String) -> URL {
             folder.map { Self.freeURL(in: $0, named: label, extension: pathExtension) }
                 ?? newCaptureURL(named: label, extension: pathExtension)
@@ -1438,20 +1441,26 @@ final class OCRViewModel {
                 return (try? FileManager.default.copyItem(at: page, to: url)) == nil ? nil : url
             }
             guard let image = PageImages.wholeImage(at: page) else { return nil }
-            return write(image, label)
+            return write(image, label, pixelsPerPoint: ScreenshotFormat.pixelsPerPoint(of: page))
         }
-        func write(_ image: CGImage, _ label: String) -> URL? {
+        func write(_ image: CGImage, _ label: String, pixelsPerPoint: CGFloat) -> URL? {
             let url = destination(label, folder == nil ? "png" : format.pathExtension)
-            let written = folder == nil ? ScrollingCapture.write(image, to: url) : format.write(image, to: url)
+            let written = (folder == nil ? ScreenshotFormat.png : format).write(image, to: url, pixelsPerPoint: pixelsPerPoint)
             return written ? url : nil
+        }
+        func copies(_ pages: [URL]) -> [URL] {
+            zip(pages, labels(String(localized: "Screenshot \(date)"), count: pages.count)).compactMap(copy)
         }
         switch output {
         case .images:
-            return pages.compactMap { copy($0, label(String(localized: "Screenshot \(date)"))) }
+            return copies(pages)
         case .longImage where pages.count > 1:
             let joined = await Task.detached { [pages] in ScrollStitcher.stitch(pages) }.value
             if let joined {
-                return joined.compactMap { write($0, label(String(localized: "Long Screenshot \(date)"))) }
+                let pixelsPerPoint = ScreenshotFormat.pixelsPerPoint(of: pages[0])
+                return zip(joined, labels(String(localized: "Long Screenshot \(date)"), count: joined.count)).compactMap {
+                    write($0, $1, pixelsPerPoint: pixelsPerPoint)
+                }
             }
             // Not one scrolled view after all: pages, then.
             return await captureFiles(from: pages, as: .document, named: name, into: folder)
@@ -1460,7 +1469,7 @@ final class OCRViewModel {
                 return [copy(pages[0], label(String(localized: "Screenshot \(date)")))].compactMap { $0 }
             }
             if folder != nil, !savesPagesAsPDF {
-                return pages.compactMap { copy($0, label(String(localized: "Screenshot \(date)"))) }
+                return copies(pages)
             }
             // A long picture among them is cut into pages of a usual shape,
             // as it would be read.
@@ -1468,10 +1477,10 @@ final class OCRViewModel {
             defer { try? FileManager.default.removeItem(at: scratch) }
             let cut = Self.cuttingLongPages(pages, into: scratch)
             if let folder {
-                let url = Self.freeURL(in: folder, named: label(String(localized: "Pages \(date)")), extension: "pdf")
+                let url = Self.freeURL(in: folder, named: label(String(localized: "Queue Screenshots \(date)")), extension: "pdf")
                 return Self.writePDF(of: cut, to: url) ? [url] : []
             }
-            let url = newCaptureURL(named: label(String(localized: "Pages \(date)")), extension: "tiff")
+            let url = newCaptureURL(named: label(String(localized: "Queue Screenshots \(date)")), extension: "tiff")
             return ScrollingCapture.assemble(cut, into: url) ? [url] : []
         }
     }
@@ -1482,30 +1491,36 @@ final class OCRViewModel {
         pages.flatMap { page -> [URL] in
             guard let cuts = LongImagePages.pages(of: page), cuts.count > 1 else { return [page] }
             try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+            let pixelsPerPoint = ScreenshotFormat.pixelsPerPoint(of: page)
             return cuts.indices.compactMap { index in
                 guard let image = LongImagePages.page(index, of: page, cutAt: cuts) else { return nil }
                 let url = scratch.appending(path: "\(UUID().uuidString).png")
-                guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString,
-                                                                        1, nil) else { return nil }
-                CGImageDestinationAddImage(destination, image, nil)
-                return CGImageDestinationFinalize(destination) ? url : nil
+                return ScreenshotFormat.png.write(image, to: url, pixelsPerPoint: pixelsPerPoint) ? url : nil
             }
         }
     }
 
-    /// A PDF of the pictures, a page each, at the size they were on a Retina
-    /// screen.
+    /// A PDF of the pictures, a page each, at the size they were on screen.
     private nonisolated static func writePDF(of pages: [URL], to url: URL) -> Bool {
         guard let context = CGContext(url as CFURL, mediaBox: nil, nil) else { return false }
         for page in pages {
             guard let image = PageImages.wholeImage(at: page) else { continue }
-            var box = CGRect(x: 0, y: 0, width: CGFloat(image.width) / 2, height: CGFloat(image.height) / 2)
+            let scale = ScreenshotFormat.pixelsPerPoint(of: page)
+            var box = CGRect(x: 0, y: 0, width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
             context.beginPage(mediaBox: &box)
             context.draw(image, in: box)
             context.endPage()
         }
         context.closePDF()
         return FileManager.default.fileExists(atPath: url.path(percentEncoded: false))
+    }
+
+    /// `base` for one; for several, `base` numbered from 1 in order, the
+    /// numbers as wide as the last so they sort as taken.
+    nonisolated static func numberedNames(_ base: String, count: Int) -> [String] {
+        guard count > 1 else { return [base] }
+        let digits = String(count).count
+        return (1...count).map { "\(base) \(String(format: "%0\(digits)d", $0))" }
     }
 
     /// A name not taken yet in `folder`, which is made if need be.
