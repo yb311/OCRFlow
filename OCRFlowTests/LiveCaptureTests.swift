@@ -56,11 +56,14 @@ final class LiveCaptureTests: XCTestCase {
         process.executableURL = URL(fileURLWithPath: helper)
         process.arguments = [info.path] + (scrolling ? ["scroll"] : [])
         try process.run()
-        for _ in 0..<50 where !FileManager.default.fileExists(atPath: info.path) {
-            try await Task.sleep(for: .milliseconds(100))
-        }
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitUntil(seconds: 5) { FileManager.default.fileExists(atPath: info.path) }
         let values = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: info)) as? [String: Double])
+        // Its window on screen.
+        let id = CGWindowID(values["id"]!)
+        try await waitUntil {
+            (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? [])
+                .contains { $0[kCGWindowNumber as String] as? CGWindowID == id }
+        }
         return Slides(process: process, window: CGWindowID(values["id"]!),
                       frame: CGRect(x: values["x"]!, y: values["y"]!, width: values["w"]!, height: values["h"]!),
                       button: CGPoint(x: values["bx"]!, y: values["by"]!))
@@ -132,20 +135,21 @@ final class LiveCaptureTests: XCTestCase {
         // The slide's title, in event coordinates.
         let title = CGRect(x: slides.frame.minX, y: slides.frame.minY + 28, width: 400, height: 120)
         NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
-        try await Task.sleep(for: .milliseconds(600))
+        try await waitUntil { NSWorkspace.shared.frontmostApplication?.processIdentifier == slides.process.processIdentifier }
         let clean = try await ScreenCapture.grab(.region(display: main, rect: title))
         XCTAssertTrue(try text(in: clean).contains("Page 1"))
 
-        // The screen dimmed around somewhere else, as around an area being
-        // taken, shown in the same turn as the picture is taken: then
+        // The screen dimmed, as around an area being taken, shown in the
+        // same turn as the picture is taken: then
         // ScreenCaptureKit does not yet list it as on screen.
         var shown: [NSPanel] = []
         defer { shown.forEach { $0.orderOut(nil) } }
         func dim() {
-            let elsewhere = CGRect(x: title.maxX + 40, y: top - title.maxY, width: 40, height: 40)
-            let shades = CaptureMarks.shades(around: elsewhere)
-            shades.forEach { $0.orderFrontRegardless() }
-            shown += shades
+            let shade = CaptureMarks.panel(screen.frame)
+            shade.ignoresMouseEvents = true
+            shade.backgroundColor = .black.withAlphaComponent(0.4)
+            shade.orderFrontRegardless()
+            shown.append(shade)
         }
         dim()
         let again = try await ScreenCapture.grab(.region(display: main, rect: title))
@@ -219,7 +223,7 @@ final class LiveCaptureTests: XCTestCase {
         let end = CGPoint(x: start.x + 400, y: start.y + 120)
 
         let dragged = Task { await ScreenCapture.choose() }
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         try await drag(from: start, to: end)
         let area = await dragged.value
         guard case let .region(_, rect)? = area?.target else { return XCTFail("no area: \(String(describing: area?.target))") }
@@ -228,13 +232,13 @@ final class LiveCaptureTests: XCTestCase {
         XCTAssertTrue(try text(in: try XCTUnwrap(area?.image)).contains("Page 1"))
 
         let escaped = Task { await ScreenCapture.choose() }
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         press(53)   // Escape
         let none = await escaped.value
         XCTAssertNil(none?.target)
 
         let clicked = Task { await ScreenCapture.choose() }
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.midX, y: top - frame.midY))
         let window = await clicked.value
         XCTAssertEqual(window?.target, .window(slides.window))
@@ -422,7 +426,7 @@ extension LiveCaptureTests {
         // Capture here, as the screenshot shortcut or the floating button
         // would: the screen holds still, and a click takes the window.
         vm.captureScreenshot()
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.midX, y: top - frame.midY))
         try await Task.sleep(for: .milliseconds(1000))
         press(124)   // →
@@ -476,7 +480,7 @@ extension LiveCaptureTests {
 extension LiveCaptureTests {
     /// The bar of buttons on screen.
     private func bar() throws -> NSPanel {
-        try XCTUnwrap(NSApp.windows.first { $0 is KeyPanel && $0.isVisible } as? NSPanel)
+        try XCTUnwrap(NSApp.windows.first { $0.identifier == CaptureMarks.barIdentifier && $0.isVisible } as? NSPanel)
     }
 
     /// A button of the bar, by how far its centre is from the bar's right
@@ -506,9 +510,9 @@ extension LiveCaptureTests {
         NSPasteboard.general.clearContents()
         let vm = try model()
         vm.captureScreenshot()
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.midX, y: top - frame.midY))
-        try await Task.sleep(for: .milliseconds(1000))
+        try await waitUntil { self.barIsUp }
         try clickBar(25)
         try await Task.sleep(for: .milliseconds(800))
         XCTAssertFalse(vm.isCapturing)
@@ -537,7 +541,7 @@ extension LiveCaptureTests {
         own.makeMain()
         defer { own.orderOut(nil) }
         NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
-        try await Task.sleep(for: .milliseconds(600))
+        try await waitUntil { NSWorkspace.shared.frontmostApplication?.processIdentifier == slides.process.processIdentifier }
         func ownIsBehind() -> Bool {
             let order = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? [])
                 .compactMap { $0[kCGWindowNumber as String] as? Int }
@@ -549,9 +553,9 @@ extension LiveCaptureTests {
 
         let vm = try model()
         vm.captureScreenshot()
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.minX + 30, y: top - frame.maxY + 60))   // the slides, clear of OCRFlow's window
-        try await Task.sleep(for: .milliseconds(1000))
+        try await waitUntil { self.barIsUp }
         XCTAssertTrue(ownIsBehind(), "came forward with the bar")
         try clickBar(25)
         try await Task.sleep(for: .milliseconds(800))
@@ -569,9 +573,9 @@ extension LiveCaptureTests {
         NSPasteboard.general.clearContents()
         let vm = try model()
         vm.captureScreenshot()
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.midX, y: top - frame.midY))
-        try await Task.sleep(for: .milliseconds(1000))
+        try await waitUntil { self.barIsUp }
         try clickBar(144)
         try await Task.sleep(for: .milliseconds(1500))
         try clickAutoScroll()
@@ -625,13 +629,13 @@ extension LiveCaptureTests {
         try await Task.sleep(for: .milliseconds(800))
         let recording = try XCTUnwrap(vm.activeRecording)
         let long = Task { await recording.captureHere(scrolling: true) }
-        try await Task.sleep(for: .milliseconds(1200))
+        try await waitUntil { self.captureScreenIsUp }
         click(CGPoint(x: frame.midX, y: top - frame.midY))
         try await Task.sleep(for: .milliseconds(1500))
         // The slides in front, so the wheel reaches them, as it would the
         // user's.
         NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
-        try await Task.sleep(for: .milliseconds(400))
+        try await waitUntil { NSWorkspace.shared.frontmostApplication?.processIdentifier == slides.process.processIdentifier }
         // By hand, clear of the Auto Scroll button.
         let wheel = CGPoint(x: frame.midX, y: top - frame.maxY + frame.height / 4)
         for _ in 0..<30 {
@@ -643,7 +647,7 @@ extension LiveCaptureTests {
         try await Task.sleep(for: .milliseconds(1500))
         try clickBar(25)   // ✓
         await long.value
-        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && !($0 is KeyPanel) && $0.isVisible && $0.frame.width > 300 })
+        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.identifier != CaptureMarks.barIdentifier && $0.isVisible && $0.frame.width > 300 })
         click(CGPoint(x: panel.frame.maxX - 14 - 25, y: top - (panel.frame.minY + 14 + 10)))   // Done
         for _ in 0..<50 where vm.macros.macros.isEmpty { try await Task.sleep(for: .milliseconds(100)) }
 
@@ -690,10 +694,13 @@ extension LiveCaptureTests {
         let frame = try XCTUnwrap(ScreenCapture.frame(of: target))
         let top = NSScreen.screens[0].frame.maxY
         let first = try await ScreenCapture.grab(target)
-        let session = Task { await ScrollingCapture().run(target, first: first) }
+        let screen = CaptureOverlay(shots: try await ScreenCapture.screens())
+        screen.show(around: frame)
+        defer { screen.close() }
+        let session = Task { await ScrollingCapture().run(target, first: first, on: screen) }
         try await Task.sleep(for: .milliseconds(1000))
         NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
-        try await Task.sleep(for: .milliseconds(400))
+        try await waitUntil { NSWorkspace.shared.frontmostApplication?.processIdentifier == slides.process.processIdentifier }
         let wheel = CGPoint(x: frame.midX, y: top - frame.maxY + frame.height / 4)
         for _ in 0..<30 {
             let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -50, wheel2: 0, wheel3: 0)
@@ -713,7 +720,8 @@ extension LiveCaptureTests {
     /// Auto Scroll over an area rather than a window. Nothing of OCRFlow's
     /// is in the picture, even a window of its own over the area; the steps
     /// come evenly, with the screen, and the preview grows with nearly every
-    /// frame; and once the user moves the pointer it stops and leaves the
+    /// frame; it scrolls where the pointer is, on its button, never moving
+    /// it; and once the user moves the pointer it stops and leaves the
     /// pointer where they put it.
     func testAutoScrollsAnAreaAndGivesThePointerBack() async throws {
         slides?.process.terminate()
@@ -725,7 +733,7 @@ extension LiveCaptureTests {
         let area = CGRect(x: frame.minX + 10, y: top - frame.maxY + 60, width: frame.width - 40, height: frame.height - 80)
         let target = try XCTUnwrap(ScreenWindows.target(for: area), "\(frame) → \(area)")
         NSRunningApplication(processIdentifier: slides.process.processIdentifier)?.activate()
-        try await Task.sleep(for: .milliseconds(400))
+        try await waitUntil { NSWorkspace.shared.frontmostApplication?.processIdentifier == slides.process.processIdentifier }
         let first = try await ScreenCapture.grab(target)
         // One of OCRFlow's own, over the area: as the Auto Scroll button once was.
         let block = NSPanel(contentRect: CGRect(x: area.midX - 100, y: top - area.midY - 150, width: 200, height: 60),
@@ -735,8 +743,11 @@ extension LiveCaptureTests {
         block.ignoresMouseEvents = true
         block.orderFrontRegardless()
         defer { block.orderOut(nil) }
+        let screen = CaptureOverlay(shots: try await ScreenCapture.screens())
+        screen.show(around: try XCTUnwrap(ScreenCapture.frame(of: target)))
+        defer { screen.close() }
         let capture = ScrollingCapture()
-        let session = Task { await capture.run(target, first: first) }
+        let session = Task { await capture.run(target, first: first, on: screen) }
         try await Task.sleep(for: .milliseconds(1000))
 
         final class Steps: @unchecked Sendable { var times: [TimeInterval] = [] }
@@ -810,38 +821,67 @@ extension LiveCaptureTests {
         let vm = try model()
         let floating = FloatingCaptureButton(model: vm)
         defer { floating.close() }
-        try await Task.sleep(for: .milliseconds(300))
         // The frontmost: earlier tests' models may have floating buttons of
         // their own in the same place, when the setting is on.
+        let side = FloatingCaptureButton.side + FloatingCaptureButton.labelRoom
+        try await waitUntil { NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.frame.width == side } }
         let front = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? [])
             .compactMap { $0[kCGWindowNumber as String] as? Int }
-        let buttons = NSApp.windows.filter { $0 is NSPanel && $0.isVisible && $0.frame.width == FloatingCaptureButton.side }
+        let buttons = NSApp.windows.filter { $0 is NSPanel && $0.isVisible && $0.frame.width == side }
         let panel = try XCTUnwrap(front.lazy.compactMap { number in buttons.first { $0.windowNumber == number } }.first)
-        let resting = panel.frame
+        let frame = panel.frame
         let top = NSScreen.screens[0].frame.maxY
+        // The main button: at the top of the panel when the others open
+        // downwards, at the bottom when upwards; on the side away from the
+        // edge its names show on.
+        let main = panel.contentView?.subviews.first { $0.frame.width == FloatingCaptureButton.side && $0.frame.height == FloatingCaptureButton.side }
+        let resting = try XCTUnwrap(main).frame.offsetBy(dx: frame.minX, dy: frame.minY)
         func move(to point: CGPoint) {
             CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?
                 .post(tap: .cghidEventTap)
         }
-        move(to: CGPoint(x: resting.midX - 80, y: top - resting.midY))
-        try await Task.sleep(for: .milliseconds(300))
+        move(to: CGPoint(x: resting.midX - 200, y: top - resting.midY))
+        try await Task.sleep(for: .milliseconds(100))
         move(to: CGPoint(x: resting.midX, y: top - resting.midY))
-        try await Task.sleep(for: .milliseconds(600))
-        XCTAssertEqual(panel.frame.height, FloatingCaptureButton.side + FloatingCaptureButton.extrasHeight)
-        // Onto the first of the others, where its name shows.
-        let opened = panel.frame
-        let downward = opened.minY < resting.minY
+        try await waitUntil { floating.isOpen }
+        XCTAssertEqual(panel.frame, frame, "it never moves or grows")
+        // Onto the first of the others, across the gap between them.
+        let downward = resting.minY > frame.minY
         let firstY = resting.midY + (downward ? -1 : 1) * ((FloatingCaptureButton.diameter + FloatingCaptureButton.extraDiameter) / 2 + FloatingCaptureButton.gap)
-        move(to: CGPoint(x: resting.midX, y: top - firstY))
-        try await Task.sleep(for: .milliseconds(500))
+        for step in 1...8 {
+            move(to: CGPoint(x: resting.midX, y: top - (resting.midY + (firstY - resting.midY) * CGFloat(step) / 8)))
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        try await Task.sleep(for: .milliseconds(700))
         if let dump = ProcessInfo.processInfo.environment["OCRFLOW_LIVE_DUMP"] {
             let picture = try await ScreenGrabber.capture(.window(CGWindowID(panel.windowNumber)))
             _ = ScreenshotFormat.png.write(picture, to: URL(fileURLWithPath: dump).appending(path: "floating.png"), pixelsPerPoint: 2)
         }
-        XCTAssertEqual(panel.frame, opened, "still open over one of the others")
+        XCTAssertTrue(floating.isOpen, "still open over one of the others")
+        // Away: closed after a moment.
         move(to: CGPoint(x: resting.midX - 400, y: top - resting.midY))
-        try await Task.sleep(for: .milliseconds(900))
-        XCTAssertEqual(panel.frame, resting)
+        try await waitUntil { !floating.isOpen }
+    }
+
+    /// The screen held still for choosing, or what was chosen on it.
+    private var captureScreenIsUp: Bool {
+        NSApp.windows.contains { window in
+            window.isVisible && window.level == .screenSaver && NSScreen.screens.contains { $0.frame == window.frame }
+        }
+    }
+
+    private var barIsUp: Bool {
+        NSApp.windows.contains { $0.identifier == CaptureMarks.barIdentifier && $0.isVisible }
+    }
+
+    /// Until `condition` holds, or fails after `seconds`.
+    private func waitUntil(seconds: Double = 3, _ condition: () -> Bool,
+                           file: StaticString = #filePath, line: UInt = #line) async throws {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !condition() {
+            guard Date() < deadline else { return XCTFail("not within \(seconds) s", file: file, line: line) }
+            try await Task.sleep(for: .milliseconds(20))
+        }
     }
 
     private func model() throws -> OCRViewModel {

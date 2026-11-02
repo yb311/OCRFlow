@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 /// What to do with what was captured, chosen there and then.
@@ -13,27 +14,35 @@ enum CaptureFinish: Sendable {
     case cancel
 }
 
-/// Shown once a screenshot is taken: its size above what was chosen, and
-/// under it a row of buttons — recognize the text, scroll on for a long
-/// screenshot, cancel, save, copy. Recognizing is one choice among others; a
-/// screenshot is often wanted as a picture.
+/// Shown once a screenshot is taken: under what was chosen, a row of
+/// buttons — recognize the text, scroll on for a long screenshot, cancel,
+/// save, copy. Recognizing is one choice among others; a screenshot is often
+/// wanted as a picture.
 ///
-/// Over the held screen, when the choice left it up: the screen stays as it
-/// was while choosing, and nothing beneath answers until the bar is done
-/// with. The caller takes the held screen away afterwards.
+/// Over the screen it was chosen on, still held, dimmed around it and its
+/// size shown: nothing beneath answers until the bar is done with.
 ///
-/// Return copies, Space saves, Escape or a right-click lets it go, and a
-/// double-click on what was chosen copies it.
+/// Return copies — or, with Done there instead, is Done — Space saves,
+/// Escape or a right-click lets it go, and a double-click on what was chosen
+/// is the same as Return.
+///
+/// Meanwhile what was chosen can still be adjusted, and the bar keeps
+/// beside it: what is taken is the screen's `chosen` once it is done.
 @MainActor
 final class CaptureBar {
-    /// `area` is what was chosen, in screen coordinates.
-    static func choose(around area: CGRect) async -> CaptureFinish {
+    /// `finishes`: the buttons, in order.
+    static func choose(on screen: CaptureOverlay,
+                       finishes: [CaptureFinish] = [.recognize, .longCapture, .cancel, .save, .copy]) async -> CaptureFinish {
+        guard let area = screen.area else { return .cancel }
         let bar = CaptureBar()
         current = bar
-        defer { current = nil }
+        defer {
+            current = nil
+            screen.onDoubleClick = {}
+        }
         return await withCheckedContinuation { continuation in
             bar.continuation = continuation
-            bar.show(around: area)
+            bar.show(around: area, on: screen, finishes: finishes)
         }
     }
 
@@ -41,69 +50,84 @@ final class CaptureBar {
     private static var current: CaptureBar?
 
     private var continuation: CheckedContinuation<CaptureFinish, Never>?
-    private var panels: [NSPanel] = []
+    private weak var screen: CaptureOverlay?
+    private var panel: NSPanel?
     private var monitors: [Any] = []
+    private var keys: [GlobalHotKey] = []
+    private var switching: NSObjectProtocol?
 
-    private func show(around area: CGRect) {
-        // As it looked while being chosen: the held screen, dimmed around
-        // it and with its size, or the same drawn over the live one.
-        let held = CaptureOverlay.keepLingering()
-        let shades = held ? [] : CaptureMarks.shades(around: area) + [CaptureMarks.sizeLabel(for: area)]
-        let catcher = CaptureMarks.outline(area, catchesClicks: true)
-        (catcher.contentView as? OutlineView)?.onDoubleClick = { [weak self] in self?.finish(.copy) }
-        let bar = CaptureMarks.bar(CaptureActionsBar(items: [.recognize, .longCapture, .cancel, .save, .copy]) {
+    private func show(around area: CGRect, on screen: CaptureOverlay, finishes: [CaptureFinish]) {
+        // Taken as it is: copied, or Done.
+        let keep: CaptureFinish = finishes.contains(.done) ? .done : .copy
+        screen.onDoubleClick = { [weak self] in self?.finish(keep) }
+        let bar = CaptureMarks.bar(finishes, beside: area) {
             [weak self] in self?.finish($0)
-        }, beside: area)
-        panels = shades + [catcher, bar]
-        panels.forEach { $0.orderFrontRegardless() }
-
-        // The keys come here without OCRFlow coming forward: the bar is a
-        // panel that takes the keyboard while another app stays active, as
-        // Spotlight does.
-        bar.makeKey()
-        let local = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .rightMouseDown]) { [weak self] event in
-            guard let self else { return event }
-            if event.type == .rightMouseDown {
-                self.finish(.cancel)
-                return nil
-            }
-            let command = event.modifierFlags.contains(.command)
-            switch (event.keyCode, command) {
-            case (36, false), (76, false), (8, true): self.finish(.copy)    // Return, Enter, ⌘C
-            case (49, false), (1, true): self.finish(.save)                 // Space, ⌘S
-            case (53, false): self.finish(.cancel)                          // Escape
-            default: return event
-            }
-            return nil
         }
-        if let local { monitors.append(local) }
+        bar.orderFrontRegardless()
+        panel = bar
+        self.screen = screen
+        screen.beginAdjusting { CaptureMarks.move(bar, beside: $0) }
+
+        // The keys come here with OCRFlow still in the background: none of
+        // its windows takes the keyboard, which would hand it on to OCRFlow's
+        // own window when they go — and bring OCRFlow forward with it.
+        let finish: (CaptureFinish) -> () -> Void = { action in { [weak self] in self?.finish(action) } }
+        let saves = finishes.contains(.save) ? [(kVK_Space, 0, finish(.save)), (kVK_ANSI_S, cmdKey, finish(.save))] : []
+        keys = GlobalHotKey.claim([
+            (kVK_Return, 0, finish(keep)), (kVK_ANSI_KeypadEnter, 0, finish(keep)), (kVK_ANSI_C, cmdKey, finish(keep)),
+            (kVK_Escape, 0, finish(.cancel)),
+        ] + saves)
+        // A right-click on the bar or what was chosen lets it go.
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown, handler: { [weak self] _ in
+            self?.finish(.cancel)
+            return nil
+        }) { monitors.append(local) }
         // A right-click anywhere else lets it go too.
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.finish(.cancel) }
         }) { monitors.append(monitor) }
+        // Going to another app lets it go: its keys are its own again.
+        switching = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.finish(.cancel) }
+        }
     }
 
     private func finish(_ action: CaptureFinish) {
         guard let continuation else { return }
         self.continuation = nil
+        // A size being typed counts.
+        screen?.endAdjusting()
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
-        panels.forEach { $0.orderOut(nil) }
-        panels = []
+        switching.map(NSWorkspace.shared.notificationCenter.removeObserver)
+        switching = nil
+        GlobalHotKey.release(keys)
+        keys = []
+        panel?.orderOut(nil)
+        panel = nil
         continuation.resume(returning: action)
     }
 }
 
-/// The marks shown around something captured: an outline, its size, a bar
-/// of buttons. Each its own panel, over everything.
+/// What is shown with something captured, over the screen it was chosen
+/// on: a bar of buttons, a long screenshot's controls. Each its own panel,
+/// over everything; where the size goes, which the screen draws, is given
+/// here too, so the bar keeps clear of it.
 @MainActor
 enum CaptureMarks {
-    static func panel(_ frame: CGRect, key: Bool = false, passesWheel: Bool = false) -> NSPanel {
-        let style: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
-        let panel = key ? KeyPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
-            : passesWheel ? WheelThroughPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
-            : NSPanel(contentRect: frame, styleMask: style, backing: .buffered, defer: false)
-        panel.level = .screenSaver
+    /// Never key: OCRFlow would come forward when it went — see `CaptureBar`.
+    static func panel(_ frame: CGRect) -> NSPanel {
+        set(up: NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false))
+    }
+
+    /// Above the screen they are shown over, which a click on it would
+    /// otherwise bring in front of them.
+    static let level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+
+    private static func set<Panel: NSPanel>(up panel: Panel) -> Panel {
+        panel.level = level
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         // Shown while another app is in front: during a long screenshot the
         // keys and the wheel belong to the app being scrolled.
@@ -112,29 +136,6 @@ enum CaptureMarks {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         return panel
-    }
-
-    /// The rest of every screen dimmed around `area`, which stays bright,
-    /// with a line round it — as the screen looks while it is chosen. Clicks
-    /// and the wheel go through to what is beneath.
-    static func shades(around area: CGRect) -> [NSPanel] {
-        NSScreen.screens.map { screen in
-            let shade = panel(screen.frame)
-            shade.ignoresMouseEvents = true
-            let view = ShadeView(frame: NSRect(origin: .zero, size: screen.frame.size))
-            view.cut = area.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY)
-            shade.contentView = view
-            return shade
-        }
-    }
-
-    /// `catchesClicks` false lets everything inside reach the app beneath:
-    /// to scroll it, say.
-    static func outline(_ area: CGRect, catchesClicks: Bool) -> NSPanel {
-        let outline = panel(area)
-        outline.ignoresMouseEvents = !catchesClicks
-        outline.contentView = OutlineView(frame: NSRect(origin: .zero, size: outline.frame.size), catchesClicks: catchesClicks)
-        return outline
     }
 
     // MARK: Size and bar, placed alike everywhere
@@ -154,20 +155,6 @@ enum CaptureMarks {
         let y = area.maxY + gap + size.height <= screen.maxY ? area.maxY + gap : area.maxY - size.height - gap
         let x = min(max(area.minX, screen.minX + gap), screen.maxX - size.width - gap)
         return CGRect(x: x, y: y, width: size.width, height: size.height)
-    }
-
-    /// The size of the area, as the held screen shows it while choosing.
-    static func sizeLabel(for area: CGRect) -> NSPanel {
-        let host = NSHostingView(rootView: Text(verbatim: sizeText(for: area))
-            .font(Font(sizeFont))
-            .foregroundStyle(.white)
-            .padding(.horizontal, sizePadding.width)
-            .padding(.vertical, sizePadding.height)
-            .background(.black.opacity(0.7), in: Capsule()))
-        let label = panel(sizeLabelFrame(size: host.fittingSize, for: area))
-        label.ignoresMouseEvents = true
-        label.contentView = host
-        return label
     }
 
     /// Under the area, its right edge on the area's. Without room below,
@@ -190,7 +177,9 @@ enum CaptureMarks {
     /// A long screenshot's own controls: the button that scrolls for the
     /// user in the middle of the area, where the eye already is; what has
     /// been joined beside it, on whichever side has more room, its top level
-    /// with the area's. The button lets the wheel through to what is under it.
+    /// with the area's. The button never takes the mouse: the wheel and
+    /// clicks over it reach what is under it, and a click on it is seen
+    /// before they do — see `ScrollingCapture`.
     ///
     /// `screen` is the visible part of the screen the area is on.
     static func scrollFrames(for area: CGRect, on screen: CGRect,
@@ -214,14 +203,49 @@ enum CaptureMarks {
     static let minimumColumnWidth: CGFloat = 140
     static let minimumPreviewHeight: CGFloat = 80
 
-    static func bar(_ content: some View, beside area: CGRect) -> NSPanel {
-        let host = FirstMouseHostingView(rootView: content)
-        let text = sizeText(for: area).size(withAttributes: [.font: sizeFont])
-        let labelSize = CGSize(width: ceil(text.width) + 2 * sizePadding.width, height: ceil(text.height) + 2 * sizePadding.height)
-        let bar = panel(barFrame(size: host.fittingSize, for: area, labelSize: labelSize), key: true)
+    /// The bar's, to tell it from the other marks.
+    static let barIdentifier = NSUserInterfaceItemIdentifier("captureBar")
+
+    static func bar(_ items: [CaptureFinish], beside area: CGRect, act: @escaping (CaptureFinish) -> Void) -> NSPanel {
+        let names = ButtonNames(area: area)
+        let host = FirstMouseHostingView(rootView: CaptureActionsBar(items: items, act: act) { names.show($0, at: $1) })
+        let bar = BarPanel(contentRect: barFrame(size: host.fittingSize, for: area, labelSize: labelSize(for: area)),
+                           styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        _ = set(up: bar)
+        bar.identifier = barIdentifier
         bar.hasShadow = true
         bar.contentView = host
+        bar.names = names
+        names.bar = bar
         return bar
+    }
+
+    /// The bar beside the area as it is now, adjusted.
+    static func move(_ bar: NSPanel, beside area: CGRect) {
+        (bar as? BarPanel)?.names?.area = area
+        bar.setFrame(barFrame(size: bar.frame.size, for: area, labelSize: labelSize(for: area)), display: true)
+    }
+
+    private static func labelSize(for area: CGRect) -> CGSize {
+        let text = sizeText(for: area).size(withAttributes: [.font: sizeFont])
+        return CGSize(width: ceil(text.width) + 2 * sizePadding.width, height: ceil(text.height) + 2 * sizePadding.height)
+    }
+
+    private final class BarPanel: NSPanel {
+        var names: ButtonNames?
+    }
+
+    /// Beside the bar, on the side away from the area; the other side, at
+    /// the edge of the screen. Centred on the button, kept on screen.
+    static func nameFrame(size: CGSize, for button: CGRect, bar: CGRect, area: CGRect) -> CGRect {
+        let gap: CGFloat = 6
+        let screen = wholeScreen(for: area)
+        let below = bar.minY - gap - size.height, above = bar.maxY + gap
+        let under = bar.midY < area.midY
+        var y = under ? below : above
+        if y < screen.minY + gap || y + size.height > screen.maxY - gap { y = under ? above : below }
+        let x = min(max(button.midX - size.width / 2, screen.minX + gap), screen.maxX - size.width - gap)
+        return CGRect(x: x.rounded(), y: y, width: size.width, height: size.height)
     }
 
     /// The whole of the screen the area is on, menu bar and Dock included:
@@ -242,76 +266,76 @@ enum CaptureMarks {
     }
 }
 
-/// A panel that can take the keyboard without making OCRFlow the active app.
-final class KeyPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-}
+/// A button's name beside the bar while the pointer is on it. The system's
+/// tooltips show only for the app in front, and OCRFlow stays behind while
+/// capturing. A window of the bar's, so it goes when the bar does.
+@MainActor
+private final class ButtonNames {
+    weak var bar: NSPanel?
+    var area: CGRect
+    private var panel: NSPanel?
 
-/// A panel over something being scrolled: the wheel turned over it goes
-/// through to what is beneath. The first turn makes it see-through, and it
-/// takes clicks again once the wheel has been still a moment.
-final class WheelThroughPanel: NSPanel {
-    private var wheelMonitor: Any?
-    private var still: Timer?
+    init(area: CGRect) {
+        self.area = area
+    }
 
-    override func sendEvent(_ event: NSEvent) {
-        guard event.type == .scrollWheel else { return super.sendEvent(event) }
-        ignoresMouseEvents = true
-        // See-through, its turns go to other apps: seen from there.
-        wheelMonitor = wheelMonitor ?? NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
-            MainActor.assumeIsolated { self?.turning() }
+    /// Nil: the pointer has left the buttons.
+    func show(_ name: String?, at button: CGRect) {
+        guard let bar, let name else {
+            panel?.orderOut(nil)
+            return
         }
-        turning()
-    }
-
-    override func orderOut(_ sender: Any?) {
-        stopWatching()
-        super.orderOut(sender)
-    }
-
-    private func turning() {
-        still?.invalidate()
-        still = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.ignoresMouseEvents = false
-                self?.stopWatching()
-            }
-        }
-    }
-
-    private func stopWatching() {
-        still?.invalidate()
-        still = nil
-        if let wheelMonitor { NSEvent.removeMonitor(wheelMonitor) }
-        wheelMonitor = nil
+        let host = NSHostingView(rootView: Text(verbatim: name)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6, style: .continuous)))
+        let panel = self.panel ?? CaptureMarks.panel(.zero)
+        self.panel = panel
+        panel.ignoresMouseEvents = true
+        panel.contentView = host
+        panel.setFrame(CaptureMarks.nameFrame(size: host.fittingSize, for: button, bar: bar.frame, area: area), display: true)
+        // Taken off the bar when it was last hidden.
+        if panel.parent == nil { bar.addChildWindow(panel, ordered: .above) }
+        panel.orderFrontRegardless()
     }
 }
 
-/// The outline around what was chosen.
-final class OutlineView: NSView {
-    var onDoubleClick: () -> Void = {}
-    private let catchesClicks: Bool
+/// Tells of the pointer coming onto the view and leaving it, in an app in
+/// the background too, which SwiftUI's own hovering is not reliably told of.
+/// Clicks go through.
+private struct PointerWatch: NSViewRepresentable {
+    /// Whether the pointer is on it, and where the view is on screen.
+    let changed: (Bool, CGRect) -> Void
 
-    init(frame: NSRect, catchesClicks: Bool) {
-        self.catchesClicks = catchesClicks
-        super.init(frame: frame)
+    func makeNSView(context: Context) -> WatchView { WatchView() }
+
+    func updateNSView(_ view: WatchView, context: Context) {
+        view.changed = changed
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    final class WatchView: NSView {
+        var changed: (Bool, CGRect) -> Void = { _, _ in }
 
-    override func draw(_ dirtyRect: NSRect) {
-        // All but invisible, so the clicks land here; the line round it is
-        // the shade's.
-        if catchesClicks {
-            NSColor.black.withAlphaComponent(0.01).setFill()
-            bounds.fill()
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                           owner: self))
         }
-    }
 
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseEntered(with event: NSEvent) { report(true) }
+        override func mouseExited(with event: NSEvent) { report(false) }
 
-    override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 { onDoubleClick() }
+        private func report(_ inside: Bool) {
+            guard let window else { return }
+            changed(inside, window.convertToScreen(convert(bounds, to: nil)))
+        }
     }
 }
 
@@ -319,6 +343,9 @@ final class OutlineView: NSView {
 struct CaptureActionsBar: View {
     let items: [CaptureFinish]
     let act: (CaptureFinish) -> Void
+    /// The name of the button the pointer is on, and where that is on
+    /// screen; nil once it has left.
+    var pointing: (String?, CGRect) -> Void = { _, _ in }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -355,56 +382,28 @@ struct CaptureActionsBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(item == .copy || item == .done ? Color.accentColor : .primary)
-        .help(help(item))
+        .background(PointerWatch { inside, frame in pointing(inside ? name(item) : nil, frame) })
+        .accessibilityLabel(Text(name(item)))
     }
 
     private func symbol(_ item: CaptureFinish) -> String {
         switch item {
         case .recognize: "text.viewfinder"
         case .longCapture: "arrow.up.and.down.square"
-        case .save: "square.and.arrow.down"
+        case .save: "arrow.down.to.line"
         case .copy, .done: "checkmark"
         case .cancel: "xmark"
         }
     }
 
-    private func help(_ item: CaptureFinish) -> LocalizedStringKey {
+    private func name(_ item: CaptureFinish) -> String {
         switch item {
-        case .recognize: "Recognize the text"
-        case .longCapture: "Long screenshot: scroll on from here"
-        case .save: "Save (Space)"
-        case .copy: "Copy to the clipboard (Return)"
-        case .done: "Done"
-        case .cancel: "Cancel (Esc or right-click)"
+        case .recognize: String(localized: "Recognize the text")
+        case .longCapture: String(localized: "Long screenshot: scroll on from here")
+        case .save: String(localized: "Save (Space)")
+        case .copy: String(localized: "Copy to the clipboard (Return)")
+        case .done: String(localized: "Done (Return)")
+        case .cancel: String(localized: "Cancel (Esc or right-click)")
         }
-    }
-}
-
-/// Dims all but the area, and draws a line round it.
-private final class ShadeView: NSView {
-    var cut: CGRect = .zero
-
-    override func draw(_ dirtyRect: NSRect) {
-        CaptureShade.draw(in: bounds, around: cut)
-    }
-}
-
-/// The look of what is chosen, the same while choosing and after: the rest
-/// dimmed, a light line with a dark one outside it, visible on any
-/// background.
-enum CaptureShade {
-    static func draw(in bounds: CGRect, around cut: CGRect) {
-        let shade = NSBezierPath(rect: bounds)
-        if cut.intersects(bounds) { shade.append(NSBezierPath(rect: cut)) }
-        shade.windingRule = .evenOdd
-        NSColor.black.withAlphaComponent(0.4).setFill()
-        shade.fill()
-        guard cut.intersects(bounds) else { return }
-        NSColor.black.withAlphaComponent(0.35).setStroke()
-        NSBezierPath(rect: cut.insetBy(dx: -0.5, dy: -0.5)).stroke()
-        let inner = NSBezierPath(rect: cut.insetBy(dx: 0.5, dy: 0.5))
-        inner.lineWidth = 1
-        NSColor.white.setStroke()
-        inner.stroke()
     }
 }

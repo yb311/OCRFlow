@@ -204,8 +204,9 @@ final class MacroRecorder {
         onChange()
     }
 
-    /// Not watching for a while: the user scrolls for a long screenshot,
-    /// which is a step of its own, not a scroll.
+    /// Not watching for a while: the user is capturing, which is a step of
+    /// its own — the keys and clicks that go to it, and the scrolling of a
+    /// long screenshot, are not.
     var isPaused = false
 
     private func record(_ event: NSEvent) {
@@ -221,12 +222,13 @@ final class MacroRecorder {
                 : event.type == .rightMouseDown ? .right : .other
             input.kind = .mouseDown(button, clickCount: max(1, event.clickCount))
             let window = ScreenWindows.at(location)
-            // The first click into another app, before anything but
-            // captures, only brings it forward: OCRFlow was in front,
-            // recording having been started there. Repeating it would click
-            // the page each round, which many viewers take as a page turn;
-            // the app is brought forward anyway when the steps are done
-            // again.
+            // The first click, before anything but captures, into an app
+            // other than the one in front when recording started, only
+            // brings it forward: the user going to the app they mean to
+            // record. Repeating it would click the page each round, which
+            // many viewers take as a page turn; the app is brought forward
+            // anyway when the steps are done again. (Started in OCRFlow's
+            // window, the app in front is the one the user was in before.)
             let nothingDoneYet = inputs.allSatisfy { if case .capture = $0.kind { true } else { false } }
             if nothingDoneYet, let window, window.pid != frontAtStart {
                 skippingPress = true

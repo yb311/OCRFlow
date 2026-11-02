@@ -44,26 +44,6 @@ extension OCRViewModel {
         store.save(items[index])
     }
 
-    /// Clears every flag that asks a person to choose between two readings
-    /// that say the same thing — left by earlier builds, which compared them
-    /// character for character and took a moved line break for a difference.
-    func settleEquivalentReadings() {
-        for index in items.indices {
-            var changed = false
-            for page in items[index].pages.indices {
-                for block in items[index].pages[page].blocks.indices {
-                    let region = items[index].pages[page].blocks[block]
-                    guard let alternative = region.alternative,
-                          AlternativeReading.isEquivalent(alternative.text, region.text) else { continue }
-                    items[index].pages[page].blocks[block].alternative = nil
-                    items[index].pages[page].blocks[block].review = nil
-                    changed = true
-                }
-            }
-            if changed { store.save(items[index]) }
-        }
-    }
-
     /// Settles a flagged region with the text a person chose.
     ///
     /// Picking one of the two readings as it stands takes that reader's word

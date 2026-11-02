@@ -1,12 +1,10 @@
 import AppKit
 
 /// OCRFlow's own ordinary windows — the main window, the settings — put out
-/// of the way while it works over other apps, and back where they were in
-/// the stack afterwards.
-///
-/// Activating an app brings its main window forward. A save panel or an
-/// alert has to activate OCRFlow, and without this the main window would
-/// come up over whatever the user was capturing.
+/// of the way while a macro works over other apps, and back where they were
+/// in the stack afterwards: run from OCRFlow's window, the screen is then as
+/// it was when the steps were recorded, nothing of OCRFlow's over a part of
+/// it a step takes.
 @MainActor
 struct OwnWindows {
     private var tucked: [(window: NSWindow, below: Int?)] = []
@@ -35,15 +33,6 @@ struct OwnWindows {
         if let previousApp { Activation.handOver(to: previousApp) }
     }
 
-    /// Runs something modal — a save panel, an alert — with OCRFlow in front
-    /// but its windows out of the way.
-    static func whileModal<T>(_ body: () -> T) -> T {
-        let own = tuck()
-        NSApp.activate()
-        defer { own.restore() }
-        return body()
-    }
-
     /// The ordinary window, of any app, just above `window`.
     private static func windowAbove(_ window: NSWindow) -> Int? {
         let list = CGWindowListCopyWindowInfo(.optionOnScreenAboveWindow, CGWindowID(window.windowNumber))
@@ -59,6 +48,23 @@ struct OwnWindows {
 /// front can only ask, and the system decides.
 @MainActor
 enum Activation {
+    /// The last app other than OCRFlow to have been in front: the one the
+    /// user came from, while OCRFlow is.
+    private(set) static var lastOther: NSRunningApplication?
+
+    /// Keeps `lastOther`, from launch on.
+    static func watch() {
+        let front = NSWorkspace.shared.frontmostApplication
+        lastOther = front == .current ? nil : front
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app != .current else { return }
+            MainActor.assumeIsolated { lastOther = app }
+        }
+    }
+
     /// Asks for `app` to come to the front, handing over OCRFlow's place
     /// when OCRFlow has it.
     static func handOver(to app: NSRunningApplication) {

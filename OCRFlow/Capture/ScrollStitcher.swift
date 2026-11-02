@@ -47,19 +47,21 @@ enum ScrollStitcher {
     /// mends a gap. Nil when none carries on from the first.
     static func join(count: Int, maxHeight: Int = maxHeight,
                      picture: (Int) -> CGImage?) -> (parts: [CGImage], usesLast: Bool)? {
-        guard count > 1, let base = picture(0) else { return nil }
-        let width = base.width, height = base.height
-        // Only those the size of the first; a pixel or two off, from
-        // rounding, is cut off.
-        var candidates: [Int] = [0]
-        for index in 1..<count {
-            guard let image = picture(index), image.width >= width, image.height >= height,
-                  image.width - width <= 4, image.height - height <= 4 else { continue }
-            candidates.append(index)
-        }
+        guard count > 1 else { return nil }
+        // Only those of one size, the size most of them are: a view scrolled
+        // is the same size throughout, and one that is not — taken while its
+        // window changed size, or recorded at a size its app will not take
+        // again — is not part of it.
+        let sizes = (0..<count).map { index in picture(index).map { [$0.width, $0.height] } }
+        let counts = sizes.compactMap { $0 }.reduce(into: [[Int]: Int]()) { $0[$1, default: 0] += 1 }
+        // The first of the most common.
+        guard let size = sizes.compactMap({ $0 }).max(by: { counts[$0, default: 0] < counts[$1, default: 0] })
+        else { return nil }
+        let candidates = sizes.indices.filter { sizes[$0] == size }
+        let width = size[0], height = size[1]
         guard candidates.count > 1 else { return nil }
 
-        // So is a sidebar that stays put.
+        // A sidebar that stays put is left out.
         var cut = CGRect(x: 0, y: 0, width: width, height: height)
         func frame(_ index: Int) -> CGImage? {
             guard let image = picture(index) else { return nil }
@@ -85,10 +87,11 @@ enum ScrollStitcher {
             cut = CGRect(x: span.lowerBound, y: 0, width: span.count, height: height)
         }
 
-        // The edges every pair shares — but one: the first picture is
-        // usually taken while choosing what to capture, its window in the
-        // background, and a background window's title bar is lighter. Pairs
-        // that do not join still share the bars that stay put.
+        // The edges every pair shares — but one, which does not decide for
+        // the rest: the first picture is the one taken while recording, the
+        // others in a run, and its window may have been behind then, its
+        // title bar lighter. Pairs that do not join still share the bars
+        // that stay put.
         var tops: [Int] = [], bottoms: [Int] = []
         guard pairs({ a, b in
             tops.append(sameRows(a, b, from: 0, by: 1, upTo: height / 2))

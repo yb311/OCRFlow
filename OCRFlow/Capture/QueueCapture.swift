@@ -105,7 +105,7 @@ final class QueueCapture {
             // no moves were reported in between.
             if selecting || hypot(now.x - start.x, now.y - start.y) > Self.dragDistance {
                 selecting = false
-                let rect = Self.rect(from: start, to: now)
+                let rect = CGRect(draggedFrom: start, to: now)
                 Task { await take(rect) }
             } else {
                 // Not a drag after all: the click goes where it was aimed.
@@ -128,13 +128,15 @@ final class QueueCapture {
         guard ScreenshotFormat.png.write(image, to: url, pixelsPerPoint: ScreenCapture.pixelsPerPoint(of: target))
         else { return }
         taken.append(url)
-        // Heard, not seen: nothing comes over what is being worked on.
+        state.taken = taken.count
+        // Heard, and counted on the panel: nothing comes over what is being
+        // worked on.
         ScreenCapture.playShutterSound()
     }
 
     /// The area being dragged out, outlined, in event coordinates.
     private func showSelection(from start: CGPoint, to end: CGPoint) {
-        let frame = cocoaRect(Self.rect(from: start, to: end))
+        let frame = cocoaRect(CGRect(draggedFrom: start, to: end))
         if selectionPanel == nil {
             let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.level = .screenSaver
@@ -148,10 +150,6 @@ final class QueueCapture {
         }
         selectionPanel?.setFrame(frame, display: true)
         selectionPanel?.orderFrontRegardless()
-    }
-
-    private static func rect(from a: CGPoint, to b: CGPoint) -> CGRect {
-        CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
     }
 
     private func cocoaPoint(_ point: CGPoint) -> CGPoint {
@@ -197,6 +195,8 @@ private final class SelectionView: NSView {
 @MainActor
 @Observable
 private final class QueueState {
+    /// Screenshots taken so far.
+    var taken = 0
     @ObservationIgnored var onEnd: () -> Void = {}
 }
 
@@ -215,6 +215,10 @@ private struct QueueView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
+                Text(state.taken == 0 ? "None taken yet" : "Taken: \(state.taken)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
                 Spacer()
                 Button("Finish") { state.onEnd() }
                     .buttonStyle(.borderedProminent)

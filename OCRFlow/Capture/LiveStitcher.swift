@@ -81,9 +81,9 @@ final class LiveStitcher: @unchecked Sendable {
             let fixed = self.edges ?? (0, 0)
             guard ScrollStitcher.changedInPlace(from: lastGray, to: gray, top: fixed.top, bottom: fixed.bottom)
             else { return .lost }
-            // Changed, not scrolled — its window came to the front, say, as
-            // the capture began: carried on from as it looks now, and begun
-            // from it while nothing has been joined.
+            // Changed, not scrolled — clicked, its window coming to the front,
+            // or a selection redrawn: carried on from as it looks now, and
+            // begun from it while nothing has been joined.
             self.lastGray = gray
             if grown == 0, let copy = Self.copy(frame) {
                 self.first = copy

@@ -42,22 +42,12 @@ extension OCRViewModel {
         guard !isCapturing, let macro = macros.macro(id), !macro.steps.isEmpty else { return }
         isCapturing = true
         runningMacroID = id
-        // OCRFlow's own windows out of the way of the clicks.
+        // OCRFlow's own windows out of the way: the screen as it was when
+        // the steps were recorded — see `OwnWindows`.
         let own = OwnWindows.tuck()
         Task {
             let player = MacroPlayer()
-            // The run's captures keep the size of those taken while recording,
-            // to be joined with them.
-            var sizes: [UUID: CGSize] = [:]
-            for step in macro.steps {
-                guard let url = macros.recordedCapture(for: step.id),
-                      let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-                      let width = properties[kCGImagePropertyPixelWidth] as? Int,
-                      let height = properties[kCGImagePropertyPixelHeight] as? Int else { continue }
-                sizes[step.id] = CGSize(width: width, height: height)
-            }
-            var runs = await player.run(macro, sizes: sizes)
+            var runs = await player.run(macro)
             defer { try? FileManager.default.removeItem(at: player.folder) }
             isCapturing = false
             runningMacroID = nil

@@ -10,9 +10,9 @@ extension OCRViewModel {
     }
 
     /// Replaces a target language macOS does not offer as written — the
-    /// default worked out from the system language, or one saved by an
-    /// earlier build — with the form it does offer, so the picker shows no
-    /// stray entry and translation asks for a language that exists.
+    /// default worked out from the system language — with the form it does
+    /// offer, so the picker shows no stray entry and translation asks for a
+    /// language that exists.
     func validateTranslationTarget() {
         Task {
             let supported = await DocumentTranslation.supportedTargets()

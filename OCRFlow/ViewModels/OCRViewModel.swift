@@ -387,7 +387,6 @@ final class OCRViewModel {
             var all = restored
             all.append(contentsOf: added.filter { !restoredURLs.contains($0.url) })
             items = all
-            settleEquivalentReadings()
             rebuildDocuments()
             if selectedIDs.isEmpty, let first = all.first { selectedIDs = [first.id] }
             isRestoringQueue = false
@@ -1289,33 +1288,17 @@ final class OCRViewModel {
         isCapturing = true
         Task {
             defer { isCapturing = false }
-            // The held screen stays while the bar is up over it: no flash of
-            // the live screen between the two, and nothing beneath answers
-            // until the user has chosen what to do.
-            guard let taken = await ScreenCapture.choose(lingering: true),
-                  let area = ScreenCapture.frame(of: taken.target) else {
-                await CaptureOverlay.closeLingering()
-                return
-            }
-            var images = [taken.image]
-            let pixelsPerPoint = ScreenCapture.pixelsPerPoint(of: taken.target)
-            var finish = await CaptureBar.choose(around: area)
-            if finish == .longCapture {
-                // Scrolling needs the live screen: it goes once the long
-                // screenshot's own marks are up over it — straight away when
-                // a permission is asked for first, so the question is seen.
-                if InputControl.isAllowedQuietly {
-                    Task { await CaptureOverlay.closeLingering() }
-                } else {
-                    await CaptureOverlay.closeLingering()
-                }
-                let (parts, picked) = await ScrollingCapture().run(taken.target, first: taken.image)
-                if !parts.isEmpty { images = parts }
-                finish = picked
-            } else {
-                // Recognizing shows OCRFlow's window: it stays in front.
-                await CaptureOverlay.closeLingering(givingBack: finish != .recognize)
-            }
+            // Chosen, then on the same screen, still up: what to do with it,
+            // and a long screenshot scrolled on from it.
+            // Adjusted there, perhaps: what is taken is what it is by then.
+            guard let (images, finish, pixelsPerPoint) = await ScreenCapture.choose(then: { screen -> ([CGImage], CaptureFinish, CGFloat) in
+                let finish = await CaptureBar.choose(on: screen)
+                guard let (image, target) = screen.chosen else { return ([], .cancel, 1) }
+                let pixelsPerPoint = ScreenCapture.pixelsPerPoint(of: target)
+                guard finish == .longCapture else { return ([image], finish, pixelsPerPoint) }
+                let (parts, picked) = await ScrollingCapture().run(target, first: image, on: screen)
+                return (parts.isEmpty ? [image] : parts, picked, pixelsPerPoint)
+            }) else { return }
             switch finish {
             case .recognize: recognizeCaptures(images, pixelsPerPoint: pixelsPerPoint)
             case .copy: copyCaptures(images, pixelsPerPoint: pixelsPerPoint)

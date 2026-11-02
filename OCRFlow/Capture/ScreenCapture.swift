@@ -7,24 +7,25 @@ import UniformTypeIdentifiers
 enum ScreenCapture {
     /// Holds the screen still and lets the user choose a part of it or a
     /// window. Nil when cancelled, or when it could not be taken — the user
-    /// has been told why. The app that was in front is in front again
-    /// afterwards. `lingering`: the held screen stays until what comes next
-    /// shows — see `CaptureOverlay.closeLingering()`.
-    static func choose(lingering: Bool = false) async -> (image: CGImage, target: CaptureTarget)? {
+    /// has been told why. The app that was in front stays in front
+    /// throughout.
+    static func choose() async -> (image: CGImage, target: CaptureTarget)? {
+        await choose { $0.chosen } ?? nil
+    }
+
+    /// The same, then `then` with the screen it was chosen on, still up
+    /// around it — for the bar, or a long screenshot, to go on over. What
+    /// was chosen is its `chosen`, which adjusting there changes. It closes
+    /// when `then` is done.
+    static func choose<T>(then: @MainActor (CaptureOverlay) async -> T) async -> T? {
         guard isAllowed() else { return nil }
         do {
-            let shots = try await screens()
-            switch await CaptureOverlay.choose(from: shots, lingering: lingering) {
-            case nil:
-                return nil
-            case let .region(target, image):
-                return (image, target)
-            case let .window(id):
-                return (try await ScreenGrabber.capture(.window(id)), .window(id))
-            }
+            let screen = CaptureOverlay(shots: try await screens())
+            defer { screen.close() }
+            guard try await screen.choose() else { return nil }
+            return await then(screen)
         } catch {
-            // Not over the alert.
-            await CaptureOverlay.closeLingering()
+            // Closed by now: not over the alert.
             report(error)
             return nil
         }
@@ -36,10 +37,8 @@ enum ScreenCapture {
     }
 
     /// The place as it is now, with no flash and no message if it fails.
-    /// `like` keeps the size of an earlier picture of the same place, for
-    /// pictures to be joined.
-    static func grab(_ target: CaptureTarget, maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
-        try await ScreenGrabber.capture(target, keeping: ownOrdinaryWindows, maxWidth: maxWidth, like: earlier)
+    static func grab(_ target: CaptureTarget, maxWidth: Int? = nil) async throws -> CGImage {
+        try await ScreenGrabber.capture(target, keeping: ownOrdinaryWindows, maxWidth: maxWidth)
     }
 
     /// The app's own ordinary windows — the main window, the settings — are
@@ -70,24 +69,23 @@ enum ScreenCapture {
         return false
     }
 
+    /// Told over the app in front — see `ResultChoice.tell`.
     private static func askForPermission() {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "OCRFlow needs permission to record the screen")
-        alert.informativeText = String(localized: "Turn on OCRFlow in Privacy & Security → Screen & System Audio Recording, then reopen it. Screenshots are read on this Mac and never leave it.")
-        alert.addButton(withTitle: String(localized: "Open System Settings"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        if OwnWindows.whileModal({ alert.runModal() }) == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture") {
-            NSWorkspace.shared.open(url)
+        Task {
+            await ResultChoice.tell(
+                String(localized: "OCRFlow needs permission to record the screen"),
+                String(localized: "Turn on OCRFlow in Privacy & Security → Screen & System Audio Recording, then reopen it. Screenshots are read on this Mac and never leave it."),
+                action: (String(localized: "Open System Settings"), {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }))
         }
     }
 
     private static func report(_ error: Error) {
         if case ScreenGrabber.Failure.notAllowed = error { return askForPermission() }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "The screen could not be captured")
-        alert.informativeText = error.localizedDescription
-        OwnWindows.whileModal { _ = alert.runModal() }
+        Task { await ResultChoice.tell(String(localized: "The screen could not be captured"), error.localizedDescription) }
     }
 
     // MARK: - Where it was taken

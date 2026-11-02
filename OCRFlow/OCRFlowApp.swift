@@ -68,6 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Settles what has to be settled before the process goes. Set by the app.
     var willTerminate: (() -> Void)?
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Activation.watch()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         if let open { open(urls) } else { waiting += urls }
     }

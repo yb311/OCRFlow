@@ -74,14 +74,16 @@ enum InputControl {
             AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
             return false
         }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "OCRFlow needs Accessibility permission to turn pages")
-        alert.informativeText = String(localized: "To repeat your clicks and key presses, turn on OCRFlow in Privacy & Security → Accessibility. What you do is only watched while you show it how to turn a page, and is never stored.")
-        alert.addButton(withTitle: String(localized: "Open System Settings"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        if OwnWindows.whileModal({ alert.runModal() }) == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
+        // Told over the app in front — see `ResultChoice.tell`.
+        Task {
+            await ResultChoice.tell(
+                String(localized: "OCRFlow needs Accessibility permission to turn pages"),
+                String(localized: "To repeat your clicks and key presses, turn on OCRFlow in Privacy & Security → Accessibility. What you do is only watched while you show it how to turn a page, and is never stored."),
+                action: (String(localized: "Open System Settings"), {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }))
         }
         return false
     }

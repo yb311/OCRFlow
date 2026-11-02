@@ -47,11 +47,23 @@ enum ResultChoice {
 
 extension ResultChoice {
     /// Something gone wrong, said where the choice would have been asked,
-    /// until the user has read it.
-    static func tell(_ title: String, _ message: String) async {
-        await withCheckedContinuation { continuation in
+    /// until the user has read it. Over whatever app is in front, without
+    /// OCRFlow coming forward — an alert would, and its windows with it.
+    ///
+    /// `action`: a button beside OK that does something about it — Open
+    /// System Settings, say.
+    static func tell(_ title: String, _ message: String,
+                     action: (label: String, perform: () -> Void)? = nil) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             var panel: NSPanel?
             var answered = false
+            @MainActor func answer(_ perform: () -> Void = {}) {
+                guard !answered else { return }
+                answered = true
+                panel?.orderOut(nil)
+                perform()
+                continuation.resume()
+            }
             let view = VStack(alignment: .leading, spacing: 8) {
                 Label(title, systemImage: "exclamationmark.triangle.fill")
                     .font(.headline)
@@ -62,13 +74,13 @@ extension ResultChoice {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Spacer()
-                    Button("OK") {
-                        guard !answered else { return }
-                        answered = true
-                        panel?.orderOut(nil)
-                        continuation.resume()
+                    if let action {
+                        Button("Cancel") { answer() }
+                        Button(action.label) { answer(action.perform) }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        Button("OK") { answer() }
                     }
-                    .keyboardShortcut(.defaultAction)
                 }
             }
             panel = HUDPanel.show(view, avoiding: nil)

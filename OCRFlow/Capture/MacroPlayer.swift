@@ -29,19 +29,12 @@ final class MacroPlayer {
     /// run's screenfuls do not fit in memory. The caller removes it.
     let folder = URL.temporaryDirectory.appending(path: "OCRFlow Run \(UUID().uuidString)", directoryHint: .isDirectory)
     private var written = 0
-    /// The size of what each capture step took first: the rest keep it, so
-    /// they can be joined.
-    private var sizes: [UUID: CGSize] = [:]
     /// Where the last capture step took its picture.
     private var pixelsPerPoint: CGFloat = 1
 
     /// What the capture steps took, as files in `folder`: one list for each
     /// address, or one in all.
-    ///
-    /// `sizes` are those of pictures the capture steps took before — while
-    /// they were recorded — for the run's to keep.
-    func run(_ macro: Macro, sizes: [UUID: CGSize] = [:]) async -> [[URL]] {
-        self.sizes = sizes
+    func run(_ macro: Macro) async -> [[URL]] {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         guard InputControl.isAllowed(), ScreenCapture.checkAllowed() else { return [] }
         state.name = macro.name
@@ -190,14 +183,12 @@ final class MacroPlayer {
             await settle(target, waitForChange: false)
             if let distance = area.scrollDistance {
                 // Scrolled on as far as when recorded, and joined.
-                guard let first = try? await ScreenCapture.grab(target, like: area.frameSize) else { return nil }
+                guard let first = try? await ScreenCapture.grab(target) else { return nil }
                 let parts = await ScrollingCapture().runAutomatically(target, size: CGSize(width: first.width, height: first.height),
                                                                       distance: distance)
                 return parts.first ?? first
             }
-            guard let image = try? await ScreenCapture.grab(target, like: sizes[step.id]) else { return nil }
-            if sizes[step.id] == nil { sizes[step.id] = CGSize(width: image.width, height: image.height) }
-            return image
+            return try? await ScreenCapture.grab(target)
 
         case let .wait(seconds):
             let until = Date().addingTimeInterval(seconds)
@@ -208,12 +199,14 @@ final class MacroPlayer {
 
     /// The window a step happened in, as it is now — put back where it was
     /// when recorded, the first time it is met in a run, so positions in it
-    /// land where they did.
+    /// land where they did, and what is taken of it is the size it was: to
+    /// be joined with what was taken while recording, a picture a point
+    /// larger is another picture.
     private func place(_ place: WindowPlace?) async -> ScreenWindow? {
         guard let place, !place.isFloating else { return nil }
         if ScreenWindows.find(place) == nil, let bundleID = place.bundleID {
-            // Not open: the app is started and given a moment.
-            await launch(bundleID)
+            // Not open: the app is started, and its window waited for.
+            await launch(bundleID) { ScreenWindows.find(place) != nil }
         }
         guard var window = ScreenWindows.find(place) else {
             missingApp = place.appName
@@ -230,12 +223,12 @@ final class MacroPlayer {
         }
         let moved = abs(window.frame.minX - place.frame.minX) + abs(window.frame.minY - place.frame.minY)
             + abs(window.frame.width - place.frame.width) + abs(window.frame.height - place.frame.height)
-        guard !restored.contains(window.id), moved > 2 else { return window }
+        guard !restored.contains(window.id), moved > 0 else { return window }
         restored.insert(window.id)
         let pid = window.pid, current = window.frame, recorded = place.frame
-        _ = await Task.detached { ElementLocator.move(windowOf: pid, at: current, to: recorded) }.value
-        try? await Task.sleep(for: .milliseconds(250))
-        return ScreenWindows.all().first { $0.id == window.id } ?? window
+        let moving = await Task.detached { ElementLocator.move(windowOf: pid, at: current, to: recorded) }.value
+        guard moving else { return window }
+        return await arrived(window, at: recorded)
     }
 
     /// The window once it has stopped moving — or after a second and a
@@ -251,29 +244,53 @@ final class MacroPlayer {
         return last
     }
 
+    /// The window once it is at `frame` — or, should its app not let it be
+    /// quite that, once it has moved and stopped; or after a second and a
+    /// half, however it is.
+    private func arrived(_ window: ScreenWindow, at frame: CGRect) async -> ScreenWindow {
+        var last = window
+        for _ in 0..<30 {
+            try? await Task.sleep(for: .milliseconds(50))
+            guard let now = ScreenWindows.all().first(where: { $0.id == window.id }) else { return last }
+            if now.frame == frame || (now.frame != window.frame && now.frame == last.frame) { return now }
+            last = now
+        }
+        return last
+    }
+
     private func app(of place: WindowPlace?) -> pid_t? {
         guard let bundleID = place?.bundleID else { return nil }
         return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.processIdentifier
     }
 
-    private func launch(_ bundleID: String) async {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-        _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        try? await Task.sleep(for: .seconds(2))
+    /// Starts the app, and waits until `ready` — its window open — or, for
+    /// an app slow to start, twenty seconds.
+    private func launch(_ bundleID: String, until ready: () -> Bool) async {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+              (try? await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())) != nil
+        else { return }
+        let deadline = Date().addingTimeInterval(20)
+        while !ready(), !stopRequested, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
     }
 
     /// Opens a page, in the app the steps were recorded in when it can open
-    /// one, and waits for it to load.
+    /// one, and waits for it to load: for the app to come forward, then for
+    /// its window to change and come to rest.
     private func open(_ url: URL, in bundleID: String?) async {
-        let configuration = NSWorkspace.OpenConfiguration()
-        if let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            _ = try? await NSWorkspace.shared.open([url], withApplicationAt: app, configuration: configuration)
-        } else {
-            NSWorkspace.shared.open(url)
+        guard let appURL = bundleID.flatMap({ NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) })
+                ?? NSWorkspace.shared.urlForApplication(toOpen: url),
+              let app = try? await NSWorkspace.shared.open([url], withApplicationAt: appURL,
+                                                           configuration: NSWorkspace.OpenConfiguration())
+        else { return }
+        let deadline = Date().addingTimeInterval(20)
+        while !app.isActive, !stopRequested, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
         }
-        try? await Task.sleep(for: .seconds(1))
-        await settle(ScreenWindows.frontWindow().map { .window($0.id) }
-                     ?? ScreenWindows.display(at: NSEvent.mouseLocationInEventCoordinates), longest: 20)
+        let window = ScreenWindows.all().first { $0.pid == app.processIdentifier && $0.layer == 0 }
+        await settle(window.map { .window($0.id) } ?? ScreenWindows.display(at: NSEvent.mouseLocationInEventCoordinates),
+                     changeWithin: 5, longest: 20)
     }
 
     // MARK: - Input
@@ -368,16 +385,18 @@ final class MacroPlayer {
 
     // MARK: - Watching the screen
 
-    /// Gives the screen a moment to start changing, then waits for it to stop:
-    /// a page loading, a slide fading in, a scroll gliding to a halt.
-    private func settle(_ target: CaptureTarget, waitForChange: Bool = true, longest: Double = 10) async {
+    /// Gives the screen a moment to start changing — `changeWithin` seconds
+    /// at most — then waits for it to stop: a page loading, a slide fading
+    /// in, a scroll gliding to a halt.
+    private func settle(_ target: CaptureTarget, waitForChange: Bool = true, changeWithin: Double = 1,
+                        longest: Double = 10) async {
         try? await Task.sleep(for: .milliseconds(150))
         guard var last = await ScrollingCapture.look(at: target) else { return }
         let deadline = Date().addingTimeInterval(longest)
         if waitForChange {
             // Most steps change something within a second. One that does not
             // may change nothing at all: it is not waited out.
-            let changeBy = Date().addingTimeInterval(1)
+            let changeBy = Date().addingTimeInterval(changeWithin)
             var changed = false
             while !stopRequested, Date() < changeBy {
                 try? await Task.sleep(for: .milliseconds(150))

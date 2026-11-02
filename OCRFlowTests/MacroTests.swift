@@ -118,7 +118,7 @@ struct MacroTests {
     }
 
     /// A title bar is lighter while its window is in the background — as it
-    /// is for the first picture, taken while choosing what to capture — and
+    /// may have been for the first picture, taken while recording — and
     /// draws a line under itself once something has scrolled beneath it.
     @Test func aTitleBarThatChangesFaintlyStaysPut() throws {
         let page = longPage()
@@ -139,6 +139,22 @@ struct MacroTests {
         }
         let long = try #require(ScrollStitcher.stitch(frames)?.first)
         #expect(long.height == layout.header + offsets.last! + layout.middle + layout.footer)
+    }
+
+    /// The first picture a few points larger — taken while recording, at a
+    /// size its window's app would not take again — is not part of the view
+    /// the others are, and is left out rather than cut down or scaled.
+    @Test func onlyPicturesOfOneSizeAreJoined() throws {
+        let page = longPage()
+        var larger = Layout()
+        larger.middle += 4
+        let offsets = [300, 600, 900]
+        let frames = [frame(of: page, at: 0, larger)] + offsets.map { frame(of: page, at: $0, Layout()) }
+        let joined = try #require(ScrollStitcher.join(count: frames.count) { frames[$0] })
+        let long = try #require(joined.parts.first)
+        #expect(long.width == Layout().width)
+        #expect(long.height == Layout().header + 600 + Layout().middle + Layout().footer)
+        #expect(joined.usesLast)
     }
 
     /// Scrolled too far at once, then back a little: the screenful that does

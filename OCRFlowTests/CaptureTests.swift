@@ -33,6 +33,87 @@ struct CaptureTests {
         #expect(pixels == CGRect(x: 10, y: 939, width: 31, height: 41))
     }
 
+    /// The pointer between points: the area dragged out is on whole points,
+    /// whichever way it was dragged, and is what is taken — not a point more.
+    @Test func aDraggedAreaIsOnWholePoints() {
+        let area = CGRect(draggedFrom: CGPoint(x: 600.6, y: 500.4), to: CGPoint(x: 200.3, y: 300.7))
+        #expect(area == CGRect(x: 200, y: 301, width: 401, height: 199))
+        let display = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        let (points, pixels) = CaptureOverlay.place(area, on: display, pixelWidth: 3840)
+        #expect(points.size == area.size)
+        #expect(pixels.size == CGSize(width: 802, height: 398))
+    }
+
+    // MARK: - Adjusting what was chosen
+
+    private let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+
+    /// Near an edge, inside or out, a drag takes it; near two, the corner;
+    /// in the middle, the whole; away from it, nothing.
+    @Test func whatADragTakesHoldOf() {
+        let area = CGRect(x: 100, y: 100, width: 300, height: 200)
+        #expect(AreaGrip.at(CGPoint(x: 97, y: 200), of: area) == .left)
+        #expect(AreaGrip.at(CGPoint(x: 404, y: 200), of: area) == .right)
+        #expect(AreaGrip.at(CGPoint(x: 250, y: 302), of: area) == .top)
+        #expect(AreaGrip.at(CGPoint(x: 402, y: 98), of: area) == [.right, .bottom])
+        #expect(AreaGrip.at(CGPoint(x: 250, y: 200), of: area) == [])
+        #expect(AreaGrip.at(CGPoint(x: 80, y: 200), of: area) == nil)
+        // Too small to have a middle: the nearest edges.
+        let small = CGRect(x: 100, y: 100, width: 8, height: 8)
+        #expect(AreaGrip.at(CGPoint(x: 103, y: 106), of: small) == [.left, .top])
+    }
+
+    /// An edge dragged by the pointer between points lands on a whole one;
+    /// the edges across from it stay.
+    @Test func aDraggedEdgeIsOnWholePoints() {
+        let area = CGRect(x: 100, y: 100, width: 300, height: 200)
+        #expect(area.adjusted(.right, by: CGVector(dx: 20.6, dy: 7), within: screen)
+                == CGRect(x: 100, y: 100, width: 321, height: 200))
+        #expect(area.adjusted([.left, .top], by: CGVector(dx: -10.4, dy: 5.5), within: screen)
+                == CGRect(x: 90, y: 100, width: 310, height: 206))
+    }
+
+    /// Dragged past the edge across from it, it turns inside out, as when
+    /// it was dragged out; never less than a point.
+    @Test func anEdgeDraggedPastTheOtherTurnsItOver() {
+        let area = CGRect(x: 100, y: 100, width: 300, height: 200)
+        #expect(area.adjusted(.left, by: CGVector(dx: 350, dy: 0), within: screen)
+                == CGRect(x: 400, y: 100, width: 50, height: 200))
+        #expect(area.adjusted(.bottom, by: CGVector(dx: 0, dy: 200), within: screen)
+                == CGRect(x: 100, y: 300, width: 300, height: 1))
+    }
+
+    /// Kept to the screen it is on, dragged by an edge or moved whole.
+    @Test func anAdjustedAreaStaysOnItsScreen() {
+        let area = CGRect(x: 100, y: 100, width: 300, height: 200)
+        #expect(area.adjusted(.right, by: CGVector(dx: 5000, dy: 0), within: screen).maxX == screen.maxX)
+        #expect(area.adjusted([.left, .bottom], by: CGVector(dx: -500, dy: -500), within: screen)
+                == CGRect(x: 0, y: 0, width: 400, height: 300))
+        // Moved whole, it stops at the edge, as large as it was.
+        #expect(area.moved(by: CGVector(dx: -150, dy: 900), within: screen)
+                == CGRect(x: 0, y: 782, width: 300, height: 200))
+        #expect(area.moved(by: CGVector(dx: 0.4, dy: -1), within: screen)
+                == CGRect(x: 100, y: 99, width: 300, height: 200))
+        // A window partly off the screen, the part on it.
+        let window = CGRect(x: -40.5, y: 900, width: 600, height: 400)
+        #expect(window.kept(within: screen) == CGRect(x: 0, y: 900, width: 560, height: 82))
+    }
+
+    /// A size typed in: the top-left corner stays where it is, unless the
+    /// screen ends first, and it is never larger than the screen.
+    @Test func aTypedSizeKeepsTheTopLeftCorner() {
+        let area = CGRect(x: 100, y: 100, width: 300, height: 200)
+        #expect(area.resized(to: CGSize(width: 640, height: 200), within: screen)
+                == CGRect(x: 100, y: 100, width: 640, height: 200))
+        // Taller: it grows down from its top.
+        #expect(area.resized(to: CGSize(width: 300, height: 250), within: screen)
+                == CGRect(x: 100, y: 50, width: 300, height: 250))
+        // More than there is room for: moved to fit.
+        #expect(area.resized(to: CGSize(width: 1500, height: 400), within: screen)
+                == CGRect(x: 12, y: 0, width: 1500, height: 400))
+        #expect(area.resized(to: CGSize(width: 9999, height: 9999), within: screen) == screen)
+    }
+
     // MARK: - Pages
 
     /// A page of "text": dark bars on white, in rows that depend on `seed`.

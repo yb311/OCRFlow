@@ -2937,6 +2937,16 @@
         }
       }
     },
+    "Done (Return)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成（回车）"
+          }
+        }
+      }
+    },
     "Double-click" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4805,6 +4815,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无"
+          }
+        }
+      }
+    },
+    "None taken yet" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有截图"
           }
         }
       }
@@ -7743,6 +7763,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表格、公式、图表、印章，以及置信度低的区域；未安装时只标记待复核"
+          }
+        }
+      }
+    },
+    "Taken: %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已截 %lld 张"
           }
         }
       }

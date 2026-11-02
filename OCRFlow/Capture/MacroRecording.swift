@@ -27,6 +27,14 @@ final class MacroRecording {
     /// The steps and what was captured, or nil when cancelled.
     func run() async -> Recorded? {
         guard InputControl.isAllowed(), ScreenCapture.checkAllowed() else { return nil }
+        // Started in OCRFlow's own window: OCRFlow steps back, and the app the
+        // user was in comes forward again, so that their first click there is
+        // a click like any other rather than one that only brings it forward.
+        // Handed over, as activation is cooperative: only stepping back
+        // (`deactivate`) leaves OCRFlow in front.
+        if NSApp.isActive, let previous = Activation.lastOther, !previous.isTerminated {
+            await Activation.bringForward(previous)
+        }
         panel = HUDPanel.show(MacroRecordView(state: state), avoiding: ScreenWindows.frontWindow().map { window in
             let top = NSScreen.screens.first?.frame.maxY ?? 0
             return CGRect(x: window.frame.minX, y: top - window.frame.maxY, width: window.frame.width, height: window.frame.height)
@@ -59,33 +67,54 @@ final class MacroRecording {
                         captures: Dictionary(uniqueKeysWithValues: zip(captureSteps.map(\.id), taken)))
     }
 
-    /// The user chooses an area or a window, and taking it becomes a step.
-    /// `scrolling`: then scrolls on from there — by hand or automatically —
-    /// to wherever they want it to end, and the step scrolls as far.
+    /// The user chooses an area or a window, and taking it becomes a step
+    /// once they say Done. `scrolling`: then scrolls on from there — by hand
+    /// or automatically — to wherever they want it to end, and the step
+    /// scrolls as far.
     func captureHere(scrolling: Bool = false) async {
         guard !state.isChoosing else { return }
         state.isChoosing = true
-        defer { state.isChoosing = false }
-        guard let chosen = await ScreenCapture.choose(),
-              let step = Self.captureStep(for: chosen.target),
-              case var .capture(area) = step.action else { return }
-        var image = chosen.image
-        if scrolling {
-            recorder.isPaused = true
-            defer { recorder.isPaused = false }
-            let capture = ScrollingCapture()
-            let (parts, finish) = await capture.run(chosen.target, first: chosen.image, finishes: [.cancel, .done])
-            guard finish != .cancel, let long = parts.first else { return }
-            image = long
-            area.frameSize = CGSize(width: chosen.image.width, height: chosen.image.height)
-            // How far it was scrolled, in points.
-            if let frame = ScreenCapture.frame(of: chosen.target), frame.height > 0 {
-                let pixelsPerPoint = CGFloat(chosen.image.height) / frame.height
-                area.scrollDistance = Double(CGFloat(capture.grown) / pixelsPerPoint)
-            }
+        // Nothing done while capturing is a step of its own: the keys and
+        // clicks given to it, nor the scrolling of a long screenshot.
+        recorder.isPaused = true
+        defer {
+            state.isChoosing = false
+            recorder.isPaused = false
         }
+        // Chosen, then on the same screen, still up: Done or Cancel, or a
+        // long screenshot scrolled on from it. Adjusted there, perhaps: the
+        // step takes what it is by then.
+        let captured = await ScreenCapture.choose { screen -> (CaptureArea, MacroStep, Capture)? in
+            guard var (image, target) = screen.chosen else { return nil }
+            var scrolled: (long: CGImage, grown: Int)?
+            if scrolling {
+                let capture = ScrollingCapture()
+                let (parts, finish) = await capture.run(target, first: image, on: screen, finishes: [.cancel, .done])
+                guard finish != .cancel, let long = parts.first, let first = capture.first, let ran = capture.target
+                else { return nil }
+                (image, target) = (first, ran)
+                scrolled = (long, capture.grown)
+            } else {
+                guard await CaptureBar.choose(on: screen, finishes: [.cancel, .done]) == .done,
+                      let chosen = screen.chosen else { return nil }
+                (image, target) = chosen
+            }
+            guard let frame = ScreenCapture.frame(of: target),
+                  let step = Self.captureStep(for: target),
+                  case var .capture(area) = step.action else { return nil }
+            if let scrolled {
+                // How far it was scrolled, in points.
+                if frame.height > 0 {
+                    let pixelsPerPoint = CGFloat(image.height) / frame.height
+                    area.scrollDistance = Double(CGFloat(scrolled.grown) / pixelsPerPoint)
+                }
+                image = scrolled.long
+            }
+            return (area, step, Capture(image: image, pixelsPerPoint: ScreenCapture.pixelsPerPoint(of: target)))
+        }
+        guard let (area, step, capture) = captured ?? nil else { return }
         recorder.addCapture(area, in: step.window)
-        taken.append(Capture(image: image, pixelsPerPoint: ScreenCapture.pixelsPerPoint(of: chosen.target)))
+        taken.append(capture)
     }
 
     /// A step that takes the same again: the same window, or the same part

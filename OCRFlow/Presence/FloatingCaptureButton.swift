@@ -33,11 +33,12 @@ final class FloatingCaptureButton {
     private let button: FloatingButtonView
     private let extras: FirstMouseHostingView<FloatingExtras>
     private var screenObserver: NSObjectProtocol?
-    private var watchTask: Task<Void, Never>?
+    /// Closes the others, once the pointer has been away from them a moment.
+    private var leaving: Task<Void, Never>?
     /// Where the main button rests, whatever the panel's size.
     private var resting: NSRect = .zero
     /// The others are out, or opening.
-    private var isOpen = false
+    private(set) var isOpen = false
 
     init(model: OCRViewModel) {
         state = FloatingButtonState(model: model)
@@ -63,6 +64,9 @@ final class FloatingCaptureButton {
         let container = NSView(frame: NSRect(x: 0, y: 0, width: Self.side, height: Self.side))
         container.addSubview(extras)
         container.addSubview(button)
+        let watch = PointerWatchView(frame: container.bounds)
+        watch.autoresizingMask = [.width, .height]
+        container.addSubview(watch)
         panel.contentView = container
 
         button.onClick = { [weak self, weak model] in
@@ -72,6 +76,7 @@ final class FloatingCaptureButton {
         button.onDrop = { [weak self] in self?.settle() }
         button.onDragStart = { [weak self] in self?.collapse() }
         button.onHover = { [weak self] in self?.expand() }
+        watch.moved = { [weak self] in self?.pointer(at: $0) }
         button.makeMenu = { [weak self, weak model] in
             // Closed first: the menu opens where the others would be.
             self?.collapse()
@@ -97,7 +102,7 @@ final class FloatingCaptureButton {
 
     func close() {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
-        watchTask?.cancel()
+        leaving?.cancel()
         panel.orderOut(nil)
     }
 
@@ -110,11 +115,11 @@ final class FloatingCaptureButton {
         guard !isOpen, !state.dragging else { return }
         isOpen = true
         state.expanded = true
-        watchPointer()
     }
 
     private func collapse() {
-        watchTask?.cancel()
+        leaving?.cancel()
+        leaving = nil
         guard isOpen else { return }
         isOpen = false
         state.expanded = false
@@ -165,28 +170,24 @@ final class FloatingCaptureButton {
         panel.display()
     }
 
-    /// Which button the pointer is on, for its name, and closing once it has
-    /// left them all. Watched rather than told: growing the panel under the
-    /// pointer can report it leaving when it has not, and the views of a
-    /// panel of an app in the background are not reliably told of hovering.
+    /// The pointer at `pointer` over the panel, or off it — nil: which
+    /// button it is on, for its name, and closing once it has left them all.
     /// A moment's grace, so crossing a gap, or overshooting a little, does
     /// not close them.
-    private func watchPointer() {
-        watchTask?.cancel()
-        watchTask = Task { [weak self] in
-            var away = 0
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(80))
-                guard let self, self.isOpen else { return }
-                let pointer = NSEvent.mouseLocation
-                let circles = self.circles()
-                self.state.hoveredExtra = circles.dropFirst().firstIndex { $0.insetBy(dx: -3, dy: -3).contains(pointer) }
-                    .map { $0 - 1 }
-                away = circles.contains { $0.insetBy(dx: -10, dy: -10).contains(pointer) } ? 0 : away + 1
-                if away >= 5 {
-                    self.collapse()
-                    return
-                }
+    private func pointer(at pointer: NSPoint?) {
+        guard isOpen else { return }
+        let circles = circles()
+        let on = pointer.flatMap { pointer in circles.dropFirst().firstIndex { $0.insetBy(dx: -3, dy: -3).contains(pointer) } }
+        if state.hoveredExtra != on.map({ $0 - 1 }) { state.hoveredExtra = on.map { $0 - 1 } }
+        let near = pointer.map { pointer in circles.contains { $0.insetBy(dx: -10, dy: -10).contains(pointer) } } ?? false
+        if near {
+            leaving?.cancel()
+            leaving = nil
+        } else if leaving == nil {
+            leaving = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                self?.collapse()
             }
         }
     }
@@ -356,6 +357,27 @@ private final class FloatingButtonState {
         guard let model, model.isProcessing else { return nil }
         return model.totalProgress
     }
+}
+
+/// Tells where the pointer is over the panel, and when it leaves — in an
+/// app in the background too, which SwiftUI's own hovering is not reliably
+/// told of. Clicks go through.
+private final class PointerWatchView: NSView {
+    /// In screen coordinates; nil when it has left.
+    var moved: (NSPoint?) -> Void = { _ in }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+                                       owner: self))
+    }
+
+    override func mouseEntered(with event: NSEvent) { moved(NSEvent.mouseLocation) }
+    override func mouseMoved(with event: NSEvent) { moved(NSEvent.mouseLocation) }
+    override func mouseExited(with event: NSEvent) { moved(nil) }
 }
 
 /// Takes the mouse, and tells a click from a drag. The look is SwiftUI's.

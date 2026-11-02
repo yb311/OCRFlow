@@ -33,21 +33,19 @@ enum ScreenGrabber {
         return shots
     }
 
-    /// The same place again, as it is now. `maxWidth` makes a smaller
-    /// picture, for looking at rather than keeping. `like` is an earlier
-    /// picture of the same place, whose size this one keeps if it is within
-    /// a pixel or two of it. Over a region, OCRFlow's own windows other than
-    /// `kept` are left out, as from `displays(keeping:)`.
+    /// The same place again, as it is now, at its own size. `maxWidth` makes
+    /// a smaller picture, for looking at rather than keeping. Over a region,
+    /// OCRFlow's own windows other than `kept` are left out, as from
+    /// `displays(keeping:)`.
     static func capture(_ target: CaptureTarget, keeping kept: [CGWindowID] = [],
-                        maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
+                        maxWidth: Int? = nil) async throws -> CGImage {
         let content = try await shareableContent()
         switch target {
         case let .region(displayID, rect):
             guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
                 throw Failure.gone
             }
-            return try await image(of: filter(display, in: content, keeping: kept), rect: rect,
-                                   maxWidth: maxWidth, like: earlier)
+            return try await image(of: filter(display, in: content, keeping: kept), rect: rect, maxWidth: maxWidth)
         case let .window(windowID):
             guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
                 throw Failure.gone
@@ -55,7 +53,7 @@ enum ScreenGrabber {
             // By the window's own size: what the filter reports wavers by a
             // point or so from one capture to the next, and the picture with it.
             return try await image(of: SCContentFilter(desktopIndependentWindow: window), rect: nil,
-                                   size: window.frame.size, maxWidth: maxWidth, like: earlier)
+                                   size: window.frame.size, maxWidth: maxWidth)
         }
     }
 
@@ -85,13 +83,10 @@ enum ScreenGrabber {
     }
 
     /// `rect` is in points from the top-left of what the filter shows; nil
-    /// takes all of it.
-    ///
-    /// The picture is drawn to the size asked for, so a window whose size is
-    /// reported a point off one time is drawn a little larger or smaller:
-    /// pictures that are to be joined keep the size of the first.
+    /// takes all of it. The picture is drawn to the size asked for: given
+    /// any other than the place's own, it would be scaled.
     private static func image(of filter: SCContentFilter, rect: CGRect?, size: CGSize? = nil,
-                              maxWidth: Int? = nil, like earlier: CGSize? = nil) async throws -> CGImage {
+                              maxWidth: Int? = nil) async throws -> CGImage {
         let size = rect?.size ?? size ?? filter.contentRect.size
         var scale = CGFloat(filter.pointPixelScale)
         if let maxWidth, size.width * scale > CGFloat(maxWidth) { scale = CGFloat(maxWidth) / max(size.width, 1) }
@@ -99,10 +94,6 @@ enum ScreenGrabber {
         if let rect { config.sourceRect = rect }
         config.width = max(1, Int((size.width * scale).rounded()))
         config.height = max(1, Int((size.height * scale).rounded()))
-        if let earlier, abs(Int(earlier.width) - config.width) <= 4, abs(Int(earlier.height) - config.height) <= 4 {
-            config.width = Int(earlier.width)
-            config.height = Int(earlier.height)
-        }
         config.showsCursor = false
         config.ignoreShadowsSingleWindow = true
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
