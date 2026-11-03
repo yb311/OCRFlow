@@ -1075,7 +1075,7 @@ struct ItemDetailView: View {
         if let page {
             let readers = page.readers
             if readers.count > 1 || item.engine == .auto {
-                parts += readers.map { String(localized: "\($0.source.label) \($0.count) blocks") }
+                parts += readers.map { String(localized: "\(page.readerName($0.source)) \($0.count) blocks") }
             } else if !page.blocks.isEmpty {
                 parts.append(String(localized: "\(page.blocks.count) regions"))
             }
@@ -1198,9 +1198,9 @@ struct ItemDetailView: View {
         guard blocks.indices.contains(index), let page else { return nil }
         let source = blocks[index].source ?? page.blockSource
         if let confidence = page.ocrConfidence(ofBlock: index) {
-            return "\(source.label) · \(confidence.percentText)"
+            return "\(page.readerName(source)) · \(confidence.percentText)"
         }
-        return source.label
+        return page.readerName(source)
     }
 
     private func refreshDocument() async {

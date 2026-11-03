@@ -277,6 +277,9 @@ struct PageResult: Equatable {
     var blocks: [PPLayoutBlock] = []
     /// Who read the blocks, unless a block says otherwise.
     var blockSource: PPTextSource = .plainOCR
+    /// The model behind each reader when the page was read, so the result
+    /// names the one that was used rather than the one set now.
+    var models: [PPTextSource: String] = [:]
     /// Used when there are no blocks: Apple Vision, PaddleOCR-VL's whole-page
     /// pass, or a PDF's text layer without a layout model to split it.
     var rawText = ""
@@ -314,9 +317,14 @@ struct PageResult: Equatable {
             .compactMap { source in counts[source].map { (source, $0) } }
     }
 
+    /// The name of the model that read for `source` on this page.
+    func readerName(_ source: PPTextSource) -> String {
+        models[source] ?? source.label
+    }
+
     static func == (lhs: PageResult, rhs: PageResult) -> Bool {
         lhs.size == rhs.size && lhs.lines == rhs.lines && lhs.blocks == rhs.blocks
-            && lhs.blockSource == rhs.blockSource && lhs.rawText == rhs.rawText
+            && lhs.blockSource == rhs.blockSource && lhs.models == rhs.models && lhs.rawText == rhs.rawText
             && lhs.rawMarkdown == rhs.rawMarkdown && lhs.notes == rhs.notes
             && lhs.rectified === rhs.rectified
     }
@@ -324,7 +332,7 @@ struct PageResult: Equatable {
 
 extension PageResult: Codable {
     private enum CodingKeys: String, CodingKey {
-        case size, lines, blocks, blockSource, rawText, rawMarkdown, notes, rectified
+        case size, lines, blocks, blockSource, models, rawText, rawMarkdown, notes, rectified
     }
 
     init(from decoder: Decoder) throws {
@@ -333,6 +341,7 @@ extension PageResult: Codable {
         lines = try container.decodeIfPresent([PPTextLine].self, forKey: .lines) ?? []
         blocks = try container.decodeIfPresent([PPLayoutBlock].self, forKey: .blocks) ?? []
         blockSource = try container.decodeIfPresent(PPTextSource.self, forKey: .blockSource) ?? .plainOCR
+        models = try container.decodeIfPresent([PPTextSource: String].self, forKey: .models) ?? [:]
         rawText = try container.decodeIfPresent(String.self, forKey: .rawText) ?? ""
         rawMarkdown = try container.decodeIfPresent(String.self, forKey: .rawMarkdown) ?? ""
         notes = try container.decodeIfPresent([ReviewNote].self, forKey: .notes) ?? []
@@ -351,6 +360,7 @@ extension PageResult: Codable {
         try container.encode(lines, forKey: .lines)
         try container.encode(blocks, forKey: .blocks)
         try container.encode(blockSource, forKey: .blockSource)
+        try container.encode(models, forKey: .models)
         try container.encode(rawText, forKey: .rawText)
         try container.encode(rawMarkdown, forKey: .rawMarkdown)
         try container.encode(notes, forKey: .notes)

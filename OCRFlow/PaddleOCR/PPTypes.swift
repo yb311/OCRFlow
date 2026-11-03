@@ -165,6 +165,14 @@ enum PPComputeUnit: String, CaseIterable, Identifiable, Codable {
 struct PPOCRConfig: Equatable, Codable {
     var tier: PPModelTier = .small
     var recognizer: PPRecognizerChoice = .builtin
+
+    /// The model that reads the text, as PaddlePaddle names it: the tier's own
+    /// recogniser, or the file of a custom one without its `_rec.onnx`.
+    var modelName: String {
+        guard let fileName = recognizer.customFileName else { return "PP-OCRv6 \(tier.rawValue)" }
+        let name = (fileName as NSString).deletingPathExtension
+        return name.hasSuffix("_rec") ? String(name.dropLast(4)) : name
+    }
     var computeUnit: PPComputeUnit = .cpu
     /// 0 lets ONNX Runtime pick, otherwise the intra-op thread count.
     var threadCount: Int = 0

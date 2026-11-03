@@ -306,8 +306,8 @@ struct ReviewDetailView: View {
         let comparable = other.map { RegionContentKind.of($0, label: region.block.label, source: otherSource) == kind }
             ?? false
 
-        let currentTitle = title(source: region.source, detail: detail(forCurrentOf: region))
-        let alternativeTitle = alternative.map { title(source: $0.source, detail: detail(for: $0, in: region)) }
+        let currentTitle = title(source: region.source, on: region.page, detail: detail(forCurrentOf: region))
+        let alternativeTitle = alternative.map { title(source: $0.source, on: region.page, detail: detail(for: $0, in: region)) }
         // The title says what will be saved — a choice, not a view.
         let heading: String = {
             if edited { return String(localized: "Result · Edited by hand") }
@@ -417,8 +417,8 @@ struct ReviewDetailView: View {
         return alternatives ? String(localized: "Click the other reading to use it instead · \(edit)") : edit
     }
 
-    private func title(source: PPTextSource, detail: String?) -> String {
-        [source.label, detail].compactMap { $0 }.joined(separator: " · ")
+    private func title(source: PPTextSource, on page: PageResult, detail: String?) -> String {
+        [page.readerName(source), detail].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// How the reading on screen came about, in a few words.

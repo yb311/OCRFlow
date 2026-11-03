@@ -62,6 +62,14 @@ enum VLModelVariant: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// The model's name where a result says who read a region.
+    var modelName: String {
+        switch self {
+        case .official:  return "PaddleOCR-VL-1.6"
+        case .quantized: return "PaddleOCR-VL-1.6 Q4"
+        }
+    }
+
     /// File names in the user models folder.
     var modelFileName: String {
         switch self {

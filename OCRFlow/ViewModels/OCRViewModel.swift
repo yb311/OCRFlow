@@ -45,8 +45,8 @@ enum OCREngine: String, CaseIterable, Identifiable, Codable {
         case .auto:           return String(localized: "Smart Layering")
         case .visionFast:     return String(localized: "Vision Fast")
         case .visionAccurate: return String(localized: "Vision Accurate")
-        case .paddleOCR:      return String(localized: "Quick reading")
-        case .paddleVL:       return String(localized: "Close reading")
+        case .paddleOCR:      return "PP-OCRv6"
+        case .paddleVL:       return "PaddleOCR-VL"
         }
     }
 
@@ -875,6 +875,11 @@ final class OCRViewModel {
                 }
                 let previous = AlternativeReading(source: block.source ?? item.pages[page].blockSource,
                                                   text: block.text, note: .beforeReread)
+                // The page names the model that read this region now.
+                if !output.text.isEmpty, let index = items.firstIndex(where: { $0.id == itemID }),
+                   items[index].pages.indices.contains(page) {
+                    items[index].pages[page].models[.visionLanguageModel] = config.variant.modelName
+                }
                 updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
                     block.review = nil
                     guard !output.text.isEmpty else {

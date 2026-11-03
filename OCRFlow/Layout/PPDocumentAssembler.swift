@@ -17,11 +17,11 @@ enum PPTextSource: String, Sendable, Codable {
     /// True when the text may carry LaTeX and HTML the model was asked for.
     var carriesMarkup: Bool { self == .visionLanguageModel }
 
-    /// Who read it, as the result pane names them.
+    /// Who read it, when the page does not say which model it was.
     var label: String {
         switch self {
-        case .visionLanguageModel: return String(localized: "Close reading")
-        case .plainOCR:            return String(localized: "Quick reading")
+        case .visionLanguageModel: return "PaddleOCR-VL"
+        case .plainOCR:            return "PP-OCRv6"
         case .pdfTextLayer:        return String(localized: "PDF text layer")
         }
     }

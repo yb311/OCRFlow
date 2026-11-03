@@ -2157,16 +2157,6 @@
         }
       }
     },
-    "Close reading" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仔细识别"
-          }
-        }
-      }
-    },
     "Close reading can't process this image (error %d)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5713,16 +5703,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "队列截图 %@"
-          }
-        }
-      }
-    },
-    "Quick reading" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快速识别"
           }
         }
       }

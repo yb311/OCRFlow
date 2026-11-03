@@ -20,6 +20,17 @@ enum DocumentRecognizer {
         var vlConfig: VLConfig
         var layered: LayeredConfig
 
+        /// The model each reader uses under these settings.
+        var models: [PPTextSource: String] {
+            let ocr = paddleConfig.modelName, vl = vlConfig.variant.modelName
+            switch engine {
+            case .visionFast, .visionAccurate: return [:]
+            case .paddleOCR:                   return [.plainOCR: ocr]
+            case .paddleVL:                    return [.visionLanguageModel: vl]
+            case .auto:                        return [.plainOCR: ocr, .visionLanguageModel: vl]
+            }
+        }
+
         /// Everything about these settings that changes what a file reads as,
         /// for the recognition cache. Knobs that only change *how fast* — the
         /// batch width, thread counts — are left out, so turning them does not
@@ -266,6 +277,7 @@ enum DocumentRecognizer {
             }
             if var page = read {
                 page.notes += unavailableNotes(engines, page: page)
+                page.models = settings.models
                 return page
             }
         }
@@ -286,6 +298,7 @@ enum DocumentRecognizer {
             }
         }
         page.rectified = rectified.map(ImageItem.page(from:))
+        page.models = settings.models
         return page
     }
 
