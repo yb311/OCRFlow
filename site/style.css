@@ -77,12 +77,19 @@ h1 {
 
 .fine { margin: 14px 0 0; color: var(--muted); font-size: 14px; }
 
+img.shot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+img.welcome { border-radius: 12px; }
+
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 32px;
-  padding: 40px 0 56px;
-  border-top: 1px solid var(--line);
+  padding: 56px 0;
 }
 
 h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.25; }
@@ -90,7 +97,10 @@ h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.25; }
 .features p, .privacy p { margin: 0; color: var(--muted); }
 
 .privacy {
-  max-width: 36em;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
   padding: 48px 0;
   border-top: 1px solid var(--line);
 }
@@ -109,5 +119,5 @@ footer a { margin-right: 16px; }
 
 @media (max-width: 720px) {
   .hero { padding-top: 40px; }
-  .features { grid-template-columns: 1fr; }
+  .features, .privacy { grid-template-columns: 1fr; }
 }

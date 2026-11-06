@@ -8,6 +8,8 @@ A native macOS app that turns files and anything on your screen into text you ca
 ![Swift](https://img.shields.io/badge/swift-6-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+![OCRFlow reading a report, with the blocks it found numbered on the page and the text and table read from them beside it](site/screenshots/main-en.png)
+
 ## Features
 
 - **Batch processing** — drag and drop multiple images or entire folders, subfolders included; PDFs and multi-page TIFFs are read page by page
