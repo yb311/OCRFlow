@@ -1681,6 +1681,16 @@
         }
       }
     },
+    "Capture from any app" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在任何应用里截图"
+          }
+        }
+      }
+    },
     "Capture the window" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4899,12 +4909,12 @@
         }
       }
     },
-    "OCRFlow needs Accessibility permission to turn pages" : {
+    "OCRFlow needs Accessibility permission" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OCRFlow 需要辅助功能权限来翻页"
+            "value" : "OCRFlow 需要辅助功能权限"
           }
         }
       }
@@ -5565,6 +5575,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按 Esc 停止。点按或打字会暂停运行。"
+          }
+        }
+      }
+    },
+    "Press ⌥⇧⌘2 to read the text, take a long screenshot, save or copy. The first time, macOS asks for Screen Recording permission; OCRFlow only looks at the screen when you capture." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 ⌥⇧⌘2，可以识别文字、截长图、保存或拷贝。第一次使用时，macOS 会请求“录屏”权限；只有在你截图时，OCRFlow 才会读取屏幕。"
           }
         }
       }
@@ -6289,6 +6309,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "录制操作"
+          }
+        }
+      }
+    },
+    "Record Actions repeats your clicks and keys, page after page, and turns what it captures into one document. The first time, macOS asks for Accessibility permission." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“录制操作”会一页页重复你的点按和按键，并把截到的内容合成一份文档。第一次使用时，macOS 会请求“辅助功能”权限。"
           }
         }
       }
@@ -7347,6 +7377,16 @@
         }
       }
     },
+    "Show it once, and it repeats" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演示一次，它来重复"
+          }
+        }
+      }
+    },
     "Show this in the document" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8373,12 +8413,12 @@
         }
       }
     },
-    "To repeat your clicks and key presses, turn on OCRFlow in Privacy & Security → Accessibility. What you do is only watched while you show it how to turn a page, and is never stored." : {
+    "To follow and repeat your clicks, keys and scrolls, turn on OCRFlow in Privacy & Security → Accessibility. It only watches while you record or capture, and keeps only the steps of a recording, until you delete it." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为了重复你的点按和按键，请在“隐私与安全性 → 辅助功能”中打开 OCRFlow。只有在你演示翻页时才会记录你的操作，而且不会保存。"
+            "value" : "为了跟随和重复你的点按、按键和滚动，请在“隐私与安全性 → 辅助功能”中打开 OCRFlow。只有在录制或截图期间才会读取你的操作，而且只保存录制下来的步骤，直到你删除为止。"
           }
         }
       }
@@ -8569,12 +8609,12 @@
         }
       }
     },
-    "Turn scans, photos and PDFs into text you can search and edit." : {
+    "Turn scans, PDFs and anything on your screen into text you can search and edit." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "把扫描件、照片和 PDF 变成可以搜索、编辑的文字。"
+            "value" : "把扫描件、PDF 和屏幕上的任何内容变成可以搜索、编辑的文字。"
           }
         }
       }

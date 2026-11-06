@@ -48,9 +48,13 @@ without a new key and a new manual download, so keep a copy somewhere safe.
 ## Cutting a release
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
+
+Put what changed in `docs/release-notes/v1.3.0.md` before tagging: it becomes the
+release page and what the update window shows. Without it, GitHub generates a
+list of pull requests, which says little when work lands directly on `main`.
 
 The workflow then:
 
@@ -62,7 +66,7 @@ The workflow then:
    without a Gatekeeper warning;
 4. packages `OCRFlow-<version>.dmg` (notarised and stapled in its own right)
    and `OCRFlow-<version>.zip`;
-5. publishes a GitHub Release with generated notes and both files;
+5. publishes a GitHub Release with those notes and both files;
 6. signs the zip with the Sparkle key and uploads `appcast.xml`.
 
 Re-running a tag needs the existing release deleted first, since the workflow

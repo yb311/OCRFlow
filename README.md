@@ -1,15 +1,12 @@
 # OCRFlow
 
-A native macOS app for batch OCR (Optical Character Recognition) and document parsing. Choose between Apple's Vision framework, a full PaddleOCR PP-OCRv6 pipeline on ONNX Runtime, or the PaddleOCR-VL-1.6 vision-language model running locally through llama.cpp. Fast, private, and works entirely offline.
+A native macOS app that turns files and anything on your screen into text you can search and edit. Read images and PDFs in batches, capture from any app, or show it once how to turn a page and let it assemble the whole document. Recognition runs on your Mac with Apple's Vision framework, PaddleOCR PP-OCRv6 or the PaddleOCR-VL-1.6 model, so nothing is uploaded.
 
-![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue)
-![Swift](https://img.shields.io/badge/swift-5.0-orange)
+**[Website](https://yb311.github.io/OCRFlow/)** · **[Download](https://github.com/yb311/OCRFlow/releases/latest)**
+
+![Platform](https://img.shields.io/badge/platform-macOS%2015%2B-blue)
+![Swift](https://img.shields.io/badge/swift-6-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
-
-## Screenshots
-
-![OCRFlow main window](screenshots/main.png)
-![OCRFlow settings](screenshots/settings.png)
 
 ## Features
 
@@ -85,6 +82,11 @@ Then press **⌘R** in Xcode to build and run.
 2. (Optional) Open **Settings** to choose OCR engine, languages, and post-processing options
 3. Click **开始识别** (Start OCR) in the toolbar
 4. View results in the detail panel; copy or export as needed
+
+To capture instead, press **⌥⇧⌘2** in any app, or choose **Record Actions…** to
+do something once and have it repeated. macOS asks for Screen Recording the first
+time you capture, and for Accessibility the first time you record, queue
+screenshots or use Auto Scroll; reopen OCRFlow after allowing Screen Recording.
 
 When PaddleOCR is the active engine, the preview also shows the detected text
 boxes, tinted by confidence. Toggle them with the viewfinder button above the
@@ -312,6 +314,8 @@ OCRFlow/
 │   ├── SearchablePDFWriter.swift      # Invisible text layer over source pages
 │   ├── TableWorkbook.swift            # Tables → .xlsx
 │   └── FolderWatcher.swift            # FSEvents-driven watched folder
+├── Capture/                  # Screenshots, long screenshots, Record Actions
+├── Presence/                 # Menu bar, Dock icon, floating button
 ├── Diagnostics/
 │   └── PipelineBenchmark.swift        # --benchmark (Debug builds only)
 ├── Layout/                   # Stage 1 of PaddleOCR-VL

@@ -38,7 +38,7 @@ struct WelcomeView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Welcome to OCRFlow").font(.title2.weight(.semibold))
-                    Text("Turn scans, photos and PDFs into text you can search and edit.")
+                    Text("Turn scans, PDFs and anything on your screen into text you can search and edit.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -46,6 +46,10 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 point("tray.and.arrow.down", "Drop in images, PDFs or whole folders",
                       "Then press Start Recognition (⌘R). Results can be checked, corrected and exported.")
+                point("camera.viewfinder", "Capture from any app",
+                      "Press ⌥⇧⌘2 to read the text, take a long screenshot, save or copy. The first time, macOS asks for Screen Recording permission; OCRFlow only looks at the screen when you capture.")
+                point("repeat", "Show it once, and it repeats",
+                      "Record Actions repeats your clicks and keys, page after page, and turns what it captures into one document. The first time, macOS asks for Accessibility permission.")
                 point("lock", "Everything stays on your Mac",
                       "Recognition runs locally. Files and text are never uploaded.")
                 point("checkmark.circle", "Ready to use now",
