@@ -42,3 +42,6 @@ Vendor/
 
 # Bundled PaddleOCR ONNX weights (fetched by Scripts/fetch-paddleocr-models.sh bundled)
 OCRFlow/Resources/PaddleOCR/*.onnx
+
+# The film's tooling (Scripts/film)
+Scripts/film/node_modules/

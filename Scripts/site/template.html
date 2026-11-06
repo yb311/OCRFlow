@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{title}}</title>
+  <meta name="description" content="{{description}}">
+  <meta name="theme-color" content="#030a09">
+  <link rel="canonical" href="{{base}}{{self}}">
+  <link rel="alternate" hreflang="en" href="{{base}}">
+  <link rel="alternate" hreflang="zh-Hans" href="{{base}}zh.html">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="media/icon-180.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{title}}">
+  <meta property="og:description" content="{{description}}">
+  <meta property="og:image" content="{{base}}media/share.jpg">
+  <meta property="og:url" content="{{base}}{{self}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="{{self}}#top" aria-label="OCRFlow">{{mark}}<span>OCRFlow</span></a>
+      <nav class="nav-links" aria-label="{{nav_label}}">
+        <a href="#film">{{nav_film}}</a>
+        <a href="#read">{{nav_read}}</a>
+        <a href="#capture">{{nav_capture}}</a>
+        <a href="#record">{{nav_record}}</a>
+        <a href="#privacy">{{nav_privacy}}</a>
+      </nav>
+      <div class="nav-end">
+        <a href="{{other}}" lang="{{other_lang}}">{{other_name}}</a>
+        <a class="btn btn-primary btn-small" href="{{download}}">{{download_short}}</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <video class="hero-video" data-loop muted loop playsinline preload="none" poster="media/hero.jpg" data-src="media/hero.mp4" aria-hidden="true"></video>
+      <div class="hero-shade"></div>
+      <div class="wrap">
+        <h1 class="rise">{{hero_title}}</h1>
+        <p class="lede rise" style="--d:.1s">{{hero_lede}}</p>
+        <div class="cta rise" style="--d:.2s">
+          <a class="btn btn-primary" href="{{download}}">{{apple}}{{download_long}}</a>
+          <a class="btn btn-ghost" href="#film">{{playicon}}{{watch}}</a>
+        </div>
+        <p class="fine rise" style="--d:.3s">{{fine}}</p>
+      </div>
+    </section>
+
+    <div class="window-stage">
+      <img class="window-shot" src="screenshots/{{main_shot}}" width="2424" height="1624" alt="{{main_alt}}">
+      <p class="window-cap">{{main_cap}}</p>
+    </div>
+
+    <section class="pad" id="film">
+      <div class="wrap">
+        <div class="film-head">
+          <p class="eyebrow rise">{{film_eyebrow}}</p>
+          <h2 class="h2 rise">{{film_title}}</h2>
+        </div>
+        <div class="player rise">
+          <video preload="none" playsinline poster="media/poster-{{code}}.jpg" src="media/film-{{code}}.mp4"></video>
+          <button class="play" aria-label="{{film_play}}"><span>{{playfill}}{{film_play}}</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="scan" id="read" aria-label="{{nav_read}}">
+      <div class="scan-stage">
+        <div class="wrap">
+          <div class="scan-grid">
+            <div class="scan-steps">
+              <div class="scan-step on"><p class="eyebrow">{{s1_eyebrow}}</p><h2>{{s1_title}}</h2><p>{{s1_text}}</p></div>
+              <div class="scan-step"><p class="eyebrow">{{s2_eyebrow}}</p><h2>{{s2_title}}</h2><p>{{s2_text}}</p></div>
+              <div class="scan-step"><p class="eyebrow">{{s3_eyebrow}}</p><h2>{{s3_title}}</h2><p>{{s3_text}}</p></div>
+              <div class="scan-progress" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+            </div>
+            <div class="page" role="img" aria-label="{{page_alt}}">
+              <div class="sheet sheet-paper" aria-hidden="true">{{doc_plain}}</div>
+              <div class="sheet sheet-read" aria-hidden="true">{{doc_blocks}}</div>
+              <div class="scan-line" aria-hidden="true"></div>
+            </div>
+            <div class="results">{{results}}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="capture">
+      <div class="wrap">
+        <p class="eyebrow rise">{{cap_eyebrow}}</p>
+        <h2 class="h2 rise">{{cap_title}}</h2>
+        <p class="lede rise">{{cap_lede}}</p>
+        <div class="bento">
+          <article class="card wide span-6 rise">
+            <div class="card-text">
+              <h3>{{cap1_title}}</h3>
+              <p>{{cap1_text}}</p>
+              <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/capture-{{code}}.jpg" data-src="media/capture-{{code}}.mp4" aria-label="{{cap1_alt}}"></video></div>
+          </article>
+          <article class="card wide span-6 rise" style="--d:.05s">
+            <div class="card-text">
+              <h3>{{cap2_title}}</h3>
+              <p>{{cap2_text}}</p>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/ribbon-{{code}}.jpg" data-src="media/ribbon-{{code}}.mp4" aria-label="{{cap2_alt}}"></video></div>
+          </article>
+          <article class="card span-3 rise">
+            <div class="card-text"><h3>{{cap3_title}}</h3><p>{{cap3_text}}</p></div>
+            <div class="queue-demo" aria-hidden="true"><div class="lines"></div>
+              <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
+              <i style="left:40%;top:44%;width:52%;height:20%;--s:1.5s"></i>
+              <i style="left:10%;top:72%;width:38%;height:18%;--s:3s"></i>
+            </div>
+          </article>
+          <article class="card span-3 rise" style="--d:.06s">
+            <div class="card-text"><h3>{{cap4_title}}</h3><p>{{cap4_text}}</p></div>
+            <div class="float-demo" aria-hidden="true">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6.5"/></svg></span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="record" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">{{rec_eyebrow}}</p>
+        <h2 class="h2 rise">{{rec_title}}</h2>
+        <p class="lede rise">{{rec_lede}}</p>
+        <div class="record-film rise"><video data-loop muted loop playsinline preload="none" poster="media/deck-{{code}}.jpg" data-src="media/deck-{{code}}.mp4" aria-label="{{rec_alt}}"></video></div>
+        <div class="record-steps">
+          <div class="rise"><span>01</span><h3>{{rec1_title}}</h3><p>{{rec1_text}}</p></div>
+          <div class="rise" style="--d:.08s"><span>02</span><h3>{{rec2_title}}</h3><p>{{rec2_text}}</p></div>
+          <div class="rise" style="--d:.16s"><span>03</span><h3>{{rec3_title}}</h3><p>{{rec3_text}}</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">{{eng_eyebrow}}</p>
+        <h2 class="h2 rise">{{eng_title}}</h2>
+        <p class="lede rise">{{eng_lede}}</p>
+        <div class="route rise">
+          <div class="route-from"><h3>{{eng_from_title}}</h3><p>{{eng_from_text}}</p></div>
+          <div class="route-mid" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M11 6l6 6-6 6"/></svg></div>
+          <div class="route-to">
+            <div class="reader"><div><b>{{r1_name}}</b><small>{{r1_small}}</small></div><span>{{r1_text}}</span></div>
+            <div class="reader"><div><b>{{r2_name}}</b><small>{{r2_small}}</small></div><span>{{r2_text}}</span></div>
+            <div class="reader"><div><b>{{r3_name}}</b><small>{{r3_small}}</small></div><span>{{r3_text}}</span></div>
+          </div>
+        </div>
+        <div class="tiles" style="margin-top:34px">
+          <article class="tile rise">{{i_review}}<h3>{{t1_title}}</h3><p>{{t1_text}}</p></article>
+          <article class="tile rise" style="--d:.06s">{{i_search}}<h3>{{t2_title}}</h3><p>{{t2_text}}</p>
+            <div class="search-demo" aria-hidden="true">{{i_search_small}}<span data-typed="{{t2_phrases}}"><span class="caret"></span></span></div>
+          </article>
+          <article class="tile rise" style="--d:.12s">{{i_export}}<h3>{{t3_title}}</h3><p>{{t3_text}}</p>
+            <div class="exports"><span>Markdown</span><span>{{plain_text}}</span><span>JSON</span><span>{{searchable_pdf}}</span><span>Excel</span></div>
+          </article>
+          <article class="tile rise">{{i_batch}}<h3>{{t4_title}}</h3><p>{{t4_text}}</p></article>
+          <article class="tile rise" style="--d:.06s">{{i_folder}}<h3>{{t5_title}}</h3><p>{{t5_text}}</p></article>
+          <article class="tile rise" style="--d:.12s">{{i_translate}}<h3>{{t6_title}}</h3><p>{{t6_text}}</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="languages" aria-label="{{lang_label}}">
+      <div class="marquee" aria-hidden="true">{{marquee_a}}</div>
+      <div class="marquee" aria-hidden="true">{{marquee_b}}</div>
+      <div class="wrap lang-note">
+        <div class="rise"><h3>{{lang1_title}}</h3><p>{{lang1_text}}</p></div>
+        <div class="rise" style="--d:.08s"><h3>{{lang2_title}}</h3><p>{{lang2_text}}</p></div>
+      </div>
+    </section>
+
+    <section class="pad privacy" id="privacy">
+      <div class="wrap privacy-grid">
+        <div>
+          <p class="eyebrow rise">{{pri_eyebrow}}</p>
+          <h2 class="h2 rise">{{pri_title}}</h2>
+          <ul class="promise">
+            <li class="rise"><b>{{p1_title}}</b>{{p1_text}}</li>
+            <li class="rise"><b>{{p2_title}}</b>{{p2_text}}</li>
+            <li class="rise"><b>{{p3_title}}</b>{{p3_text}}</li>
+          </ul>
+          <a class="text-link rise" href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">{{pri_link}} →</a>
+        </div>
+        <canvas id="lock" class="rise" role="img" aria-label="{{lock_alt}}"></canvas>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap faq">
+        <h2 class="rise">{{faq_title}}</h2>
+        <div class="rise">{{faq}}</div>
+      </div>
+    </section>
+
+    <section class="pad closing" id="download">
+      <div class="wrap">
+        {{mark_large}}
+        <h2 class="rise">{{end_title}}</h2>
+        <p class="lede rise" style="margin-inline:auto">{{end_lede}}</p>
+        <div class="cta rise">
+          <a class="btn btn-primary" href="{{download}}">{{apple}}{{download_long}}</a>
+          <a class="btn btn-ghost" href="https://github.com/yb311/OCRFlow">GitHub</a>
+        </div>
+        <p class="fine rise">{{end_fine}}</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>OCRFlow · {{license}}</span>
+      <nav aria-label="{{footer_label}}">
+        <a href="https://github.com/yb311/OCRFlow">GitHub</a>
+        <a href="https://github.com/yb311/OCRFlow/releases">{{releases}}</a>
+        <a href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">{{nav_privacy}}</a>
+        <a href="https://github.com/yb311/OCRFlow/issues">{{report}}</a>
+        <a href="{{other}}" lang="{{other_lang}}">{{other_name}}</a>
+      </nav>
+    </div>
+  </footer>
+  <script src="site.js" type="module"></script>
+</body>
+</html>

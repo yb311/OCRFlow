@@ -2,59 +2,237 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OCRFlow</title>
-  <meta name="description" content="Turn files and anything on your screen into text you can search and edit, on your Mac. Nothing is uploaded.">
-  <link rel="alternate" hreflang="zh-Hans" href="zh.html">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>OCRFlow — Everything on your screen is text</title>
+  <meta name="description" content="OCRFlow turns scans, PDFs and anything on your screen into text you can search and edit. Free for Mac. Recognition runs on your Mac and nothing is uploaded.">
+  <meta name="theme-color" content="#030a09">
+  <link rel="canonical" href="https://yb311.github.io/OCRFlow/">
+  <link rel="alternate" hreflang="en" href="https://yb311.github.io/OCRFlow/">
+  <link rel="alternate" hreflang="zh-Hans" href="https://yb311.github.io/OCRFlow/zh.html">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="media/icon-180.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OCRFlow — Everything on your screen is text">
+  <meta property="og:description" content="OCRFlow turns scans, PDFs and anything on your screen into text you can search and edit. Free for Mac. Recognition runs on your Mac and nothing is uploaded.">
+  <meta property="og:image" content="https://yb311.github.io/OCRFlow/media/share.jpg">
+  <meta property="og:url" content="https://yb311.github.io/OCRFlow/">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <span class="name">OCRFlow</span>
-      <a href="zh.html" lang="zh-Hans">简体中文</a>
-    </header>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="#top" aria-label="OCRFlow"><svg  viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="ip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="if" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#ip)"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#if)"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg><span>OCRFlow</span></a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#film">Film</a>
+        <a href="#read">Reading</a>
+        <a href="#capture">Capture</a>
+        <a href="#record">Record</a>
+        <a href="#privacy">Privacy</a>
+      </nav>
+      <div class="nav-end">
+        <a href="zh.html" lang="zh-Hans">简体中文</a>
+        <a class="btn btn-primary btn-small" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg">Download</a>
+      </div>
+    </div>
+  </header>
 
-    <main>
-      <section class="hero">
-        <h1>Get the text out of anything on your screen.</h1>
-        <p class="lead">Read scans and PDFs in batches, capture from any app, or show OCRFlow once how to turn a page and let it build the whole document.</p>
-        <a class="button" href="https://github.com/yb311/OCRFlow/releases/latest">Download for Mac</a>
-        <p class="fine">Free and open source · macOS 15 or later · Apple silicon and Intel · Signed and notarized</p>
-      </section>
-
-      <img class="shot main" src="screenshots/main-en.png" alt="The OCRFlow window: a report with its blocks numbered on one side, and the title, paragraphs and table read from it on the other." width="2424" height="1624">
-
-      <section class="features">
-        <div>
-          <h2>Read whole folders</h2>
-          <p>Drop in images, PDFs or folders. With the optional models, tables, formulas and columns keep their structure. Export Markdown, text, searchable PDF or Excel.</p>
+  <main id="top">
+    <section class="hero">
+      <video class="hero-video" data-loop muted loop playsinline preload="none" poster="media/hero.jpg" data-src="media/hero.mp4" aria-hidden="true"></video>
+      <div class="hero-shade"></div>
+      <div class="wrap">
+        <h1 class="rise">Everything on your screen is <em>text.</em></h1>
+        <p class="lede rise" style="--d:.1s">Read scans and PDFs by the folder, capture from any app, or show OCRFlow once how to turn a page and let it assemble the whole document.</p>
+        <div class="cta rise" style="--d:.2s">
+          <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Download for Mac</a>
+          <a class="btn btn-ghost" href="#film"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Watch the film</a>
         </div>
-        <div>
-          <h2>Capture from any app</h2>
-          <p>Press ⌥⇧⌘2, choose an area or window, and read, save or copy it. Long screenshots join as they scroll, by hand or automatically.</p>
-        </div>
-        <div>
-          <h2>Show it once</h2>
-          <p>Capture a slide and press →. OCRFlow repeats your steps until the screen stops changing, then turns the pages into one document.</p>
-        </div>
-      </section>
+        <p class="fine rise" style="--d:.3s">Free and open source · macOS 15 or later · Apple silicon and Intel · Signed and notarized</p>
+      </div>
+    </section>
 
-      <section class="privacy">
-        <div>
-          <h2>It stays on your Mac</h2>
-          <p>Recognition runs locally. There are no accounts, analytics or tracking, and your files and text are never uploaded.</p>
-          <a href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">Read the privacy statement</a>
-        </div>
-        <img class="shot welcome" src="screenshots/welcome-en.png" alt="The OCRFlow welcome window, listing what the app does, the permissions it asks for and the optional models." width="1070" height="1170">
-      </section>
-    </main>
+    <div class="window-stage">
+      <img class="window-shot" src="screenshots/main-en.png" width="2424" height="1624" alt="The OCRFlow window: a report with its blocks numbered on one side, and the title, paragraphs and table read from it on the other.">
+      <p class="window-cap">The app itself, reading a made-up report.</p>
+    </div>
 
-    <footer>
-      <a href="https://github.com/yb311/OCRFlow">GitHub</a>
-      <a href="https://github.com/yb311/OCRFlow/issues">Report a problem</a>
-      <span>MIT License</span>
-    </footer>
-  </div>
+    <section class="pad" id="film">
+      <div class="wrap">
+        <div class="film-head">
+          <p class="eyebrow rise">The film</p>
+          <h2 class="h2 rise">Forty-eight seconds, in light.</h2>
+        </div>
+        <div class="player rise">
+          <video preload="none" playsinline poster="media/poster-en.jpg" src="media/film-en.mp4"></video>
+          <button class="play" aria-label="Play with sound"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="scan" id="read" aria-label="Reading">
+      <div class="scan-stage">
+        <div class="wrap">
+          <div class="scan-grid">
+            <div class="scan-steps">
+              <div class="scan-step on"><p class="eyebrow">Reading</p><h2>A page is more than lines of text.</h2><p>Keep scrolling. This one is being read as you go.</p></div>
+              <div class="scan-step"><p class="eyebrow">Layout</p><h2>It finds the structure first.</h2><p>Headings, paragraphs, tables and formulas each get their own block, in reading order.</p></div>
+              <div class="scan-step"><p class="eyebrow">Results</p><h2>Then every block is real, usable text.</h2><p>Tables stay tables and formulas stay formulas. Check it, correct it, export it.</p></div>
+              <div class="scan-progress" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+            </div>
+            <div class="page" role="img" aria-label="A report being read by a line of light, and turning into structured text.">
+              <div class="sheet sheet-paper" aria-hidden="true"><p class="doc-title">Community Library Annual Report</p><p class="doc-p">Reading rooms stayed busy throughout the year. Visits rose in every quarter, and the new evening hours brought in many first-time members. Volunteers digitized the local newspaper archive.</p><p class="doc-h">Visits by quarter</p><table class="doc-table"><tr><th>Quarter</th><th>Visits</th><th>New members</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table><p class="doc-f">(23,160 − 18,240) ÷ 18,240 = 27%</p><p class="doc-h">Next year</p><p class="doc-p">The library will extend weekend opening, add two study rooms, and continue scanning the photograph collection.</p></div>
+              <div class="sheet sheet-read" aria-hidden="true"><div class="blk" data-n="1"><p class="doc-title">Community Library Annual Report</p></div><div class="blk" data-n="2"><p class="doc-p">Reading rooms stayed busy throughout the year. Visits rose in every quarter, and the new evening hours brought in many first-time members. Volunteers digitized the local newspaper archive.</p></div><div class="blk" data-n="3"><p class="doc-h">Visits by quarter</p></div><div class="blk" data-n="4"><table class="doc-table"><tr><th>Quarter</th><th>Visits</th><th>New members</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table></div><div class="blk" data-n="5"><p class="doc-f">(23,160 − 18,240) ÷ 18,240 = 27%</p></div><div class="blk" data-n="6"><p class="doc-h">Next year</p></div><div class="blk" data-n="7"><p class="doc-p">The library will extend weekend opening, add two study rooms, and continue scanning the photograph collection.</p></div></div>
+              <div class="scan-line" aria-hidden="true"></div>
+            </div>
+            <div class="results"><div class="result"><small><b>1</b>Heading</small><h3>Community Library Annual Report</h3></div><div class="result"><small><b>2</b>Paragraph</small><p>Reading rooms stayed busy throughout the year. Visits rose in every quarter, and the new evening hours brought in many first-time members. Volunteers digitized the local newspaper archive.</p></div><div class="result"><small><b>3</b>Heading</small><h3>Visits by quarter</h3></div><div class="result"><small><b>4</b>Table</small><table><tr><th>Quarter</th><th>Visits</th><th>New members</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table></div><div class="result"><small><b>5</b>Formula</small><code>(23,160 − 18,240) ÷ 18,240 = 27%</code></div><div class="result"><small><b>6</b>Heading</small><h3>Next year</h3></div><div class="result"><small><b>7</b>Paragraph</small><p>The library will extend weekend opening, add two study rooms, and continue scanning the photograph collection.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="capture">
+      <div class="wrap">
+        <p class="eyebrow rise">Capture</p>
+        <h2 class="h2 rise">Take it from anywhere.</h2>
+        <p class="lede rise">A capture engine built for reading. OCRFlow stays out of the way: it never comes forward, so the window you are capturing looks exactly as it did.</p>
+        <div class="bento">
+          <article class="card wide span-6 rise">
+            <div class="card-text">
+              <h3>Choose it. Read it.</h3>
+              <p>Press the shortcut in any app, drag out an area or click a window, and pick from the bar beside it: recognize, long screenshot, save or copy.</p>
+              <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/capture-en.jpg" data-src="media/capture-en.mp4" aria-label="An area of an article is chosen on screen, and its text is read."></video></div>
+          </article>
+          <article class="card wide span-6 rise" style="--d:.05s">
+            <div class="card-text">
+              <h3>Long screenshots</h3>
+              <p>Scroll by hand or let Auto Scroll do it. The joined picture grows beside the page as you go, and is read as pages so small text stays sharp.</p>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/ribbon-en.jpg" data-src="media/ribbon-en.mp4" aria-label="A long page joined into one continuous ribbon."></video></div>
+          </article>
+          <article class="card span-3 rise">
+            <div class="card-text"><h3>Queue Screenshots</h3><p>Drag out area after area, with no shortcut in between, turning pages as usual. Esc ends it.</p></div>
+            <div class="queue-demo" aria-hidden="true"><div class="lines"></div>
+              <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
+              <i style="left:40%;top:44%;width:52%;height:20%;--s:1.5s"></i>
+              <i style="left:10%;top:72%;width:38%;height:18%;--s:3s"></i>
+            </div>
+          </article>
+          <article class="card span-3 rise" style="--d:.06s">
+            <div class="card-text"><h3>Always one click away</h3><p>A small button floats above every window. Click it to capture; point at it and Queue Screenshots and Record Actions open out. Or start from the menu bar, even with the main window closed.</p></div>
+            <div class="float-demo" aria-hidden="true">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6.5"/></svg></span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="record" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">Record Actions</p>
+        <h2 class="h2 rise">Show it once. It does the rest.</h2>
+        <p class="lede rise">Clicks, keys, typing, scrolls, captures: whatever you do, OCRFlow can repeat. It knows nothing about any particular app or site, so it works with all of them.</p>
+        <div class="record-film rise"><video data-loop muted loop playsinline preload="none" poster="media/deck-en.jpg" data-src="media/deck-en.mp4" aria-label="A slide is captured and the next one brought up, again and again, until the whole deck has been taken."></video></div>
+        <div class="record-steps">
+          <div class="rise"><span>01</span><h3>Do it once</h3><p>Capture a slide and press →, say. Every step can be edited afterwards.</p></div>
+          <div class="rise" style="--d:.08s"><span>02</span><h3>It repeats</h3><p>A set number of times, or until the screen stops changing, and optionally on each of a list of web addresses.</p></div>
+          <div class="rise" style="--d:.16s"><span>03</span><h3>You get the result</h3><p>One document, one long picture or separate pictures, recognized when it ends. Or only saved.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">Smart Layering</p>
+        <h2 class="h2 rise">The right reader for each part of the page.</h2>
+        <p class="lede rise">Fast where the page is simple, careful where it is not. You do not have to choose.</p>
+        <div class="route rise">
+          <div class="route-from"><h3>Every page</h3><p>A PDF with trustworthy text of its own keeps it as it is. Anything else is split into regions by the layout model.</p></div>
+          <div class="route-mid" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M11 6l6 6-6 6"/></svg></div>
+          <div class="route-to">
+            <div class="reader"><div><b>Quick reading</b><small>PP-OCRv6</small></div><span>Prose and ordinary text, quickly. Built in, and offline from the first moment.</span></div>
+            <div class="reader"><div><b>Close reading</b><small>PaddleOCR-VL-1.6</small></div><span>Tables, formulas, charts and seals, and any region quick reading is unsure of.</span></div>
+            <div class="reader"><div><b>Apple Vision</b><small>Also available</small></div><span>Choose it, or either reader alone, whenever you prefer.</span></div>
+          </div>
+        </div>
+        <div class="tiles" style="margin-top:34px">
+          <article class="tile rise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg><h3>Review what deserves a look</h3><p>Regions are flagged with a specific reason: low confidence, output cut off, two readers disagreeing. Your corrections are never overwritten without asking.</p></article>
+          <article class="tile rise" style="--d:.06s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><h3>Search everything you have read</h3><p>Every document stays in the history, searchable by any phrase, Chinese included.</p>
+            <div class="search-demo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span data-typed="sixty years of stories|harbor and market square|annual report"><span class="caret"></span></span></div>
+          </article>
+          <article class="tile rise" style="--d:.12s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg><h3>Export it your way</h3><p>Combined into one file, or one per source with the folder structure kept.</p>
+            <div class="exports"><span>Markdown</span><span>Plain text</span><span>JSON</span><span>Searchable PDF</span><span>Excel</span></div>
+          </article>
+          <article class="tile rise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="13" height="13" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg><h3>Whole folders at once</h3><p>Drop in images, PDFs or folders. The list and every result survive quitting, and nothing is read twice.</p></article>
+          <article class="tile rise" style="--d:.06s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5L12 11l2.5 2.5"/></svg><h3>A folder that reads itself</h3><p>Files that land in a watched folder are read once they finish copying, and the results are exported for you.</p></article>
+          <article class="tile rise" style="--d:.12s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M8.5 4v2M11 6c-.8 3.6-3.2 6.3-6.5 7.8M6 9c1 2 2.8 3.6 5 4.6"/><path d="M13 20l3.8-9L21 20M14.3 17h5.2"/></svg><h3>Translate on the device</h3><p>Results can be translated with Apple’s Translation framework. The text is translated on your Mac.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="languages" aria-label="Languages">
+      <div class="marquee" aria-hidden="true"><span>中文</span><span>繁體中文</span><span>日本語</span><span>English</span><span>Français</span><span>Deutsch</span><span>Español</span><span>Italiano</span><span>Português</span><span>Nederlands</span><span>Svenska</span><span>Norsk</span><span>Dansk</span><span>Polski</span><span>Čeština</span><span>Română</span><span>Türkçe</span><span>Tiếng Việt</span><span>Bahasa Indonesia</span><span>中文</span><span>繁體中文</span><span>日本語</span><span>English</span><span>Français</span><span>Deutsch</span><span>Español</span><span>Italiano</span><span>Português</span><span>Nederlands</span><span>Svenska</span><span>Norsk</span><span>Dansk</span><span>Polski</span><span>Čeština</span><span>Română</span><span>Türkçe</span><span>Tiếng Việt</span><span>Bahasa Indonesia</span></div>
+      <div class="marquee" aria-hidden="true"><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span></div>
+      <div class="wrap lang-note">
+        <div class="rise"><h3>Fifty languages, built in</h3><p>Simplified and Traditional Chinese, English, Japanese and 46 Latin-script languages, read by one model that ships inside the app.</p></div>
+        <div class="rise" style="--d:.08s"><h3>Six more scripts, one click away</h3><p>Korean, Arabic, Cyrillic, Thai, Greek and Devanagari install from the model manager.</p></div>
+      </div>
+    </section>
+
+    <section class="pad privacy" id="privacy">
+      <div class="wrap privacy-grid">
+        <div>
+          <p class="eyebrow rise">Privacy</p>
+          <h2 class="h2 rise">It stays on your Mac.</h2>
+          <ul class="promise">
+            <li class="rise"><b>Recognition runs locally</b>Layout analysis, both readers, translation and search all happen on your Mac. Your files and text are never uploaded.</li>
+            <li class="rise"><b>No accounts, analytics or tracking</b>There is nothing to sign in to, and nothing is watching what you do. This website has no trackers either.</li>
+            <li class="rise"><b>Online only when it has to be</b>For models you choose to download, Apple’s translation language packs, and the update check, which you can turn off. Never with your files or text.</li>
+          </ul>
+          <a class="text-link rise" href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">Read the privacy statement →</a>
+        </div>
+        <canvas id="lock" class="rise" role="img" aria-label="A padlock made of points of light."></canvas>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap faq">
+        <h2 class="rise">Good questions</h2>
+        <div class="rise"><details><summary>Is it really free?</summary><p>Yes. OCRFlow is open source under the MIT license, with no account, subscription or limit.</p></details><details><summary>Which Macs does it run on?</summary><p>macOS 15 Sequoia or later, on Apple silicon or Intel. Releases are signed and notarized by Apple, and update themselves.</p></details><details><summary>Why is there an optional 1 GB download?</summary><p>Text in 50 languages works straight away, with the 69 MB app. The layout model and close reading, which handle tables, formulas and complex layouts, are about 1 GB, so you choose whether to add them.</p></details><details><summary>Why does it ask for permissions?</summary><p>Screenshots need macOS’s Screen Recording permission. Record Actions, Queue Screenshots and Auto Scroll also need Accessibility, to follow and repeat your clicks and keys. It only watches while you record or capture.</p></details><details><summary>Does it record passwords?</summary><p>Text typed during a recording is saved as typed, in the recording on your Mac, so avoid typing passwords while recording. Nothing is watched outside a recording or capture.</p></details><details><summary>Is it in the Mac App Store?</summary><p>No. Download it here. It installs like any other Mac app and keeps itself up to date.</p></details></div>
+      </div>
+    </section>
+
+    <section class="pad closing" id="download">
+      <div class="wrap">
+        <svg class="mark rise" viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="ip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="if" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#ip)"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#if)"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg>
+        <h2 class="rise">Your screen is full of words.</h2>
+        <p class="lede rise" style="margin-inline:auto">Now they can all be yours.</p>
+        <div class="cta rise">
+          <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Download for Mac</a>
+          <a class="btn btn-ghost" href="https://github.com/yb311/OCRFlow">GitHub</a>
+        </div>
+        <p class="fine rise">Version 1.3.0 · 69 MB · macOS 15 or later</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>OCRFlow · MIT License</span>
+      <nav aria-label="Links">
+        <a href="https://github.com/yb311/OCRFlow">GitHub</a>
+        <a href="https://github.com/yb311/OCRFlow/releases">Releases</a>
+        <a href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">Privacy</a>
+        <a href="https://github.com/yb311/OCRFlow/issues">Report a problem</a>
+        <a href="zh.html" lang="zh-Hans">简体中文</a>
+      </nav>
+    </div>
+  </footer>
+  <script src="site.js" type="module"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 A native macOS app that turns files and anything on your screen into text you can search and edit. Read images and PDFs in batches, capture from any app, or show it once how to turn a page and let it assemble the whole document. Recognition runs on your Mac with Apple's Vision framework, PaddleOCR PP-OCRv6 or the PaddleOCR-VL-1.6 model, so nothing is uploaded.
 
-**[Website](https://yb311.github.io/OCRFlow/)** · **[Download](https://github.com/yb311/OCRFlow/releases/latest)**
+**[Website](https://yb311.github.io/OCRFlow/)** · **[Watch the film](https://yb311.github.io/OCRFlow/#film)** · **[Download](https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg)**
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2015%2B-blue)
 ![Swift](https://img.shields.io/badge/swift-6-orange)

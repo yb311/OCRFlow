@@ -1,0 +1,14 @@
+{
+  "name": "ocrflow-film",
+  "private": true,
+  "type": "module",
+  "description": "Renders the OCRFlow film frame by frame: nothing is recorded, everything is generated.",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "puppeteer-core": "^24.0.0",
+    "three": "^0.170.0"
+  }
+}

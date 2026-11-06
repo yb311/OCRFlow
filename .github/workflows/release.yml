@@ -153,6 +153,10 @@ jobs:
           # it validates offline the same way the disk image does.
           ditto -c -k --keepParent build/export/OCRFlow.app "build/OCRFlow-$version.zip"
 
+          # The same disk image under a name that never changes, for the website's
+          # download button: releases/latest/download/OCRFlow.dmg.
+          cp "build/OCRFlow-$version.dmg" build/OCRFlow.dmg
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -165,7 +169,8 @@ jobs:
             --title "OCRFlow $version" \
             "${notes[@]}" \
             "build/OCRFlow-$version.dmg" \
-            "build/OCRFlow-$version.zip"
+            "build/OCRFlow-$version.zip" \
+            build/OCRFlow.dmg
 
       - name: Publish the appcast
         env:

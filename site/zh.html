@@ -2,59 +2,237 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OCRFlow</title>
-  <meta name="description" content="在你的 Mac 上，把文件和屏幕上的任何内容变成可以搜索、编辑的文字。不上传任何内容。">
-  <link rel="alternate" hreflang="en" href="index.html">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>OCRFlow — 屏幕上的一切，都是文字</title>
+  <meta name="description" content="OCRFlow 把扫描件、PDF 和屏幕上的任何内容变成可以搜索、编辑的文字。Mac 版免费。识别全部在你的 Mac 上完成，不上传任何内容。">
+  <meta name="theme-color" content="#030a09">
+  <link rel="canonical" href="https://yb311.github.io/OCRFlow/zh.html">
+  <link rel="alternate" hreflang="en" href="https://yb311.github.io/OCRFlow/">
+  <link rel="alternate" hreflang="zh-Hans" href="https://yb311.github.io/OCRFlow/zh.html">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="media/icon-180.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OCRFlow — 屏幕上的一切，都是文字">
+  <meta property="og:description" content="OCRFlow 把扫描件、PDF 和屏幕上的任何内容变成可以搜索、编辑的文字。Mac 版免费。识别全部在你的 Mac 上完成，不上传任何内容。">
+  <meta property="og:image" content="https://yb311.github.io/OCRFlow/media/share.jpg">
+  <meta property="og:url" content="https://yb311.github.io/OCRFlow/zh.html">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <span class="name">OCRFlow</span>
-      <a href="index.html" lang="en">English</a>
-    </header>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="zh.html#top" aria-label="OCRFlow"><svg  viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="ip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="if" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#ip)"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#if)"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg><span>OCRFlow</span></a>
+      <nav class="nav-links" aria-label="主导航">
+        <a href="#film">短片</a>
+        <a href="#read">识别</a>
+        <a href="#capture">截图</a>
+        <a href="#record">录制</a>
+        <a href="#privacy">隐私</a>
+      </nav>
+      <div class="nav-end">
+        <a href="./" lang="en">English</a>
+        <a class="btn btn-primary btn-small" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg">下载</a>
+      </div>
+    </div>
+  </header>
 
-    <main>
-      <section class="hero">
-        <h1>把屏幕上的任何内容变成文字。</h1>
-        <p class="lead">批量识别扫描件和 PDF，在任何应用里截图，或者演示一次翻页，让 OCRFlow 替你整理出完整的文档。</p>
-        <a class="button" href="https://github.com/yb311/OCRFlow/releases/latest">下载 Mac 版</a>
-        <p class="fine">免费开源 · macOS 15 或更高版本 · 支持 Apple 芯片和 Intel · 已签名并通过 Apple 公证</p>
-      </section>
-
-      <img class="shot main" src="screenshots/main-zh.png" alt="OCRFlow 窗口：一侧是标好区块编号的报告，另一侧是从中识别出的标题、段落和表格。" width="2424" height="1624">
-
-      <section class="features">
-        <div>
-          <h2>整个文件夹一起识别</h2>
-          <p>拖入图片、PDF 或文件夹。下载可选模型后，表格、公式和分栏都会保留结构。可以导出 Markdown、纯文本、可搜索 PDF 或 Excel。</p>
+  <main id="top">
+    <section class="hero">
+      <video class="hero-video" data-loop muted loop playsinline preload="none" poster="media/hero.jpg" data-src="media/hero.mp4" aria-hidden="true"></video>
+      <div class="hero-shade"></div>
+      <div class="wrap">
+        <h1 class="rise">屏幕上的一切，<br>都是<em>文字。</em></h1>
+        <p class="lede rise" style="--d:.1s">成批识别扫描件和 PDF，在任何应用里截图，或者演示一次翻页，让 OCRFlow 替你整理出完整的文档。</p>
+        <div class="cta rise" style="--d:.2s">
+          <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>下载 Mac 版</a>
+          <a class="btn btn-ghost" href="#film"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>观看短片</a>
         </div>
-        <div>
-          <h2>在任何应用里截图</h2>
-          <p>按 ⌥⇧⌘2，选择区域或窗口，然后识别、保存或拷贝。长截图可以手动或自动滚动，边滚边拼接。</p>
-        </div>
-        <div>
-          <h2>演示一次就够了</h2>
-          <p>截一张幻灯片，再按 →。OCRFlow 会重复你的步骤，直到屏幕不再变化，然后把所有页面合成一份文档。</p>
-        </div>
-      </section>
+        <p class="fine rise" style="--d:.3s">免费开源 · macOS 15 或更高版本 · 支持 Apple 芯片和 Intel · 已签名并通过 Apple 公证</p>
+      </div>
+    </section>
 
-      <section class="privacy">
-        <div>
-          <h2>所有数据都留在你的 Mac 上</h2>
-          <p>识别在本机完成。没有账号，没有统计分析，没有追踪，你的文件和文字从不上传。</p>
-          <a href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">阅读隐私说明</a>
-        </div>
-        <img class="shot welcome" src="screenshots/welcome-zh.png" alt="OCRFlow 欢迎窗口：列出应用的功能、需要的权限和可选模型。" width="1070" height="1040">
-      </section>
-    </main>
+    <div class="window-stage">
+      <img class="window-shot" src="screenshots/main-zh.png" width="2424" height="1624" alt="OCRFlow 窗口：一侧是标好区块编号的报告，另一侧是从中识别出的标题、段落和表格。">
+      <p class="window-cap">这就是应用本身，正在识别一份虚构的报告。</p>
+    </div>
 
-    <footer>
-      <a href="https://github.com/yb311/OCRFlow">GitHub</a>
-      <a href="https://github.com/yb311/OCRFlow/issues">报告问题</a>
-      <span>MIT 许可证</span>
-    </footer>
-  </div>
+    <section class="pad" id="film">
+      <div class="wrap">
+        <div class="film-head">
+          <p class="eyebrow rise">短片</p>
+          <h2 class="h2 rise">48 秒，一道光。</h2>
+        </div>
+        <div class="player rise">
+          <video preload="none" playsinline poster="media/poster-zh.jpg" src="media/film-zh.mp4"></video>
+          <button class="play" aria-label="有声播放"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>有声播放</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="scan" id="read" aria-label="识别">
+      <div class="scan-stage">
+        <div class="wrap">
+          <div class="scan-grid">
+            <div class="scan-steps">
+              <div class="scan-step on"><p class="eyebrow">识别</p><h2>一页文档，不只是几行字。</h2><p>继续往下滚动。这一页正随着你的滚动被读取。</p></div>
+              <div class="scan-step"><p class="eyebrow">版面</p><h2>先看懂结构。</h2><p>标题、正文、表格和公式各成一块，并按阅读顺序排好。</p></div>
+              <div class="scan-step"><p class="eyebrow">结果</p><h2>每一块，都是能直接用的文字。</h2><p>表格还是表格，公式还是公式。校对、修改，然后导出。</p></div>
+              <div class="scan-progress" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+            </div>
+            <div class="page" role="img" aria-label="一道光读过一份报告，报告变成结构化的文字。">
+              <div class="sheet sheet-paper" aria-hidden="true"><p class="doc-title">社区图书馆年度报告</p><p class="doc-p">阅览室全年都很热闹。每个季度的到馆人次都在增长，新开放的夜间时段吸引了许多首次办证的读者。志愿者把本地报纸档案全部数字化。</p><p class="doc-h">各季度到馆人次</p><table class="doc-table"><tr><th>季度</th><th>到馆人次</th><th>新增读者</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table><p class="doc-f">(23,160 − 18,240) ÷ 18,240 = 27%</p><p class="doc-h">明年计划</p><p class="doc-p">图书馆将延长周末开放时间，增设两间自习室，并继续扫描老照片馆藏。</p></div>
+              <div class="sheet sheet-read" aria-hidden="true"><div class="blk" data-n="1"><p class="doc-title">社区图书馆年度报告</p></div><div class="blk" data-n="2"><p class="doc-p">阅览室全年都很热闹。每个季度的到馆人次都在增长，新开放的夜间时段吸引了许多首次办证的读者。志愿者把本地报纸档案全部数字化。</p></div><div class="blk" data-n="3"><p class="doc-h">各季度到馆人次</p></div><div class="blk" data-n="4"><table class="doc-table"><tr><th>季度</th><th>到馆人次</th><th>新增读者</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table></div><div class="blk" data-n="5"><p class="doc-f">(23,160 − 18,240) ÷ 18,240 = 27%</p></div><div class="blk" data-n="6"><p class="doc-h">明年计划</p></div><div class="blk" data-n="7"><p class="doc-p">图书馆将延长周末开放时间，增设两间自习室，并继续扫描老照片馆藏。</p></div></div>
+              <div class="scan-line" aria-hidden="true"></div>
+            </div>
+            <div class="results"><div class="result"><small><b>1</b>标题</small><h3>社区图书馆年度报告</h3></div><div class="result"><small><b>2</b>正文</small><p>阅览室全年都很热闹。每个季度的到馆人次都在增长，新开放的夜间时段吸引了许多首次办证的读者。志愿者把本地报纸档案全部数字化。</p></div><div class="result"><small><b>3</b>标题</small><h3>各季度到馆人次</h3></div><div class="result"><small><b>4</b>表格</small><table><tr><th>季度</th><th>到馆人次</th><th>新增读者</th></tr><tr><td>Q1</td><td>18,240</td><td>312</td></tr><tr><td>Q2</td><td>19,875</td><td>401</td></tr><tr><td>Q3</td><td>21,330</td><td>458</td></tr><tr><td>Q4</td><td>23,160</td><td>526</td></tr></table></div><div class="result"><small><b>5</b>公式</small><code>(23,160 − 18,240) ÷ 18,240 = 27%</code></div><div class="result"><small><b>6</b>标题</small><h3>明年计划</h3></div><div class="result"><small><b>7</b>正文</small><p>图书馆将延长周末开放时间，增设两间自习室，并继续扫描老照片馆藏。</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="capture">
+      <div class="wrap">
+        <p class="eyebrow rise">截图</p>
+        <h2 class="h2 rise">从任何地方取得文字。</h2>
+        <p class="lede rise">一套为识别而做的截图引擎。OCRFlow 不会打扰你：它从不跳到前台，你截的窗口始终保持原样。</p>
+        <div class="bento">
+          <article class="card wide span-6 rise">
+            <div class="card-text">
+              <h3>选中，就能读。</h3>
+              <p>在任何应用里按下快捷键，拖出区域或点选窗口，然后在旁边的操作栏里选择：识别、长截图、保存或拷贝。</p>
+              <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/capture-zh.jpg" data-src="media/capture-zh.mp4" aria-label="在屏幕上选中一段文章，读出其中的文字。"></video></div>
+          </article>
+          <article class="card wide span-6 rise" style="--d:.05s">
+            <div class="card-text">
+              <h3>长截图</h3>
+              <p>手动滚动，或者交给自动滚动。拼接结果在页面旁边实时变长，并按页识别，小字也能保持清晰。</p>
+            </div>
+            <div class="card-media"><video data-loop muted loop playsinline preload="none" poster="media/ribbon-zh.jpg" data-src="media/ribbon-zh.mp4" aria-label="一个长页面拼接成连续的长条。"></video></div>
+          </article>
+          <article class="card span-3 rise">
+            <div class="card-text"><h3>队列截图</h3><p>一次又一次拖出区域，中间不用按快捷键，照常翻页就行。按 Esc 结束。</p></div>
+            <div class="queue-demo" aria-hidden="true"><div class="lines"></div>
+              <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
+              <i style="left:40%;top:44%;width:52%;height:20%;--s:1.5s"></i>
+              <i style="left:10%;top:72%;width:38%;height:18%;--s:3s"></i>
+            </div>
+          </article>
+          <article class="card span-3 rise" style="--d:.06s">
+            <div class="card-text"><h3>随时一键可达</h3><p>一个小按钮浮在所有窗口之上。点按即可截图，鼠标移上去还会展开队列截图和录制操作。也可以从菜单栏开始，主窗口关着也行。</p></div>
+            <div class="float-demo" aria-hidden="true">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6.5"/></svg></span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" id="record" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">录制操作</p>
+        <h2 class="h2 rise">演示一次，剩下的交给它。</h2>
+        <p class="lede rise">点按、按键、输入、滚动、截图，你做过的都能重复。它不针对任何特定的应用或网站，所以哪里都能用。</p>
+        <div class="record-film rise"><video data-loop muted loop playsinline preload="none" poster="media/deck-zh.jpg" data-src="media/deck-zh.mp4" aria-label="截下一张幻灯片，翻到下一张，一遍又一遍，直到整份幻灯片都截完。"></video></div>
+        <div class="record-steps">
+          <div class="rise"><span>01</span><h3>做一遍</h3><p>比如截一张幻灯片，再按 →。之后每一步都可以修改。</p></div>
+          <div class="rise" style="--d:.08s"><span>02</span><h3>它来重复</h3><p>按设定的次数，或者一直到屏幕不再变化，还可以依次处理一组网址。</p></div>
+          <div class="rise" style="--d:.16s"><span>03</span><h3>拿到结果</h3><p>一份文档、一张长图或多张单独的图片，结束后自动识别。也可以只保存。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap">
+        <p class="eyebrow rise">智能分层</p>
+        <h2 class="h2 rise">页面的每个部分，都交给合适的读取方式。</h2>
+        <p class="lede rise">简单的地方快，复杂的地方细。你不需要自己选。</p>
+        <div class="route rise">
+          <div class="route-from"><h3>每一页</h3><p>自带可靠文字的 PDF 直接使用原有文字。其余页面由版面模型划分成多个区域。</p></div>
+          <div class="route-mid" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M11 6l6 6-6 6"/></svg></div>
+          <div class="route-to">
+            <div class="reader"><div><b>快速读取</b><small>PP-OCRv6</small></div><span>正文和普通文字，读得很快。内置在应用里，一开始就能离线使用。</span></div>
+            <div class="reader"><div><b>精读</b><small>PaddleOCR-VL-1.6</small></div><span>表格、公式、图表和印章，以及快速读取拿不准的区域。</span></div>
+            <div class="reader"><div><b>Apple Vision</b><small>也可以选用</small></div><span>想用时可以选它，也可以单独使用上面任一种。</span></div>
+          </div>
+        </div>
+        <div class="tiles" style="margin-top:34px">
+          <article class="tile rise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg><h3>标出值得复核的地方</h3><p>每个被标记的区域都写明原因：置信度低、输出被截断、两种读取结果不一致。你的修改不会在未询问时被覆盖。</p></article>
+          <article class="tile rise" style="--d:.06s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><h3>搜索读过的一切</h3><p>每份文档都留在历史记录里，可以按任意词句搜索，包括中文。</p>
+            <div class="search-demo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span data-typed="六十多年来的报道|港口和旧市集广场|年度报告"><span class="caret"></span></span></div>
+          </article>
+          <article class="tile rise" style="--d:.12s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg><h3>按你的方式导出</h3><p>合并成一个文件，或者按来源分开并保留文件夹结构。</p>
+            <div class="exports"><span>Markdown</span><span>纯文本</span><span>JSON</span><span>可搜索 PDF</span><span>Excel</span></div>
+          </article>
+          <article class="tile rise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="13" height="13" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg><h3>整个文件夹一起来</h3><p>拖入图片、PDF 或文件夹。退出后列表和结果都还在，同样的内容不会读第二遍。</p></article>
+          <article class="tile rise" style="--d:.06s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5L12 11l2.5 2.5"/></svg><h3>会自己读取的文件夹</h3><p>放进监视文件夹的文件，复制完成后会被自动识别，结果也会替你导出。</p></article>
+          <article class="tile rise" style="--d:.12s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M8.5 4v2M11 6c-.8 3.6-3.2 6.3-6.5 7.8M6 9c1 2 2.8 3.6 5 4.6"/><path d="M13 20l3.8-9L21 20M14.3 17h5.2"/></svg><h3>在设备上翻译</h3><p>可以用 Apple 的翻译框架，在你的 Mac 上翻译识别结果。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="languages" aria-label="语言">
+      <div class="marquee" aria-hidden="true"><span>中文</span><span>繁體中文</span><span>日本語</span><span>English</span><span>Français</span><span>Deutsch</span><span>Español</span><span>Italiano</span><span>Português</span><span>Nederlands</span><span>Svenska</span><span>Norsk</span><span>Dansk</span><span>Polski</span><span>Čeština</span><span>Română</span><span>Türkçe</span><span>Tiếng Việt</span><span>Bahasa Indonesia</span><span>中文</span><span>繁體中文</span><span>日本語</span><span>English</span><span>Français</span><span>Deutsch</span><span>Español</span><span>Italiano</span><span>Português</span><span>Nederlands</span><span>Svenska</span><span>Norsk</span><span>Dansk</span><span>Polski</span><span>Čeština</span><span>Română</span><span>Türkçe</span><span>Tiếng Việt</span><span>Bahasa Indonesia</span></div>
+      <div class="marquee" aria-hidden="true"><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span><span>한국어</span><span>العربية</span><span>Русский</span><span>ไทย</span><span>Ελληνικά</span><span>हिन्दी</span></div>
+      <div class="wrap lang-note">
+        <div class="rise"><h3>内置 50 种语言</h3><p>简体和繁体中文、英文、日文，以及 46 种拉丁字母语言，由应用内置的同一个模型读取。</p></div>
+        <div class="rise" style="--d:.08s"><h3>另外 6 种文字，一键安装</h3><p>韩文、阿拉伯文、西里尔文、泰文、希腊文和德瓦那加里文，可以在模型管理器里安装。</p></div>
+      </div>
+    </section>
+
+    <section class="pad privacy" id="privacy">
+      <div class="wrap privacy-grid">
+        <div>
+          <p class="eyebrow rise">隐私</p>
+          <h2 class="h2 rise">所有数据都留在你的 Mac 上。</h2>
+          <ul class="promise">
+            <li class="rise"><b>识别在本机完成</b>版面分析、两种读取方式、翻译和搜索都在你的 Mac 上进行。你的文件和文字从不上传。</li>
+            <li class="rise"><b>没有账号，没有统计，没有追踪</b>不需要登录，也没有东西在观察你的操作。这个网站同样没有追踪器。</li>
+            <li class="rise"><b>只在必要时联网</b>下载你选择的模型、Apple 的翻译语言包，以及检查更新（可以关闭）。从不发送你的文件或文字。</li>
+          </ul>
+          <a class="text-link rise" href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">阅读隐私说明 →</a>
+        </div>
+        <canvas id="lock" class="rise" role="img" aria-label="由光点组成的一把锁。"></canvas>
+      </div>
+    </section>
+
+    <section class="pad" style="padding-top:0">
+      <div class="wrap faq">
+        <h2 class="rise">常见问题</h2>
+        <div class="rise"><details><summary>真的免费吗？</summary><p>是的。OCRFlow 以 MIT 许可证开源，没有账号、订阅或使用限制。</p></details><details><summary>支持哪些 Mac？</summary><p>macOS 15 Sequoia 或更高版本，支持 Apple 芯片和 Intel。每个版本都经过签名和 Apple 公证，并且可以自动更新。</p></details><details><summary>为什么有一个约 1 GB 的可选下载？</summary><p>69 MB 的应用本身就能识别 50 种语言的文字。处理表格、公式和复杂版面需要版面模型和精读模型，约 1 GB，要不要下载由你决定。</p></details><details><summary>为什么需要这些权限？</summary><p>截图需要 macOS 的“录屏”权限。录制操作、队列截图和自动滚动还需要“辅助功能”权限，用来跟随和重复你的点按和按键。只有在录制或截图期间才会读取你的操作。</p></details><details><summary>会录下密码吗？</summary><p>录制时输入的文字会原样保存在你 Mac 上的录制内容里，所以录制时请不要输入密码。录制和截图之外，不会读取你的任何操作。</p></details><details><summary>Mac App Store 里有吗？</summary><p>没有。请在这里下载。它和其他 Mac 应用一样安装，并且会自动更新。</p></details></div>
+      </div>
+    </section>
+
+    <section class="pad closing" id="download">
+      <div class="wrap">
+        <svg class="mark rise" viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="ip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="if" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#ip)"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#if)"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg>
+        <h2 class="rise">你的屏幕上全是文字。</h2>
+        <p class="lede rise" style="margin-inline:auto">现在，它们都可以为你所用。</p>
+        <div class="cta rise">
+          <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>下载 Mac 版</a>
+          <a class="btn btn-ghost" href="https://github.com/yb311/OCRFlow">GitHub</a>
+        </div>
+        <p class="fine rise">版本 1.3.0 · 69 MB · macOS 15 或更高版本</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>OCRFlow · MIT 许可证</span>
+      <nav aria-label="链接">
+        <a href="https://github.com/yb311/OCRFlow">GitHub</a>
+        <a href="https://github.com/yb311/OCRFlow/releases">版本发布</a>
+        <a href="https://github.com/yb311/OCRFlow/blob/main/docs/PRIVACY.md">隐私</a>
+        <a href="https://github.com/yb311/OCRFlow/issues">报告问题</a>
+        <a href="./" lang="en">English</a>
+      </nav>
+    </div>
+  </footer>
+  <script src="site.js" type="module"></script>
 </body>
 </html>

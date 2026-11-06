@@ -65,8 +65,9 @@ The workflow then:
 3. notarises the app with Apple and staples the ticket, so it opens offline
    without a Gatekeeper warning;
 4. packages `OCRFlow-<version>.dmg` (notarised and stapled in its own right)
-   and `OCRFlow-<version>.zip`;
-5. publishes a GitHub Release with those notes and both files;
+   and `OCRFlow-<version>.zip`, plus a copy of the disk image named
+   `OCRFlow.dmg`, which the website's download button links to;
+5. publishes a GitHub Release with those notes and those files;
 6. signs the zip with the Sparkle key and uploads `appcast.xml`.
 
 Re-running a tag needs the existing release deleted first, since the workflow
