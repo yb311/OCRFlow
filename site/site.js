@@ -1,5 +1,5 @@
 // The site's only script: scroll-driven reading, loops that play when seen, the
-// film, and the lock. No third parties, nothing stored, nothing sent.
+// videos, and the lock. No third parties, nothing stored, nothing sent.
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const seg = (x, a, b) => clamp((x - a) / (b - a));
@@ -23,22 +23,31 @@ const loops = new IntersectionObserver((entries) => {
 }, { rootMargin: '200px' });
 $$('video[data-loop]').forEach((v) => loops.observe(v));
 
-// The film. --------------------------------------------------------------------
-const player = $('.player');
-if (player) {
+// The videos: one plays at a time, and stops once it is out of sight. ----------
+const players = $$('.player');
+const start = (player, at) => {
   const video = $('video', player);
-  $('.play', player).addEventListener('click', () => {
-    player.classList.add('playing');
-    video.controls = true;
-    video.muted = false;
-    video.play();
-  });
+  players.forEach((other) => { if (other !== player) $('video', other).pause(); });
+  player.classList.add('playing');
+  video.controls = true;
+  if (at !== undefined) video.currentTime = at;
+  video.play();
+};
+for (const player of players) {
+  const video = $('video', player);
+  $('.play', player).addEventListener('click', () => start(player));
+  video.addEventListener('play', () => { player.classList.add('playing'); video.controls = true; });
   new IntersectionObserver(([e]) => { if (!e.isIntersecting && !video.paused) video.pause(); }, { threshold: 0.1 }).observe(player);
 }
+// "Watch this in the video" goes to that part of the guide.
+const guide = $('#guide-player');
+$$('[data-seek]').forEach((button) => button.addEventListener('click', () => {
+  guide.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+  start(guide, Number(button.dataset.seek));
+}));
 
 // Scroll. ------------------------------------------------------------------------
 const nav = $('.nav');
-const shot = $('.window-shot');
 const scan = $('.scan');
 const page = scan && $('.page', scan);
 const blocks = page ? $$('.sheet-read .blk', page) : [];
@@ -63,10 +72,6 @@ let queued = false;
 function frame() {
   queued = false;
   nav.classList.toggle('solid', scrollY > 30);
-  if (shot && !reduced && innerWidth > 640) {
-    const r = shot.getBoundingClientRect();
-    shot.style.setProperty('--tilt', seg(r.top, innerHeight * 0.14, innerHeight * 0.9).toFixed(3));
-  }
   if (scan && pinned()) {
     const r = scan.getBoundingClientRect();
     reading(clamp(-r.top / (r.height - innerHeight)));
