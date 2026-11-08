@@ -26,7 +26,6 @@
       <nav class="nav-links" aria-label="{{nav_label}}">
         <a href="#jobs">{{nav_jobs}}</a>
         <a href="#files">{{nav_how}}</a>
-        <a href="#videos">{{nav_videos}}</a>
         <a href="#privacy">{{nav_privacy}}</a>
         <a href="#faq">{{nav_faq}}</a>
       </nav>
@@ -46,7 +45,7 @@
         <p class="lede rise" style="--d:.1s">{{hero_lede}}</p>
         <div class="cta rise" style="--d:.2s">
           <a class="btn btn-primary" href="{{download}}">{{apple}}{{download_long}}</a>
-          <a class="btn btn-ghost" href="#guide">{{playicon}}{{watch}}</a>
+          <a class="btn btn-ghost" href="#jobs">{{watch}}</a>
         </div>
         <p class="fine rise" style="--d:.3s">{{fine}}</p>
       </div>
@@ -101,7 +100,6 @@
             <p class="how-lede">{{cap_lede}}</p>
             <ol class="steps">{{cap_steps}}</ol>
             <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
-            {{link_capture}}
           </div>
           <div class="demo demo-capture" aria-hidden="true">
             <div class="d-lines"></div>
@@ -116,7 +114,6 @@
             <h2>{{long_title}}</h2>
             <p class="how-lede">{{long_lede}}</p>
             <ol class="steps">{{long_steps}}</ol>
-            {{link_long}}
           </div>
           <div class="demo demo-long" aria-hidden="true">
             <div class="d-view"><div class="d-scroll"></div></div>
@@ -130,7 +127,6 @@
             <h2>{{queue_title}}</h2>
             <p class="how-lede">{{queue_lede}}</p>
             <ol class="steps">{{queue_steps}}</ol>
-            {{link_queue}}
           </div>
           <div class="demo demo-queue queue-demo" aria-hidden="true"><div class="lines"></div>
             <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
@@ -145,7 +141,6 @@
             <h2>{{rec_title}}</h2>
             <p class="how-lede">{{rec_lede}}</p>
             <ol class="steps">{{rec_steps}}</ol>
-            {{link_record}}
           </div>
           <div class="demo demo-record" aria-hidden="true">
             <small>{{rec_d_steps}}</small>
@@ -201,31 +196,32 @@
       </div>
     </section>
 
-    <section class="pad videos" id="videos" style="padding-top:0">
-      <div class="wrap">
-        <h2 class="h2 rise">{{videos_title}}</h2>
-        <div class="video-block rise" id="guide">
-          <div class="video-head"><h3>{{guide_title}}</h3><p>{{guide_text}}</p></div>
-          <div class="player" id="guide-player">
-            <video preload="none" playsinline poster="media/tutorial-{{code}}.jpg" src="media/tutorial-{{code}}.mp4"></video>
-            <button class="play" aria-label="{{guide_play}}"><span>{{playfill}}{{guide_play}}</span></button>
-          </div>
-          <div class="chapters">{{chapters}}</div>
-        </div>
-        <div class="video-block film rise">
-          <div class="video-head"><h3>{{film_title}}</h3><p>{{film_text}}</p></div>
-          <div class="player">
-            <video preload="none" playsinline poster="media/poster-{{code}}.jpg" src="media/film-{{code}}.mp4"></video>
-            <button class="play" aria-label="{{film_play}}"><span>{{playfill}}{{film_play}}</span></button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section class="pad" id="faq" style="padding-top:0">
       <div class="wrap faq">
         <h2 class="rise">{{faq_title}}</h2>
         <div class="rise">{{faq}}</div>
+      </div>
+    </section>
+
+    <section class="pad videos" id="videos" style="padding-top:0">
+      <div class="wrap">
+        <h2 class="h2 rise">{{videos_title}}</h2>
+        <div class="video-pair">
+          <figure class="video-block rise">
+            <div class="player">
+              <video preload="none" playsinline poster="media/tutorial-{{code}}.jpg" src="media/tutorial-{{code}}.mp4"></video>
+              <button class="play" aria-label="{{guide_play}}"><span>{{playfill}}<i>{{guide_play}}</i></span></button>
+            </div>
+            <figcaption><b>{{guide_title}}</b>{{guide_text}}</figcaption>
+          </figure>
+          <figure class="video-block rise" style="--d:.08s">
+            <div class="player">
+              <video preload="none" playsinline poster="media/poster-{{code}}.jpg" src="media/film-{{code}}.mp4"></video>
+              <button class="play" aria-label="{{film_play}}"><span>{{playfill}}<i>{{film_play}}</i></span></button>
+            </div>
+            <figcaption><b>{{film_title}}</b>{{film_text}}</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

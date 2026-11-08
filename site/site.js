@@ -25,13 +25,12 @@ $$('video[data-loop]').forEach((v) => loops.observe(v));
 
 // The videos: one plays at a time, and stops once it is out of sight. ----------
 const players = $$('.player');
-const start = (player, at) => {
+const start = (player) => {
   const video = $('video', player);
   players.forEach((other) => { if (other !== player) $('video', other).pause(); });
   player.classList.add('playing');
   video.controls = true;
-  if (at !== undefined) video.currentTime = at;
-  video.play();
+  video.play().catch(() => {});
 };
 for (const player of players) {
   const video = $('video', player);
@@ -39,12 +38,6 @@ for (const player of players) {
   video.addEventListener('play', () => { player.classList.add('playing'); video.controls = true; });
   new IntersectionObserver(([e]) => { if (!e.isIntersecting && !video.paused) video.pause(); }, { threshold: 0.1 }).observe(player);
 }
-// "Watch this in the video" goes to that part of the guide.
-const guide = $('#guide-player');
-$$('[data-seek]').forEach((button) => button.addEventListener('click', () => {
-  guide.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-  start(guide, Number(button.dataset.seek));
-}));
 
 // Scroll. ------------------------------------------------------------------------
 const nav = $('.nav');

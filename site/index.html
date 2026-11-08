@@ -26,7 +26,6 @@
       <nav class="nav-links" aria-label="Main">
         <a href="#jobs">What it does</a>
         <a href="#files">How to use it</a>
-        <a href="#videos">Videos</a>
         <a href="#privacy">Privacy</a>
         <a href="#faq">FAQ</a>
       </nav>
@@ -46,7 +45,7 @@
         <p class="lede rise" style="--d:.1s">OCRFlow is a text recognition (OCR) app for Mac. Free, runs entirely on your Mac, nothing uploaded.</p>
         <div class="cta rise" style="--d:.2s">
           <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Download for Mac</a>
-          <a class="btn btn-ghost" href="#guide"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Watch how it works</a>
+          <a class="btn btn-ghost" href="#jobs">See what it does</a>
         </div>
         <p class="fine rise" style="--d:.3s">macOS 15 or later · Apple silicon and Intel · Open source</p>
       </div>
@@ -101,7 +100,6 @@
             <p class="how-lede">For text you cannot select: in an image, a video, a locked PDF, an app.</p>
             <ol class="steps"><li><span>Press <b>⌥⇧⌘2</b> in any app, or start from the menu bar or the floating button.</span></li><li><span>Drag out an area, or click a window.</span></li><li><span>Click <b>OCR</b> in the bar beside it to read the text. Or save the picture, or copy it.</span></li></ol>
             <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
-            <button class="text-link" data-seek="36">Watch this in the video →</button>
           </div>
           <div class="demo demo-capture" aria-hidden="true">
             <div class="d-lines"></div>
@@ -116,7 +114,6 @@
             <h2>Capture a page longer than your screen</h2>
             <p class="how-lede">The pieces are joined into one picture, and you can see it grow as you go.</p>
             <ol class="steps"><li><span>Take a screenshot as above, then click the long screenshot button in the bar.</span></li><li><span>Scroll by hand, or click <b>Auto Scroll</b>. Stop wherever you want it to end.</span></li><li><span>Click <b>OCR</b> to read it, or save or copy the picture.</span></li></ol>
-            <button class="text-link" data-seek="58">Watch this in the video →</button>
           </div>
           <div class="demo demo-long" aria-hidden="true">
             <div class="d-view"><div class="d-scroll"></div></div>
@@ -130,7 +127,6 @@
             <h2>Take many areas in a row</h2>
             <p class="how-lede">For a book or a document you turn yourself. No shortcut between one and the next.</p>
             <ol class="steps"><li><span>Choose <b>Queue Screenshots</b> from the menu bar icon.</span></li><li><span>Drag out an area to take it. Turn the page as usual, then drag again.</span></li><li><span>Press <b>Esc</b> and choose: one document, each on its own, only save, or discard.</span></li></ol>
-            <button class="text-link" data-seek="78">Watch this in the video →</button>
           </div>
           <div class="demo demo-queue queue-demo" aria-hidden="true"><div class="lines"></div>
             <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
@@ -145,7 +141,6 @@
             <h2>Do it once, and it repeats</h2>
             <p class="how-lede">It records your clicks, keys, typing and scrolls, then does them again. Works in any app or website.</p>
             <ol class="steps"><li><span>Choose <b>Record Actions…</b> from the menu bar icon.</span></li><li><span>Do it once. Click <b>Capture Here</b> where you want a screenshot, then turn the page, say. Click <b>Done</b>.</span></li><li><span>Choose how often it runs, and what the captures become. Click <b>Run</b>. Press Esc to stop.</span></li></ol>
-            <button class="text-link" data-seek="98">Watch this in the video →</button>
           </div>
           <div class="demo demo-record" aria-hidden="true">
             <small>Steps</small>
@@ -201,31 +196,32 @@
       </div>
     </section>
 
-    <section class="pad videos" id="videos" style="padding-top:0">
-      <div class="wrap">
-        <h2 class="h2 rise">Videos</h2>
-        <div class="video-block rise" id="guide">
-          <div class="video-head"><h3>How to use OCRFlow</h3><p>Two minutes, no sound. Every feature above, step by step.</p></div>
-          <div class="player" id="guide-player">
-            <video preload="none" playsinline poster="media/tutorial-en.jpg" src="media/tutorial-en.mp4"></video>
-            <button class="play" aria-label="Play the guide"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play the guide</span></button>
-          </div>
-          <div class="chapters"><button data-seek="4">Recognize files</button><button data-seek="36">Screenshot</button><button data-seek="58">Long screenshot</button><button data-seek="78">Queue Screenshots</button><button data-seek="98">Record Actions</button></div>
-        </div>
-        <div class="video-block film rise">
-          <div class="video-head"><h3>The film</h3><p>48 seconds, with music.</p></div>
-          <div class="player">
-            <video preload="none" playsinline poster="media/poster-en.jpg" src="media/film-en.mp4"></video>
-            <button class="play" aria-label="Play with sound"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span></button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section class="pad" id="faq" style="padding-top:0">
       <div class="wrap faq">
         <h2 class="rise">Questions</h2>
         <div class="rise"><details><summary>Is it really free?</summary><p>Yes. OCRFlow is open source under the MIT license, with no account, subscription or limit.</p></details><details><summary>Which Macs does it run on?</summary><p>macOS 15 Sequoia or later, on Apple silicon or Intel. Releases are signed and notarized by Apple, and update themselves.</p></details><details><summary>Why is there an optional 1 GB download?</summary><p>Text in 50 languages works straight away, with the 69 MB app. The layout model and close reading, which handle tables, formulas and complex layouts, are about 1 GB, so you choose whether to add them.</p></details><details><summary>Why does it ask for permissions?</summary><p>Screenshots need macOS’s Screen Recording permission. Record Actions, Queue Screenshots and Auto Scroll also need Accessibility, to follow and repeat your clicks and keys. It only watches while you record or capture.</p></details><details><summary>Does it record passwords?</summary><p>Text typed during a recording is saved as typed, in the recording on your Mac, so avoid typing passwords while recording. Nothing is watched outside a recording or capture.</p></details><details><summary>Is it in the Mac App Store?</summary><p>No. Download it here. It installs like any other Mac app and keeps itself up to date.</p></details></div>
+      </div>
+    </section>
+
+    <section class="pad videos" id="videos" style="padding-top:0">
+      <div class="wrap">
+        <h2 class="h2 rise">Videos</h2>
+        <div class="video-pair">
+          <figure class="video-block rise">
+            <div class="player">
+              <video preload="none" playsinline poster="media/tutorial-en.jpg" src="media/tutorial-en.mp4"></video>
+              <button class="play" aria-label="Play"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg><i>Play</i></span></button>
+            </div>
+            <figcaption><b>How to use OCRFlow</b>Two minutes, no sound. Every feature, step by step.</figcaption>
+          </figure>
+          <figure class="video-block rise" style="--d:.08s">
+            <div class="player">
+              <video preload="none" playsinline poster="media/poster-en.jpg" src="media/film-en.mp4"></video>
+              <button class="play" aria-label="Play with sound"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg><i>Play with sound</i></span></button>
+            </div>
+            <figcaption><b>The film</b>48 seconds, with music.</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

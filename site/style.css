@@ -131,6 +131,7 @@ section { position: relative; }
 }
 .play:hover span { transform: scale(1.06); }
 .play svg { width: 22px; height: 22px; }
+.play i { font-style: normal; }
 .player.playing .play { opacity: 0; pointer-events: none; }
 
 /* The page that gets read -------------------------------------------------- */
@@ -341,14 +342,15 @@ a.job:hover { background: rgba(143, 240, 216, .06); }
 .d-row b { font-weight: 500; font-size: 15px; text-align: right; }
 
 /* Videos -------------------------------------------------------------------- */
-.video-block { margin-top: 44px; scroll-margin-top: 80px; }
-.video-head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 18px; }
-.video-head h3 { font-size: clamp(22px, 2.4vw, 30px); }
-.video-head p { color: var(--muted); }
-.chapters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.chapters button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 14.5px; color: var(--mint); transition: background .2s; }
-.chapters button:hover { background: rgba(143, 240, 216, .1); }
-.film { max-width: 760px; margin-top: 70px; }
+.video-pair { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 3vw, 40px); margin-top: 44px; }
+.video-block { margin: 0; }
+.video-block .player { box-shadow: 0 0 0 1px var(--line-2), 0 30px 80px -30px rgba(21, 184, 153, .35); }
+.video-block figcaption { margin-top: 14px; color: var(--muted); }
+.video-block figcaption b { display: block; color: var(--text); font-size: 18px; font-weight: 600; margin-bottom: 2px; }
+.video-block .play { padding: clamp(12px, 2vw, 22px); }
+.video-block .play span { padding: 16px; gap: 0; }
+.video-block .play svg { width: 20px; height: 20px; transform: translateX(1px); }
+.video-block .play i { display: none; }
 
 /* Smaller screens ------------------------------------------------------------- */
 @media (max-width: 1040px) {
@@ -367,7 +369,7 @@ a.job:hover { background: rgba(143, 240, 216, .06); }
   .how, .privacy-grid, .faq { grid-template-columns: 1fr; }
   .how.flip > :first-child { order: 0; }
   .demo { max-width: 560px; }
-  .tiles, .lang-note { grid-template-columns: 1fr; }
+  .tiles, .lang-note, .video-pair { grid-template-columns: 1fr; }
   #lock { max-width: 320px; order: -1; }
 }
 @media (max-width: 640px) {

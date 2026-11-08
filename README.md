@@ -2,13 +2,21 @@
 
 A native macOS app that turns files and anything on your screen into text you can search and edit. Read images and PDFs in batches, capture from any app, or show it once how to turn a page and let it assemble the whole document. Recognition runs on your Mac with Apple's Vision framework, PaddleOCR PP-OCRv6 or the PaddleOCR-VL-1.6 model, so nothing is uploaded.
 
-**[Website](https://yb311.github.io/OCRFlow/)** · **[Watch the film](https://yb311.github.io/OCRFlow/#film)** · **[Download](https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg)**
+**[Website](https://yb311.github.io/OCRFlow/)** · **[How-to video](#how-to-video)** · **[Download](https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg)**
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2015%2B-blue)
 ![Swift](https://img.shields.io/badge/swift-6-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ![OCRFlow reading a report, with the blocks it found numbered on the page and the text and table read from them beside it](site/screenshots/main-en.png)
+
+## How-to video
+
+Two minutes, no sound: recognizing files, screenshots, long screenshots, Queue Screenshots and Record Actions, step by step. Click to play.
+
+[![How to use OCRFlow — click to play the two-minute video](site/media/tutorial-en.jpg)](https://yb311.github.io/OCRFlow/media/tutorial-en.mp4)
+
+[中文版](https://yb311.github.io/OCRFlow/media/tutorial-zh.mp4) · [The 48-second film, with music](https://yb311.github.io/OCRFlow/media/film-en.mp4)
 
 ## Features
 

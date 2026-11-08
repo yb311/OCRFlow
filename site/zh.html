@@ -26,7 +26,6 @@
       <nav class="nav-links" aria-label="主导航">
         <a href="#jobs">能做什么</a>
         <a href="#files">怎么用</a>
-        <a href="#videos">视频</a>
         <a href="#privacy">隐私</a>
         <a href="#faq">常见问题</a>
       </nav>
@@ -46,7 +45,7 @@
         <p class="lede rise" style="--d:.1s">OCRFlow 是一款 Mac 上的文字识别（OCR）软件。免费，全部在本机运行，不上传任何内容。</p>
         <div class="cta rise" style="--d:.2s">
           <a class="btn btn-primary" href="https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>下载 Mac 版</a>
-          <a class="btn btn-ghost" href="#guide"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>看怎么用</a>
+          <a class="btn btn-ghost" href="#jobs">看看能做什么</a>
         </div>
         <p class="fine rise" style="--d:.3s">macOS 15 或更高版本 · 支持 Apple 芯片和 Intel · 开源</p>
       </div>
@@ -101,7 +100,6 @@
             <p class="how-lede">用来对付选不中的文字：图片里的、视频里的、加密 PDF 里的、软件界面上的。</p>
             <ol class="steps"><li><span>在任何应用里按 <b>⌥⇧⌘2</b>，或者从菜单栏、悬浮按钮开始。</span></li><li><span>拖出一个区域，或者点选一个窗口。</span></li><li><span>点旁边操作栏里的 <b>OCR</b> 识别文字。也可以保存或拷贝这张图。</span></li></ol>
             <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
-            <button class="text-link" data-seek="36">在视频里看这一段 →</button>
           </div>
           <div class="demo demo-capture" aria-hidden="true">
             <div class="d-lines"></div>
@@ -116,7 +114,6 @@
             <h2>截下比屏幕还长的页面</h2>
             <p class="how-lede">滚动时自动拼成一张图，旁边能看到它一点点变长。</p>
             <ol class="steps"><li><span>先按上面的方法截图，再点操作栏里的长截图按钮。</span></li><li><span>自己滚动，或者点<b>自动滚动</b>。滚到哪里停，图就到哪里。</span></li><li><span>点 <b>OCR</b> 识别，或者保存、拷贝这张图。</span></li></ol>
-            <button class="text-link" data-seek="58">在视频里看这一段 →</button>
           </div>
           <div class="demo demo-long" aria-hidden="true">
             <div class="d-view"><div class="d-scroll"></div></div>
@@ -130,7 +127,6 @@
             <h2>连续截取很多个区域</h2>
             <p class="how-lede">适合自己一页页翻的书和文档。每次之间不用按快捷键。</p>
             <ol class="steps"><li><span>点菜单栏图标，选<b>队列截图</b>。</span></li><li><span>拖出区域就截取一张。照常翻页，再拖下一张。</span></li><li><span>按 <b>Esc</b> 结束，然后选择：识别为一份文档、分别识别、只保存或丢弃。</span></li></ol>
-            <button class="text-link" data-seek="78">在视频里看这一段 →</button>
           </div>
           <div class="demo demo-queue queue-demo" aria-hidden="true"><div class="lines"></div>
             <i style="left:7%;top:10%;width:48%;height:24%;--s:0s"></i>
@@ -145,7 +141,6 @@
             <h2>做一遍，它来重复</h2>
             <p class="how-lede">录下你的点按、按键、输入和滚动，然后照做。任何应用和网站都能用。</p>
             <ol class="steps"><li><span>点菜单栏图标，选<b>录制操作…</b></span></li><li><span>照常做一遍。需要截图时点<b>截取此处</b>，比如截完再翻一页，然后点<b>完成</b>。</span></li><li><span>选好执行次数和截图合成方式，点<b>运行</b>。按 Esc 可以随时停止。</span></li></ol>
-            <button class="text-link" data-seek="98">在视频里看这一段 →</button>
           </div>
           <div class="demo demo-record" aria-hidden="true">
             <small>步骤</small>
@@ -201,31 +196,32 @@
       </div>
     </section>
 
-    <section class="pad videos" id="videos" style="padding-top:0">
-      <div class="wrap">
-        <h2 class="h2 rise">视频</h2>
-        <div class="video-block rise" id="guide">
-          <div class="video-head"><h3>OCRFlow 使用说明</h3><p>两分钟，没有声音。上面每个功能，一步步演示。</p></div>
-          <div class="player" id="guide-player">
-            <video preload="none" playsinline poster="media/tutorial-zh.jpg" src="media/tutorial-zh.mp4"></video>
-            <button class="play" aria-label="播放使用说明"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>播放使用说明</span></button>
-          </div>
-          <div class="chapters"><button data-seek="4">识别文件</button><button data-seek="36">截图</button><button data-seek="58">长截图</button><button data-seek="78">队列截图</button><button data-seek="98">录制操作</button></div>
-        </div>
-        <div class="video-block film rise">
-          <div class="video-head"><h3>宣传短片</h3><p>48 秒，有音乐。</p></div>
-          <div class="player">
-            <video preload="none" playsinline poster="media/poster-zh.jpg" src="media/film-zh.mp4"></video>
-            <button class="play" aria-label="有声播放"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>有声播放</span></button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section class="pad" id="faq" style="padding-top:0">
       <div class="wrap faq">
         <h2 class="rise">常见问题</h2>
         <div class="rise"><details><summary>真的免费吗？</summary><p>是的。OCRFlow 以 MIT 许可证开源，没有账号、订阅或使用限制。</p></details><details><summary>支持哪些 Mac？</summary><p>macOS 15 Sequoia 或更高版本，支持 Apple 芯片和 Intel。每个版本都经过签名和 Apple 公证，并且可以自动更新。</p></details><details><summary>为什么有一个约 1 GB 的可选下载？</summary><p>69 MB 的应用本身就能识别 50 种语言的文字。处理表格、公式和复杂版面需要版面模型和仔细识别模型，约 1 GB，要不要下载由你决定。</p></details><details><summary>为什么需要这些权限？</summary><p>截图需要 macOS 的“录屏”权限。录制操作、队列截图和自动滚动还需要“辅助功能”权限，用来跟随和重复你的点按和按键。只有在录制或截图期间才会读取你的操作。</p></details><details><summary>会录下密码吗？</summary><p>录制时输入的文字会原样保存在你 Mac 上的录制内容里，所以录制时请不要输入密码。录制和截图之外，不会读取你的任何操作。</p></details><details><summary>Mac App Store 里有吗？</summary><p>没有。请在这里下载。它和其他 Mac 应用一样安装，并且会自动更新。</p></details></div>
+      </div>
+    </section>
+
+    <section class="pad videos" id="videos" style="padding-top:0">
+      <div class="wrap">
+        <h2 class="h2 rise">视频</h2>
+        <div class="video-pair">
+          <figure class="video-block rise">
+            <div class="player">
+              <video preload="none" playsinline poster="media/tutorial-zh.jpg" src="media/tutorial-zh.mp4"></video>
+              <button class="play" aria-label="播放"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg><i>播放</i></span></button>
+            </div>
+            <figcaption><b>OCRFlow 使用说明</b>两分钟，无声。每个功能一步步演示。</figcaption>
+          </figure>
+          <figure class="video-block rise" style="--d:.08s">
+            <div class="player">
+              <video preload="none" playsinline poster="media/poster-zh.jpg" src="media/film-zh.mp4"></video>
+              <button class="play" aria-label="有声播放"><span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg><i>有声播放</i></span></button>
+            </div>
+            <figcaption><b>宣传短片</b>48 秒，有音乐。</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

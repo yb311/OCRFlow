@@ -20,7 +20,6 @@ def icon(path, extra=''):
 
 ICONS = dict(
     apple='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>',
-    playicon='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
     playfill='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
     i_review=icon('<path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/>'),
     i_search=icon('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),
@@ -46,15 +45,13 @@ def marquee(items):
     return row * 2
 
 
-# When each chapter of the tutorial starts, in seconds. Kept equal to CHAPTERS in Scripts/tutorial/src/script.js.
-CHAPTER_TIMES = dict(files=4, capture=36, long=58, queue=78, record=98)
 
 EN = dict(
     lang='en', code='en', self='', other='zh.html', other_lang='zh-Hans', other_name='简体中文', main_shot='main-en.png',
     title='OCRFlow — Text recognition (OCR) for Mac',
     description='OCRFlow is a free Mac app that turns images, PDFs and anything on your screen into text you can copy and edit. Everything runs on your Mac and nothing is uploaded.',
-    nav_label='Main', nav_jobs='What it does', nav_how='How to use it', nav_videos='Videos', nav_privacy='Privacy', nav_faq='FAQ',
-    download_short='Download', download_long='Download for Mac', watch='Watch how it works',
+    nav_label='Main', nav_jobs='What it does', nav_how='How to use it', nav_privacy='Privacy', nav_faq='FAQ',
+    download_short='Download', download_long='Download for Mac', watch='See what it does',
     hero_title='Turn images, PDFs and anything on your screen into <em>text.</em>',
     hero_lede='OCRFlow is a text recognition (OCR) app for Mac. Free, runs entirely on your Mac, nothing uploaded.',
     fine='macOS 15 or later · Apple silicon and Intel · Open source',
@@ -93,7 +90,6 @@ EN = dict(
     rec_lede='It records your clicks, keys, typing and scrolls, then does them again. Works in any app or website.',
     rec_steps=['Choose <b>Record Actions…</b> from the menu bar icon.', 'Do it once. Click <b>Capture Here</b> where you want a screenshot, then turn the page, say. Click <b>Done</b>.', 'Choose how often it runs, and what the captures become. Click <b>Run</b>. Press Esc to stop.'],
     rec_d_steps='Steps', rec_d1='Capture an area of 1280 × 720', rec_d2='Press →', rec_d3='How often', rec_d4='Until the screen stops changing', rec_d5='Captures become', rec_d6='One document',
-    demo_link='Watch this in the video',
     more_title='Also in the app',
     t1_title='Flags what needs checking', t1_text='Regions are flagged with a reason: low confidence, output cut off, two readers disagreeing. Correct them in the Review view.',
     t2_title='Search everything you have read', t2_text='Every document stays in the history (⌘Y), searchable by any phrase, Chinese included.', t2_phrases='sixty years of stories|harbor and market square|annual report',
@@ -111,8 +107,7 @@ EN = dict(
     p3_title='Online only for', p3_text='Models you choose to download, Apple’s translation language packs, and the update check, which you can turn off.',
     pri_link='Read the privacy statement', lock_alt='A padlock made of points of light.',
     videos_title='Videos',
-    guide_title='How to use OCRFlow', guide_text='Two minutes, no sound. Every feature above, step by step.', guide_play='Play the guide',
-    chapters_names=dict(files='Recognize files', capture='Screenshot', long='Long screenshot', queue='Queue Screenshots', record='Record Actions'),
+    guide_title='How to use OCRFlow', guide_text='Two minutes, no sound. Every feature, step by step.', guide_play='Play',
     film_title='The film', film_text='48 seconds, with music.', film_play='Play with sound',
     faq_title='Questions',
     faq=[
@@ -131,8 +126,8 @@ ZH = dict(
     lang='zh-Hans', code='zh', self='zh.html', other='./', other_lang='en', other_name='English', main_shot='main-zh.png',
     title='OCRFlow — Mac 上的文字识别（OCR）软件',
     description='OCRFlow 是一款免费的 Mac 软件，把图片、PDF 和屏幕上的内容变成可以复制和编辑的文字。全部在本机运行，不上传任何内容。',
-    nav_label='主导航', nav_jobs='能做什么', nav_how='怎么用', nav_videos='视频', nav_privacy='隐私', nav_faq='常见问题',
-    download_short='下载', download_long='下载 Mac 版', watch='看怎么用',
+    nav_label='主导航', nav_jobs='能做什么', nav_how='怎么用', nav_privacy='隐私', nav_faq='常见问题',
+    download_short='下载', download_long='下载 Mac 版', watch='看看能做什么',
     hero_title='把图片、PDF 和屏幕上的内容，变成<em>文字。</em>',
     hero_lede='OCRFlow 是一款 Mac 上的文字识别（OCR）软件。免费，全部在本机运行，不上传任何内容。',
     fine='macOS 15 或更高版本 · 支持 Apple 芯片和 Intel · 开源',
@@ -171,7 +166,6 @@ ZH = dict(
     rec_lede='录下你的点按、按键、输入和滚动，然后照做。任何应用和网站都能用。',
     rec_steps=['点菜单栏图标，选<b>录制操作…</b>', '照常做一遍。需要截图时点<b>截取此处</b>，比如截完再翻一页，然后点<b>完成</b>。', '选好执行次数和截图合成方式，点<b>运行</b>。按 Esc 可以随时停止。'],
     rec_d_steps='步骤', rec_d1='截取 1280 × 720 的区域', rec_d2='按 →', rec_d3='执行次数', rec_d4='直到屏幕不再变化', rec_d5='截图合成为', rec_d6='一份文档',
-    demo_link='在视频里看这一段',
     more_title='还有这些功能',
     t1_title='标出需要复核的地方', t1_text='被标记的区域都写明原因：置信度低、输出被截断、两种识别结果不一致。可以在“复核”视图里修改。',
     t2_title='搜索读过的一切', t2_text='每份文档都留在历史记录里（⌘Y），可以按任意词句搜索，包括中文。', t2_phrases='六十多年来的报道|港口和旧市集广场|年度报告',
@@ -189,8 +183,7 @@ ZH = dict(
     p3_title='只有这些时候联网', p3_text='下载你选择的模型、Apple 的翻译语言包，以及检查更新（可以关闭）。',
     pri_link='阅读隐私说明', lock_alt='由光点组成的一把锁。',
     videos_title='视频',
-    guide_title='OCRFlow 使用说明', guide_text='两分钟，没有声音。上面每个功能，一步步演示。', guide_play='播放使用说明',
-    chapters_names=dict(files='识别文件', capture='截图', long='长截图', queue='队列截图', record='录制操作'),
+    guide_title='OCRFlow 使用说明', guide_text='两分钟，无声。每个功能一步步演示。', guide_play='播放',
     film_title='宣传短片', film_text='48 秒，有音乐。', film_play='有声播放',
     faq_title='常见问题',
     faq=[
@@ -255,9 +248,6 @@ def page(w):
         long_steps=''.join(f'<li><span>{x}</span></li>' for x in w['long_steps']),
         queue_steps=''.join(f'<li><span>{x}</span></li>' for x in w['queue_steps']),
         rec_steps=''.join(f'<li><span>{x}</span></li>' for x in w['rec_steps']),
-        chapters=''.join(f'<button data-seek="{CHAPTER_TIMES[k]}">{w["chapters_names"][k]}</button>' for k in CHAPTER_TIMES),
-        **{f'link_{name}': f'<button class="text-link" data-seek="{CHAPTER_TIMES[key]}">{w["demo_link"]} →</button>'
-           for name, key in dict(capture='capture', long='long', queue='queue', record='record').items()},
     )
     html = (HERE / 'template.html').read_text(encoding='utf-8')
     html = re.sub(r'\{\{(\w+)\}\}', lambda m: str(values[m.group(1)]), html)
