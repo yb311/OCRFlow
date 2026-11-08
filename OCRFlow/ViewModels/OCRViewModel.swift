@@ -360,8 +360,12 @@ final class OCRViewModel {
         updatePresence()
 
         // A model the user just deleted may be the one currently selected.
-        modelDownloader.onInventoryChange = { [weak self] in self?.validateModelSelections() }
+        modelDownloader.onInventoryChange = { [weak self] in
+            self?.validateModelSelections()
+            PPLayoutAccelerator.prepareInstalledModel()
+        }
         restoreQueue()
+        PPLayoutAccelerator.prepareInstalledModel()
     }
 
     /// Called as the app quits. llama.cpp tears its Metal device down in a
@@ -609,7 +613,6 @@ final class OCRViewModel {
         var reset = PPOCRConfig.default
         reset.tier = paddleConfig.tier
         reset.recognizer = paddleConfig.recognizer
-        reset.computeUnit = paddleConfig.computeUnit
         reset.threadCount = paddleConfig.threadCount
         reset.applyDetectionDefaults()
         paddleConfig = reset

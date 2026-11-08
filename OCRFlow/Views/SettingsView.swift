@@ -547,16 +547,11 @@ struct SettingsView: View {
 
         settingSection("Compute Backend") {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(PPComputeUnit.allCases) { unit in
-                    radioRow(title: unit.label, subtitle: unit.hint,
-                             selected: vm.paddleConfig.computeUnit == unit, enabled: true) {
-                        vm.paddleConfig.computeUnit = unit
-                    }
-                }
                 Stepper(value: $vm.paddleConfig.threadCount, in: 0...16) {
                     valueLabel("Threads", value: vm.paddleConfig.threadCount == 0
                                ? String(localized: "Auto") : "\(vm.paddleConfig.threadCount)")
                 }
+                hint("Layout analysis runs on the GPU; text is read several lines at a time on the CPU. Auto uses every core.")
             }
         }
 
@@ -583,9 +578,6 @@ struct SettingsView: View {
                         valueSlider("Box unclip ratio", value: $vm.paddleConfig.detUnclipRatio,
                                     range: 1.0...3.0, step: 0.1,
                                     hint: "Raise it to avoid clipping stroke edges; too high and neighboring text merges")
-                        Stepper(value: $vm.paddleConfig.recBatchSize, in: 1...32) {
-                            valueLabel("Recognition batch size", value: "\(vm.paddleConfig.recBatchSize)")
-                        }
                         valueSlider("Minimum confidence", value: $vm.paddleConfig.dropScore,
                                     range: 0...0.95, step: 0.05,
                                     hint: "Lines recognized with lower confidence than this are left out of the results")

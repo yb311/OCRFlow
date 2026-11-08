@@ -2477,16 +2477,6 @@
         }
       }
     },
-    "Core ML (Neural Engine / GPU)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core ML（神经引擎 / GPU）"
-          }
-        }
-      }
-    },
     "Correct this block (or double-click)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4239,6 +4229,16 @@
         }
       }
     },
+    "Layout analysis runs on the GPU; text is read several lines at a time on the CPU. Auto uses every core." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版面分析在 GPU 上运行；文字识别在 CPU 上多行同时进行。“自动”会用上全部核心。"
+          }
+        }
+      }
+    },
     "Leave it for now and go to the next one (⌘])" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5947,16 +5947,6 @@
         }
       }
     },
-    "Recognition batch size" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "识别批大小"
-          }
-        }
-      }
-    },
     "Recognition is in progress. You can recognize this page again once it finishes" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6983,16 +6973,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把全部层放到 GPU 上，比纯 CPU 快数倍（推荐）"
-          }
-        }
-      }
-    },
-    "Runs on the Neural Engine / GPU. PP-OCR's input sizes vary, so in practice this is usually several times slower than CPU" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "交由神经引擎/GPU 执行。PP-OCR 输入尺寸可变，实测通常比 CPU 慢数倍"
           }
         }
       }

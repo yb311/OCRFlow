@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0DE00010000000000000004 /* PPLayoutAccelerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00020000000000000004 /* PPLayoutAccelerator.swift */; };
+		C0DE00010000000000000002 /* ORTDimensionOverride.mm in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00020000000000000002 /* ORTDimensionOverride.mm */; };
+		C0DE00010000000000000001 /* ONNXGraphSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00020000000000000001 /* ONNXGraphSplit.swift */; };
 		F1000001000000000000B001 /* ScreenGrabber.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B001 /* ScreenGrabber.swift */; };
 		F1000001000000000000B002 /* CaptureOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B002 /* CaptureOverlay.swift */; };
 		F1000001000000000000B003 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002000000000000B003 /* ScreenCapture.swift */; };
@@ -119,6 +122,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C0DE00020000000000000004 /* PPLayoutAccelerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLayoutAccelerator.swift; sourceTree = "<group>"; };
+		C0DE00020000000000000003 /* ORTDimensionOverride.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ORTDimensionOverride.h; sourceTree = "<group>"; };
+		C0DE00020000000000000002 /* ORTDimensionOverride.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ORTDimensionOverride.mm; sourceTree = "<group>"; };
+		C0DE00020000000000000001 /* ONNXGraphSplit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ONNXGraphSplit.swift; sourceTree = "<group>"; };
 		F1000002000000000000B001 /* ScreenGrabber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGrabber.swift; sourceTree = "<group>"; };
 		F1000002000000000000B002 /* CaptureOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOverlay.swift; sourceTree = "<group>"; };
 		F1000002000000000000B003 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
@@ -409,6 +416,9 @@
 				B10000020000000000000001 /* PPTypes.swift */,
 				B10000020000000000000002 /* PPModelStore.swift */,
 				B10000020000000000000003 /* PPSession.swift */,
+				C0DE00020000000000000003 /* ORTDimensionOverride.h */,
+				C0DE00020000000000000002 /* ORTDimensionOverride.mm */,
+				C0DE00020000000000000001 /* ONNXGraphSplit.swift */,
 				B10000020000000000000004 /* PPDetector.swift */,
 				B10000020000000000000A07 /* PPDocOrientationClassifier.swift */,
 				B10000020000000000000005 /* PPTextLineClassifier.swift */,
@@ -429,6 +439,7 @@
 			children = (
 				B1000002000000000000010A /* PPLayoutTypes.swift */,
 				B1000002000000000000010B /* PPLayoutDetector.swift */,
+				C0DE00020000000000000004 /* PPLayoutAccelerator.swift */,
 				B1000002000000000000010C /* PPReadingOrder.swift */,
 				B1000002000000000000010D /* PPDocumentAssembler.swift */,
 				B1000002000000000000010E /* PPStructureAssembler.swift */,
@@ -685,6 +696,9 @@
 				B10000010000000000000000 /* PPOCREngine.swift in Sources */,
 				B10000010000000000000001 /* PPTypes.swift in Sources */,
 				B10000010000000000000002 /* PPModelStore.swift in Sources */,
+				C0DE00010000000000000001 /* ONNXGraphSplit.swift in Sources */,
+				C0DE00010000000000000002 /* ORTDimensionOverride.mm in Sources */,
+				C0DE00010000000000000004 /* PPLayoutAccelerator.swift in Sources */,
 				B10000010000000000000003 /* PPSession.swift in Sources */,
 				B10000010000000000000004 /* PPDetector.swift in Sources */,
 				B10000010000000000000A07 /* PPDocOrientationClassifier.swift in Sources */,
@@ -880,6 +894,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OCRFlow/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "OCRFlow/OCRFlow-Bridging-Header.h";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -911,6 +926,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OCRFlow/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "OCRFlow/OCRFlow-Bridging-Header.h";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

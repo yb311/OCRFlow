@@ -132,32 +132,6 @@ enum PPTextOrder: String, CaseIterable, Identifiable, Codable {
     var needsLayoutModel: Bool { self == .layout }
 }
 
-/// Execution backend handed to ONNX Runtime.
-enum PPComputeUnit: String, CaseIterable, Identifiable, Codable {
-    case cpu
-    case coreML
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .cpu:    return "CPU"
-        case .coreML: return String(localized: "Core ML (Neural Engine / GPU)")
-        }
-    }
-
-    var hint: String {
-        switch self {
-        case .cpu:    return String(localized: "Multithreaded, with the same results as Core ML (recommended)")
-        case .coreML:
-            // PP-OCR's det and rec graphs have dynamic input shapes, so Core ML
-            // recompiles per shape and ends up several times slower than CPU on
-            // typical pages. Kept as an escape hatch, not as an optimisation.
-            return String(localized: "Runs on the Neural Engine / GPU. PP-OCR's input sizes vary, so in practice this is usually several times slower than CPU")
-        }
-    }
-}
-
 /// Every knob PaddleOCR exposes on the det → cls → rec chain.
 ///
 /// Defaults mirror the `inference.yml` shipped with the PP-OCRv6 models, so an
@@ -173,7 +147,6 @@ struct PPOCRConfig: Equatable, Codable {
         let name = (fileName as NSString).deletingPathExtension
         return name.hasSuffix("_rec") ? String(name.dropLast(4)) : name
     }
-    var computeUnit: PPComputeUnit = .cpu
     /// 0 lets ONNX Runtime pick, otherwise the intra-op thread count.
     var threadCount: Int = 0
 
@@ -207,7 +180,6 @@ struct PPOCRConfig: Equatable, Codable {
     var useDocOrientation: Bool = true
 
     // Recognition
-    var recBatchSize: Int = 6
     var recImageHeight: Int = 48
     var recImageWidth: Int = 320
     /// Lines recognised with less confidence than this are discarded.
@@ -244,7 +216,6 @@ extension PPOCRConfig {
         }
         tier = value(.tier, fallback.tier)
         recognizer = value(.recognizer, fallback.recognizer)
-        computeUnit = value(.computeUnit, fallback.computeUnit)
         threadCount = value(.threadCount, fallback.threadCount)
         detLimitSideLen = value(.detLimitSideLen, fallback.detLimitSideLen)
         detThresh = value(.detThresh, fallback.detThresh)
@@ -256,7 +227,6 @@ extension PPOCRConfig {
         clsThresh = value(.clsThresh, fallback.clsThresh)
         clsBatchSize = value(.clsBatchSize, fallback.clsBatchSize)
         useDocOrientation = value(.useDocOrientation, fallback.useDocOrientation)
-        recBatchSize = value(.recBatchSize, fallback.recBatchSize)
         recImageHeight = value(.recImageHeight, fallback.recImageHeight)
         recImageWidth = value(.recImageWidth, fallback.recImageWidth)
         dropScore = value(.dropScore, fallback.dropScore)

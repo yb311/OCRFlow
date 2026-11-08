@@ -49,22 +49,50 @@ final class PPSession: @unchecked Sendable {
     let inputNames: [String]
     let outputNames: [String]
 
-    init(modelPath: URL, env: ORTEnv, config: PPOCRConfig) throws {
+    /// The file the session was built from.
+    let modelPath: URL
+
+    /// Running a graph on the GPU through Core ML.
+    struct GPUPlacement {
+        /// A size for every symbolic input dimension: Core ML only keeps a
+        /// graph on the GPU when its shapes are known in advance.
+        var fixedDimensions: [String: Int64]
+        /// Where Core ML keeps the compiled model, so it is built once rather
+        /// than on every launch. One directory per graph and shape: Core ML's
+        /// cache key does not see the fixed dimensions, and a compiled model
+        /// read back for the wrong shapes crashes the process.
+        var cacheDirectory: URL
+    }
+
+    /// `intraOpThreads` overrides the thread count for a graph that is run
+    /// from several threads at once, where each call should keep to one core.
+    init(modelPath: URL, env: ORTEnv, config: PPOCRConfig, intraOpThreads: Int? = nil,
+         gpu: GPUPlacement? = nil) throws {
+        self.modelPath = modelPath
         do {
             let options = try ORTSessionOptions()
             try options.setLogSeverityLevel(.error)
             try options.setGraphOptimizationLevel(.all)
-            if config.threadCount > 0 {
+            if let intraOpThreads {
+                try options.setIntraOpNumThreads(Int32(intraOpThreads))
+            } else if config.threadCount > 0 {
                 try options.setIntraOpNumThreads(Int32(config.threadCount))
             }
-            if config.computeUnit == .coreML, ORTIsCoreMLExecutionProviderAvailable() {
-                let coreML = ORTCoreMLExecutionProviderOptions()
-                coreML.createMLProgram = true
-                // The det and rec graphs have dynamic spatial dimensions; letting
-                // Core ML claim only the static subgraphs and leaving the rest on
-                // CPU is faster than forcing everything through one backend.
-                coreML.enableOnSubgraphs = true
-                try options.appendCoreMLExecutionProvider(with: coreML)
+            if let gpu {
+                for (name, value) in gpu.fixedDimensions {
+                    var failure: NSError?
+                    guard OCRFlowFixInputDimension(options, name, value, &failure) else {
+                        throw failure ?? PPOCRError.sessionFailed(name)
+                    }
+                }
+                // GPU only, never the Neural Engine: the GPU computes in
+                // 32-bit floats and matches the CPU to about 1e-6, while the
+                // Neural Engine's 16-bit arithmetic moves results visibly.
+                try options.appendCoreMLExecutionProvider(withOptionsV2: [
+                    "ModelFormat": "MLProgram",
+                    "MLComputeUnits": "CPUAndGPU",
+                    "ModelCacheDirectory": gpu.cacheDirectory.path(percentEncoded: false),
+                ])
             }
             session = try ORTSession(env: env, modelPath: modelPath.path(percentEncoded: false), sessionOptions: options)
             inputNames = try session.inputNames()
@@ -119,32 +147,50 @@ final class PPSession: @unchecked Sendable {
         }
     }
 
+    /// Runs the graph on values that are already ONNX Runtime tensors and
+    /// hands its outputs back the same way, so one graph's outputs can feed
+    /// another's inputs without a copy or a change of element type.
+    func run(values: [String: ORTValue], outputNames wanted: [String]) throws -> [String: ORTValue] {
+        do {
+            return try session.run(withInputs: values, outputNames: Set(wanted), runOptions: nil)
+        } catch {
+            throw PPOCRError.inferenceFailed(error.localizedDescription)
+        }
+    }
+
+    /// Wraps tensors for `run(values:outputNames:)`. The returned buffers
+    /// back the values and have to outlive the call.
+    static func values(_ inputs: [String: PPTensor]) throws -> (values: [String: ORTValue], backing: [NSMutableData]) {
+        var backing: [NSMutableData] = []
+        var values: [String: ORTValue] = [:]
+        for (name, tensor) in inputs {
+            let data: NSMutableData
+            let type: ORTTensorElementDataType
+            switch tensor {
+            case let .float(elements, _):
+                data = elements.withUnsafeBufferPointer {
+                    NSMutableData(bytes: $0.baseAddress, length: $0.count * MemoryLayout<Float>.size)
+                }
+                type = .float
+            case let .int32(elements, _):
+                data = elements.withUnsafeBufferPointer {
+                    NSMutableData(bytes: $0.baseAddress, length: $0.count * MemoryLayout<Int32>.size)
+                }
+                type = .int32
+            }
+            backing.append(data)
+            values[name] = try ORTValue(tensorData: data, elementType: type,
+                                        shape: tensor.shape.map { NSNumber(value: $0) })
+        }
+        return (values, backing)
+    }
+
     /// Runs a graph with any number of named inputs and outputs.
     func run(inputs: [String: PPTensor], outputNames wanted: [String]) throws -> [String: PPTensor] {
         do {
             // ONNX Runtime does not copy the input buffers, so every one of them
             // has to stay alive until `run` returns.
-            var backing: [NSMutableData] = []
-            var values: [String: ORTValue] = [:]
-            for (name, tensor) in inputs {
-                let data: NSMutableData
-                let type: ORTTensorElementDataType
-                switch tensor {
-                case let .float(elements, _):
-                    data = elements.withUnsafeBufferPointer {
-                        NSMutableData(bytes: $0.baseAddress, length: $0.count * MemoryLayout<Float>.size)
-                    }
-                    type = .float
-                case let .int32(elements, _):
-                    data = elements.withUnsafeBufferPointer {
-                        NSMutableData(bytes: $0.baseAddress, length: $0.count * MemoryLayout<Int32>.size)
-                    }
-                    type = .int32
-                }
-                backing.append(data)
-                values[name] = try ORTValue(tensorData: data, elementType: type,
-                                            shape: tensor.shape.map { NSNumber(value: $0) })
-            }
+            let (values, backing) = try Self.values(inputs)
 
             let outputs = try session.run(withInputs: values,
                                           outputNames: Set(wanted),
@@ -166,7 +212,7 @@ final class PPSession: @unchecked Sendable {
         }
     }
 
-    private static func read(_ value: ORTValue, name: String) throws -> PPTensor {
+    static func read(_ value: ORTValue, name: String) throws -> PPTensor {
         let info = try value.tensorTypeAndShapeInfo()
         let shape = info.shape.map(\.intValue)
         let count = shape.reduce(1, *)

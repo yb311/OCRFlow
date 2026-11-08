@@ -50,8 +50,9 @@ final class PPOCREngine: @unchecked Sendable {
         classifier = PPTextLineClassifier(session: try PPSession(modelPath: paths.clsModel, env: env, config: config))
         docOrienter = PPDocOrientationClassifier(
             session: try PPSession(modelPath: paths.docOriModel, env: env, config: config))
+        // Lines are read several at once, one core each; see `PPRecognizer`.
         recognizer = try PPRecognizer(
-            session: try PPSession(modelPath: paths.recModel, env: env, config: config),
+            session: try PPSession(modelPath: paths.recModel, env: env, config: config, intraOpThreads: 1),
             dictionaryURL: paths.dictionary)
 
         if config.readingOrder.needsLayoutModel, let modelURL = try? VLModelStore.resolveLayoutModel() {
@@ -73,7 +74,6 @@ final class PPOCREngine: @unchecked Sendable {
     func matchesModelConfiguration(_ other: PPOCRConfig) -> Bool {
         config.tier == other.tier
             && config.recognizer == other.recognizer
-            && config.computeUnit == other.computeUnit
             && config.threadCount == other.threadCount
             // Turning layout analysis on or off adds or drops a session, so the
             // engine has to be rebuilt rather than reused.
@@ -104,17 +104,25 @@ final class PPOCREngine: @unchecked Sendable {
         let page = PPDocOrientationClassifier.straighten(buffer, from: orientation)
         progress?(0.1)
 
-        // Layout first, on the straightened page: the regions are what the
-        // lines will be sorted into, and they are cheap next to recognition.
-        var regions: [PPLayoutBlock] = []
+        // Layout runs alongside everything below: its regions are only needed
+        // at the end, to sort the lines into, and it runs on the GPU while
+        // detection and recognition keep the CPU busy.
         let ranLayout = cfg.readingOrder.needsLayoutModel && layout != nil
+        let pendingRegions = InFlight<[PPLayoutBlock]>()
         if ranLayout, let layout {
-            // The same correction the VL pipeline applies: a "header" halfway
-            // down the page is a paragraph the classifier misnamed, and leaving
-            // it labelled as furniture would drop it from the document.
-            regions = ((try? layout.detect(page)) ?? [])
-                .reclassifyingFalsePageFurniture(pageHeight: CGFloat(page.height))
+            nonisolated(unsafe) let page = page
+            pendingRegions.start {
+                // The same correction the VL pipeline applies: a "header" halfway
+                // down the page is a paragraph the classifier misnamed, and leaving
+                // it labelled as furniture would drop it from the document.
+                ((try? layout.detect(page)) ?? [])
+                    .reclassifyingFalsePageFurniture(pageHeight: CGFloat(page.height))
+            }
         }
+        // Every way out of this function waits for it, so the layout never
+        // outlives the call or overlaps the next page's.
+        defer { pendingRegions.wait() }
+        var regions: [PPLayoutBlock] { pendingRegions.wait() ?? [] }
         // Everything below works on the straightened page — reading order is
         // a matter of columns and rows, which only exist the right way up —
         // and is turned back into the caller's coordinates at the end.
@@ -248,5 +256,24 @@ extension Array where Element == PPTextLine {
     /// handles paragraph reflow from here.
     var plainText: String {
         map(\.text).joined(separator: "\n")
+    }
+}
+
+/// A value being worked out on another thread, waited for where it is used.
+private final class InFlight<Value>: @unchecked Sendable {
+    private let group = DispatchGroup()
+    private var value: Value?
+
+    func start(_ work: @escaping @Sendable () -> Value) {
+        DispatchQueue.global(qos: .userInitiated).async(group: group) { [self] in
+            value = work()
+        }
+    }
+
+    /// The value, once ready; nil if nothing was started.
+    @discardableResult
+    func wait() -> Value? {
+        group.wait()
+        return value
     }
 }

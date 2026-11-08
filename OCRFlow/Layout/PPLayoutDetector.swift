@@ -11,6 +11,13 @@ import CoreGraphics
 /// the VLM in one shot silently drops content.
 struct PPLayoutDetector {
     let session: PPSession
+    /// The same graph on the GPU, used once it has been compiled.
+    private let accelerator: PPLayoutAccelerator?
+
+    init(session: PPSession) {
+        self.session = session
+        accelerator = PPLayoutAccelerator.shared(for: session.modelPath)
+    }
 
     /// The exported graph has a fixed 800×800 input; `keep_ratio` is false in
     /// the model's `inference.yml`, so the page is stretched, not letterboxed.
@@ -48,13 +55,16 @@ struct PPLayoutDetector {
         // [queries, 200, 200] instance-mask tensor — 48 MB per page — that V3
         // uses for multi-point boxes on curved scans; we crop rectangles, so
         // asking for it would just pay for a large copy we throw away.
-        let outputs = try session.run(
-            inputs: [
-                "image":        .float(tensor, shape: [1, 3, side, side]),
-                "scale_factor": .float([scaleY, scaleX], shape: [1, 2]),
-                "im_shape":     .float([Float(side), Float(side)], shape: [1, 2]),
-            ],
-            outputNames: ["fetch_name_0"])
+        let inputs: [String: PPTensor] = [
+            "image":        .float(tensor, shape: [1, 3, side, side]),
+            "scale_factor": .float([scaleY, scaleX], shape: [1, 2]),
+            "im_shape":     .float([Float(side), Float(side)], shape: [1, 2]),
+        ]
+        let wanted = ["fetch_name_0"]
+        // The GPU when it is ready; the CPU until then, and if the GPU ever
+        // turns a page down.
+        let outputs = try (try? accelerator?.run(inputs: inputs, outputNames: wanted))
+            ?? session.run(inputs: inputs, outputNames: wanted)
 
         return try decode(outputs, scoreThreshold: scoreThreshold,
                           width: CGFloat(image.width), height: CGFloat(image.height))
