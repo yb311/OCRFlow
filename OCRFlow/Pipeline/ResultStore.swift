@@ -92,6 +92,13 @@ final class ResultStore: @unchecked Sendable {
         }
     }
 
+    /// Waits for every write already handed to the store to land. The app
+    /// calls this as it quits: the process exits when `willTerminate`
+    /// returns, and writes still queued would be lost.
+    func flush() {
+        io.sync {}
+    }
+
     /// Writes one item's pages, and its text to the history. Called when a
     /// result lands — `isNewReading` — and whenever it is corrected.
     func save(_ item: ImageItem, isNewReading: Bool = false) {
@@ -321,10 +328,14 @@ final class ResultStore: @unchecked Sendable {
 
     func cachedPages(for key: String) -> [PageResult]? {
         let file = cacheDirectory.appending(path: "\(key).json")
+        io.sync {}   // an entry still on its way to disk counts too
         guard let data = try? Data(contentsOf: file),
               let pages = try? JSONDecoder().decode([PageResult].self, from: data) else { return nil }
-        // Touched, so the pruning below keeps what is still being used.
-        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path(percentEncoded: false))
+        // Touched, so the pruning below keeps what is still being used — on
+        // the store's queue, in order with that pruning.
+        io.async {
+            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path(percentEncoded: false))
+        }
         return pages
     }
 

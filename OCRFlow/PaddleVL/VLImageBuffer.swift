@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import Accelerate
 
 /// A tightly packed RGB8 buffer, the layout `mtmd_bitmap_init` expects.
 ///
@@ -46,16 +47,18 @@ struct VLImageBuffer {
         }
         guard drew else { return nil }
 
+        // Dropping the padding byte of every pixel, vectorised.
         var rgb = [UInt8](repeating: 0, count: w * h * 3)
-        rgba.withUnsafeBufferPointer { src in
-            rgb.withUnsafeMutableBufferPointer { dst in
-                for i in 0..<(w * h) {
-                    dst[i * 3]     = src[i * 4]
-                    dst[i * 3 + 1] = src[i * 4 + 1]
-                    dst[i * 3 + 2] = src[i * 4 + 2]
-                }
+        let converted: vImage_Error = rgba.withUnsafeMutableBytes { src in
+            rgb.withUnsafeMutableBytes { dst in
+                var source = vImage_Buffer(data: src.baseAddress, height: vImagePixelCount(h),
+                                           width: vImagePixelCount(w), rowBytes: w * 4)
+                var destination = vImage_Buffer(data: dst.baseAddress, height: vImagePixelCount(h),
+                                                width: vImagePixelCount(w), rowBytes: w * 3)
+                return vImageConvert_RGBA8888toRGB888(&source, &destination, vImage_Flags(kvImageNoFlags))
             }
         }
+        guard converted == kvImageNoError else { return nil }
 
         self.width = w
         self.height = h

@@ -375,6 +375,7 @@ final class OCRViewModel {
     func prepareForTermination() {
         store.saveQueue(items)
         releaseVLEngine()
+        store.flush()
         sentinel.end()
     }
 
@@ -855,7 +856,7 @@ final class OCRViewModel {
         let config = vlConfig
         let pageSize = item.pages[page].size
         // Shown under the region while the model works.
-        updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { $0.review = .rereading }
+        updateBlock(itemID: itemID, page: page, matching: block) { $0.review = .rereading }
 
         Task {
             do {
@@ -879,11 +880,10 @@ final class OCRViewModel {
                 let previous = AlternativeReading(source: block.source ?? item.pages[page].blockSource,
                                                   text: block.text, note: .beforeReread)
                 // The page names the model that read this region now.
-                if !output.text.isEmpty, let index = items.firstIndex(where: { $0.id == itemID }),
-                   items[index].pages.indices.contains(page) {
+                if !output.text.isEmpty, let (index, _) = locateBlock(itemID: itemID, page: page, matching: block) {
                     items[index].pages[page].models[.visionLanguageModel] = config.variant.modelName
                 }
-                updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) { block in
+                updateBlock(itemID: itemID, page: page, matching: block) { block in
                     block.review = nil
                     guard !output.text.isEmpty else {
                         block.review = .rereadReadNothing
@@ -911,18 +911,34 @@ final class OCRViewModel {
                     }
                 }
             } catch {
-                updateBlock(itemID: itemID, page: page, blockIndex: blockIndex) {
+                updateBlock(itemID: itemID, page: page, matching: block) {
                     $0.review = .rereadFailed(error: error.localizedDescription)
                 }
             }
         }
     }
 
-    private func updateBlock(itemID: UUID, page: Int, blockIndex: Int,
-                             _ change: (inout PPLayoutBlock) -> Void) {
+    /// Where a region is now: the item, and the region on the page at the
+    /// same place, of the same kind, at the same point in the reading order
+    /// as `anchor`. Nil when the page has been read again — or the file
+    /// removed — since, and the region is gone.
+    ///
+    /// A region has no identity of its own, and its index is not one: a page
+    /// read again while a region of it was being reread comes back with
+    /// regions of its own, and the reread must not land on whichever one now
+    /// holds the old index.
+    private func locateBlock(itemID: UUID, page: Int, matching anchor: PPLayoutBlock) -> (item: Int, block: Int)? {
         guard let index = items.firstIndex(where: { $0.id == itemID }),
               items[index].pages.indices.contains(page),
-              items[index].pages[page].blocks.indices.contains(blockIndex) else { return }
+              let blockIndex = items[index].pages[page].blocks.firstIndex(where: {
+                  $0.rect == anchor.rect && $0.label == anchor.label && $0.readingOrder == anchor.readingOrder
+              }) else { return nil }
+        return (index, blockIndex)
+    }
+
+    private func updateBlock(itemID: UUID, page: Int, matching anchor: PPLayoutBlock,
+                             _ change: (inout PPLayoutBlock) -> Void) {
+        guard let (index, blockIndex) = locateBlock(itemID: itemID, page: page, matching: anchor) else { return }
         change(&items[index].pages[page].blocks[blockIndex])
         rebuildDocument(at: index)
         store.save(items[index])
@@ -1016,6 +1032,10 @@ final class OCRViewModel {
     }
 
     private var watcher: FolderWatcher?
+    /// The export being written, if any. Writing runs off the main actor, so
+    /// a second export could otherwise start while the first is still
+    /// writing — into the same files; each waits for the one before it.
+    @ObservationIgnored var exportInFlight: Task<Void, Never>?
     /// Files the watcher added, exported as each one finishes.
     @ObservationIgnored private var watchedIDs = Set<UUID>()
     /// Watched files arrived while a run was going; they get one of their own
@@ -1242,7 +1262,8 @@ final class OCRViewModel {
     /// used to do to get a thumbnail — froze the window for a folder of
     /// photos and held each one in memory for as long as it stayed listed.
     func loadThumbnails(for ids: [UUID]) {
-        let targets = items.filter { ids.contains($0.id) }.map { ($0.id, $0.url) }
+        let wanted = Set(ids)
+        let targets = items.filter { wanted.contains($0.id) }.map { ($0.id, $0.url) }
         Task { [weak self] in
             for start in stride(from: 0, to: targets.count, by: 16) {
                 let chunk = Array(targets[start..<min(start + 16, targets.count)])
@@ -1592,13 +1613,16 @@ final class OCRViewModel {
     }
 
     func clearAll() {
+        // A run going stops the way 停止 stops it: `isProcessing` clears
+        // itself once the last worker has let go, not here under its feet.
+        stopProcessing()
+        waitingForRun.removeAll()
         store.remove(items.map(\.id))
         store.prunePartials(keeping: [])
         forgetTranslations(Set(items.map(\.id)))
         items.removeAll()
         selectedIDs = []
         totalProgress = 0
-        isProcessing = false
         store.saveQueue(items)
     }
 
@@ -1642,7 +1666,10 @@ final class OCRViewModel {
     func retryItems(ids: Set<UUID>) {
         let corrected = items.filter { ids.contains($0.id) && $0.isCorrected }
         confirmDiscardingCorrections(in: corrected) { [weak self] in
-            guard let self else { return }
+            // `run` would not start while a run is going, and re-arming the
+            // files first would throw their results away for nothing — or,
+            // for a file being read, flip it to 待处理 under its worker.
+            guard let self, !isProcessing, !isStopping else { return }
             for id in ids { retryItem(id: id) }
             run(ids: items.filter { ids.contains($0.id) }.map(\.id), useCache: false)
         }
@@ -1771,7 +1798,7 @@ final class OCRViewModel {
     func readWithVL(id: UUID) {
         guard !isProcessing, let item = items.first(where: { $0.id == id }) else { return }
         confirmDiscardingCorrections(in: item.isCorrected ? [item] : []) { [weak self] in
-            guard let self else { return }
+            guard let self, !isProcessing, !isStopping else { return }
             engineOverrides[id] = .paddleVL
             retryItem(id: id)
             run(ids: [id], useCache: false)

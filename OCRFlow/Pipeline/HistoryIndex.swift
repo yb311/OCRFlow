@@ -63,9 +63,12 @@ final class HistoryIndex: @unchecked Sendable {
                 sqlite3_column_double($0, 0)
             }.first
             let recognizedAt = isNewReading ? Date() : previous.map(Date.init(timeIntervalSince1970:)) ?? Date()
-            execute("DELETE FROM history WHERE id = ?", [id.uuidString])
-            execute("INSERT INTO history (id, path, name, engine, pages, recognized_at, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    [id.uuidString, path, name, engine?.rawValue, pages, recognizedAt.timeIntervalSince1970, text])
+            // One transaction, so a crash between the two cannot lose the row.
+            transaction {
+                execute("DELETE FROM history WHERE id = ?", [id.uuidString])
+                execute("INSERT INTO history (id, path, name, engine, pages, recognized_at, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        [id.uuidString, path, name, engine?.rawValue, pages, recognizedAt.timeIntervalSince1970, text])
+            }
         }
     }
 
@@ -79,7 +82,9 @@ final class HistoryIndex: @unchecked Sendable {
 
     func remove(_ ids: [UUID]) {
         queue.async { [self] in
-            for id in ids { execute("DELETE FROM history WHERE id = ?", [id.uuidString]) }
+            transaction {
+                for id in ids { execute("DELETE FROM history WHERE id = ?", [id.uuidString]) }
+            }
         }
     }
 
@@ -88,7 +93,9 @@ final class HistoryIndex: @unchecked Sendable {
         queue.sync {
             let all = rows("SELECT id FROM history", []) { UUID(uuidString: column($0, 0)) }.compactMap { $0 }
             let dropped = all.filter { !kept.contains($0) }
-            for id in dropped { execute("DELETE FROM history WHERE id = ?", [id.uuidString]) }
+            transaction {
+                for id in dropped { execute("DELETE FROM history WHERE id = ?", [id.uuidString]) }
+            }
             return dropped
         }
     }
@@ -170,6 +177,14 @@ final class HistoryIndex: @unchecked Sendable {
         guard let statement = prepare(sql, arguments) else { return }
         sqlite3_step(statement)
         sqlite3_finalize(statement)
+    }
+
+    /// Runs `body` as one transaction: one commit, and one sync to disk,
+    /// however many statements it runs.
+    private func transaction(_ body: () -> Void) {
+        execute("BEGIN IMMEDIATE")
+        body()
+        execute("COMMIT")
     }
 
     private func rows<T>(_ sql: String, _ arguments: [Any?], _ read: (OpaquePointer) -> T) -> [T] {

@@ -34,6 +34,8 @@ struct TranslationSheet: View {
 
     var body: some View {
         @Bindable var vm = vm
+        // Counted once per pass; the progress redraws this after every paragraph.
+        let totalParagraphs = self.totalParagraphs
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Text(items.count == 1 ? "Translate “\(items[0].fileName)”" : "Translate \(items.count) Files")

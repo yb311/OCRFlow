@@ -24,6 +24,9 @@ final class MacroPlayer {
     private(set) var missingApp: String?
     /// Stopped by the user, rather than come to its end.
     var wasStopped: Bool { stopRequested }
+    /// Stopped by the user, or the task running it cancelled: either way
+    /// nothing more is done, and nothing is waited for.
+    private var isStopping: Bool { stopRequested || Task.isCancelled }
 
     /// Where what the capture steps take is written, as it is taken: a long
     /// run's screenfuls do not fit in memory. The caller removes it.
@@ -54,7 +57,7 @@ final class MacroPlayer {
 
         var results: [[URL]] = []
         for (index, url) in urls.enumerated() {
-            guard !stopRequested else { break }
+            guard !isStopping else { break }
             state.address = index + 1
             if let url {
                 await open(url, in: firstWindow?.bundleID)
@@ -76,16 +79,16 @@ final class MacroPlayer {
         var firstLook: PageFingerprint?
         var lastLook: PageFingerprint?
         var round = 0
-        while round < limit, !stopRequested {
+        while round < limit, !isStopping {
             round += 1
             state.round = round
             var took: [CGImage] = []
             for step in macro.steps {
                 await waitWhilePaused()
-                guard !stopRequested else { break }
-                if let image = await perform(step) { took.append(image) }
+                guard !isStopping else { break }
+                took += await perform(step)
             }
-            guard !stopRequested else {
+            guard !isStopping else {
                 taken += keep(took)
                 break
             }
@@ -124,8 +127,9 @@ final class MacroPlayer {
     // MARK: - Steps
 
     /// Does one step and waits for the screen to settle. A capture step
-    /// returns what it took.
-    private func perform(_ step: MacroStep) async -> CGImage? {
+    /// returns what it took: a long screenshot too long for one picture, in
+    /// its parts, in order.
+    private func perform(_ step: MacroStep) async -> [CGImage] {
         let window = await place(step.window)
         let origin = window?.frame.origin ?? .zero
         func onScreen(_ point: CGPoint) -> CGPoint { CGPoint(x: point.x + origin.x, y: point.y + origin.y) }
@@ -143,7 +147,7 @@ final class MacroPlayer {
                 case let .point(found)?: point = found
                 case .pressed?:
                     await settle(watched ?? ScreenWindows.display(at: point))
-                    return nil
+                    return []
                 case nil: break
                 }
             }
@@ -178,23 +182,23 @@ final class MacroPlayer {
             case let (nil, rect?): target = ScreenWindows.target(for: rect)
             case (nil, nil): target = nil
             }
-            guard let target else { return nil }
+            guard let target else { return [] }
             pixelsPerPoint = ScreenCapture.pixelsPerPoint(of: target)
             await settle(target, waitForChange: false)
             if let distance = area.scrollDistance {
                 // Scrolled on as far as when recorded, and joined.
-                guard let first = try? await ScreenCapture.grab(target) else { return nil }
+                guard let first = try? await ScreenCapture.grab(target) else { return [] }
                 let parts = await ScrollingCapture().runAutomatically(target, size: CGSize(width: first.width, height: first.height),
                                                                       distance: distance)
-                return parts.first ?? first
+                return parts.isEmpty ? [first] : parts
             }
-            return try? await ScreenCapture.grab(target)
+            return (try? await ScreenCapture.grab(target)).map { [$0] } ?? []
 
         case let .wait(seconds):
             let until = Date().addingTimeInterval(seconds)
-            while Date() < until, !stopRequested { try? await Task.sleep(for: .milliseconds(100)) }
+            while Date() < until, !isStopping { try? await Task.sleep(for: .milliseconds(100)) }
         }
-        return nil
+        return []
     }
 
     /// The window a step happened in, as it is now — put back where it was
@@ -270,7 +274,7 @@ final class MacroPlayer {
               (try? await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())) != nil
         else { return }
         let deadline = Date().addingTimeInterval(20)
-        while !ready(), !stopRequested, Date() < deadline {
+        while !ready(), !isStopping, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(100))
         }
     }
@@ -285,7 +289,7 @@ final class MacroPlayer {
                                                            configuration: NSWorkspace.OpenConfiguration())
         else { return }
         let deadline = Date().addingTimeInterval(20)
-        while !app.isActive, !stopRequested, Date() < deadline {
+        while !app.isActive, !isStopping, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(100))
         }
         let window = ScreenWindows.all().first { $0.pid == app.processIdentifier && $0.layer == 0 }
@@ -359,7 +363,7 @@ final class MacroPlayer {
         let characters = Array(typed.text)
         let keys = typed.keyCodes.count == characters.count ? typed.keyCodes : nil
         for (index, character) in characters.enumerated() {
-            guard !stopRequested else { return }
+            guard !isStopping else { return }
             press(keys?[index] ?? 0, modifiers: 0, text: String(character))
             try? await Task.sleep(for: .milliseconds(15))
         }
@@ -398,14 +402,14 @@ final class MacroPlayer {
             // may change nothing at all: it is not waited out.
             let changeBy = Date().addingTimeInterval(changeWithin)
             var changed = false
-            while !stopRequested, Date() < changeBy {
+            while !isStopping, Date() < changeBy {
                 try? await Task.sleep(for: .milliseconds(150))
                 guard let look = await ScrollingCapture.look(at: target) else { return }
                 if !look.isSamePage(as: last) { last = look; changed = true; break }
             }
             guard changed else { return }
         }
-        while !stopRequested, Date() < deadline {
+        while !isStopping, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(250))
             guard let look = await ScrollingCapture.look(at: target) else { return }
             if look.isSamePage(as: last) { return }
@@ -450,7 +454,7 @@ final class MacroPlayer {
     }
 
     private func waitWhilePaused() async {
-        while state.pausedBecause != nil, !stopRequested {
+        while state.pausedBecause != nil, !isStopping {
             try? await Task.sleep(for: .milliseconds(150))
         }
     }

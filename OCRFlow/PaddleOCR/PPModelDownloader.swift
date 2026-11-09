@@ -1,4 +1,6 @@
+import CryptoKit
 import Foundation
+import os
 
 /// Installs catalog entries into the user models folder.
 ///
@@ -50,7 +52,12 @@ final class PPModelDownloader {
 
         let id = entry.id
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
-            Task { @MainActor in self?.progress[id] = fraction }
+            Task { @MainActor in
+                // An update still in flight when the download ends must not
+                // bring its progress entry back.
+                guard let self, self.tasks[id] != nil else { return }
+                self.progress[id] = fraction
+            }
         }
 
         let fallback = PPModelCatalog.Source.allCases.first { $0 != source }
@@ -60,8 +67,10 @@ final class PPModelDownloader {
             do {
                 try await Self.install(entry, from: source, into: destination, progress: report)
                 failure = nil
-            } catch is CancellationError {
+            } catch where error is CancellationError || Task.isCancelled {
                 // Leaving no error message reads as "the user stopped it".
+                // URLSession reports a cancelled transfer as its own
+                // `URLError.cancelled`, not as `CancellationError`.
                 failure = nil
             } catch {
                 // One host being unreachable is the common case here — either
@@ -71,7 +80,7 @@ final class PPModelDownloader {
                     do {
                         try await Self.install(entry, from: fallback, into: destination, progress: report)
                         failure = nil
-                    } catch is CancellationError {
+                    } catch where error is CancellationError || Task.isCancelled {
                         failure = nil
                     } catch let retryError {
                         failure = String(localized: "\(error.localizedDescription). Retried with \(fallback.label), which also failed: \(retryError.localizedDescription)")
@@ -155,11 +164,19 @@ final class PPModelDownloader {
                                             progress: @escaping @Sendable (Double) -> Void) async throws {
         // Assemble everything in a scratch folder first: a model without its
         // dictionary is worse than no model at all, because the engine loads it
-        // and then decodes gibberish.
-        let staging = URL.temporaryDirectory
-            .appending(path: "OCRFlowDownload-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: staging) }
+        // and then decodes gibberish. The folder is on the destination's
+        // volume, so moving a gigabyte into place is a rename, not a copy.
+        let fileManager = FileManager.default
+        let staging: URL
+        if let sameVolume = try? fileManager.url(for: .itemReplacementDirectory, in: .userDomainMask,
+                                                 appropriateFor: destination, create: true) {
+            staging = sameVolume
+        } else {
+            staging = URL.temporaryDirectory
+                .appending(path: "OCRFlowDownload-\(UUID().uuidString)", directoryHint: .isDirectory)
+            try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        }
+        defer { try? fileManager.removeItem(at: staging) }
 
         let total = Double(entry.assets.count)
         for (index, asset) in entry.assets.enumerated() {
@@ -167,51 +184,88 @@ final class PPModelDownloader {
                 throw PPDownloadError.badURL(asset.remoteFile)
             }
             let staged = staging.appending(path: asset.localName)
-            try await downloadFile(from: url, to: staged) { fraction in
+            try await downloadFile(asset, from: url, to: staged) { fraction in
                 progress((Double(index) + fraction) / total)
             }
             if asset.kind == .dictionary {
                 // `inference.yml` carries the charset; the app writes it out in
-                // the one-character-per-line form `PPRecognizer` reads.
+                // the one-character-per-line form `PPRecognizer` reads. Its
+                // hash was checked above, before it is parsed.
                 guard let yaml = try? String(contentsOf: staged, encoding: .utf8) else {
                     throw PPDownloadError.malformedDictionary(asset.remoteFile)
                 }
                 try PPDictionary.writeDictionary(fromInferenceYAML: yaml, to: staged)
             }
         }
+        try Task.checkCancellation()
 
-        for asset in entry.assets {
-            let from = staging.appending(path: asset.localName)
-            let to = destination.appending(path: asset.localName)
-            if FileManager.default.fileExists(atPath: to.path(percentEncoded: false)) {
-                _ = try FileManager.default.replaceItemAt(to, withItemAt: from)
-            } else {
-                try FileManager.default.moveItem(at: from, to: to)
+        // All or nothing: if any file cannot be put in place, the ones this
+        // install already moved come out again and what they replaced goes
+        // back, so the folder never holds half of an entry.
+        let backups = staging.appending(path: "Replaced", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: backups, withIntermediateDirectories: true)
+        var placed: [(installed: URL, replaced: URL?)] = []
+        var current = ""
+        do {
+            for asset in entry.assets {
+                current = asset.localName
+                let from = staging.appending(path: asset.localName)
+                let to = destination.appending(path: asset.localName)
+                var replaced: URL?
+                if fileManager.fileExists(atPath: to.path(percentEncoded: false)) {
+                    let backup = backups.appending(path: asset.localName)
+                    try fileManager.moveItem(at: to, to: backup)
+                    replaced = backup
+                }
+                placed.append((to, replaced))
+                try fileManager.moveItem(at: from, to: to)
             }
+        } catch {
+            for item in placed.reversed() {
+                try? fileManager.removeItem(at: item.installed)
+                if let replaced = item.replaced {
+                    try? fileManager.moveItem(at: replaced, to: item.installed)
+                }
+            }
+            throw PPDownloadError.cannotWrite(current)
         }
         progress(1)
     }
 
-    /// Downloads `url` to `file`. A download task rather than `URLSession.bytes`:
-    /// the byte sequence is iterated one element at a time, which costs more
-    /// than the transfer itself on a 139 MB model.
-    private nonisolated static func downloadFile(from url: URL, to file: URL,
+    /// What URLSession kept of transfers that broke off, by the URL they were
+    /// for, so trying again picks a gigabyte download up where it stopped
+    /// instead of starting over. Held for this run of the app only.
+    private nonisolated static let resumeData = OSAllocatedUnfairLock<[URL: Data]>(initialState: [:])
+
+    /// Downloads `url` to `file` and checks it is exactly the published file.
+    /// A download task rather than `URLSession.bytes`: the byte sequence is
+    /// iterated one element at a time, which costs more than the transfer
+    /// itself on a 139 MB model.
+    private nonisolated static func downloadFile(_ asset: PPModelCatalog.Asset, from url: URL, to file: URL,
                                                  progress: @escaping @Sendable (Double) -> Void) async throws {
-        let observer = DownloadObserver(onProgress: progress)
-        let (temporary, response) = try await URLSession.shared.download(from: url, delegate: observer)
+        let (temporary, response) = try await transfer(url, observer: DownloadObserver(onProgress: progress))
 
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             try? FileManager.default.removeItem(at: temporary)
             throw PPDownloadError.httpStatus(http.statusCode, url.host ?? "")
         }
 
-        // A transfer cut short but still reported as 200 would otherwise be
-        // installed as a valid model.
-        let expected = response.expectedContentLength
-        let written = (try? FileManager.default.attributesOfItem(atPath: temporary.path(percentEncoded: false))[.size] as? Int64) ?? nil
-        if expected > 0, let written, written != expected {
+        // A transfer cut short but still reported as 200, or a file a proxy
+        // or mirror altered, would otherwise be installed as a valid model.
+        // The size is checked first, as it costs nothing. (Not against
+        // `expectedContentLength`: that counts the bytes on the wire, which
+        // differ from the file for a compressed response.)
+        do {
+            let written = try FileManager.default.attributesOfItem(atPath: temporary.path(percentEncoded: false))[.size] as? Int64
+            if let written, written < asset.size {
+                throw PPDownloadError.truncated(received: written, expected: asset.size)
+            }
+            guard written == asset.size, try sha256(of: temporary) == asset.sha256 else {
+                throw PPDownloadError.checksumMismatch(asset.remoteFile)
+            }
+        } catch {
             try? FileManager.default.removeItem(at: temporary)
-            throw PPDownloadError.truncated(received: written, expected: expected)
+            throw error
         }
 
         do {
@@ -221,6 +275,51 @@ final class PPModelDownloader {
             throw PPDownloadError.cannotWrite(file.lastPathComponent)
         }
         progress(1)
+    }
+
+    /// Runs the download task, continuing an earlier one for the same URL
+    /// where URLSession kept what had arrived.
+    private nonisolated static func transfer(_ url: URL, observer: DownloadObserver) async throws -> (URL, URLResponse) {
+        if let data = resumeData.withLock({ $0.removeValue(forKey: url) }) {
+            do {
+                let (temporary, response) = try await URLSession.shared.download(resumeFrom: data, delegate: observer)
+                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                    // The server would not continue the old transfer — the
+                    // signed link it had redirected to expires — so start over.
+                    try? FileManager.default.removeItem(at: temporary)
+                } else {
+                    return (temporary, response)
+                }
+            } catch {
+                if let partial = (error as? URLError)?.downloadTaskResumeData {
+                    resumeData.withLock { $0[url] = partial }
+                    throw error
+                }
+                if Task.isCancelled { throw error }
+                // Not resumable any more; start over.
+            }
+        }
+        do {
+            return try await URLSession.shared.download(from: url, delegate: observer)
+        } catch {
+            if let partial = (error as? URLError)?.downloadTaskResumeData {
+                resumeData.withLock { $0[url] = partial }
+            }
+            throw error
+        }
+    }
+
+    /// Lowercase hex SHA-256 of a file, read a few megabytes at a time so a
+    /// gigabyte of weights never has to fit in memory.
+    private nonisolated static func sha256(of file: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 8 << 20), !chunk.isEmpty {
+            try Task.checkCancellation()
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -253,6 +352,7 @@ enum PPDownloadError: LocalizedError {
     case httpStatus(Int, String)
     case cannotWrite(String)
     case truncated(received: Int64, expected: Int64)
+    case checksumMismatch(String)
     case malformedDictionary(String)
 
     var errorDescription: String? {
@@ -267,6 +367,8 @@ enum PPDownloadError: LocalizedError {
             return String(localized: "Couldn't write file \(name)")
         case let .truncated(received, expected):
             return String(localized: "Incomplete download: received \(received) bytes, expected \(expected)")
+        case let .checksumMismatch(file):
+            return String(localized: "\(file) doesn't match the published file (SHA-256 check failed). Try again or switch the download source.")
         case let .malformedDictionary(file):
             return String(localized: "Couldn't read the character dictionary from \(file)")
         }

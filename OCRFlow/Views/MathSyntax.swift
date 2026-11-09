@@ -59,8 +59,24 @@ enum MathParser {
     /// stripped if present.
     static func parse(_ latex: String) -> MathNode {
         var scanner = Scanner(source: Array(stripDelimiters(latex)))
-        let node = scanner.parseSequence(stopAt: [])
-        return node
+        var parts = [scanner.parseSequence(stopAt: [])]
+        // Stopped short of the end: a `}` with no `{` open is kept as itself,
+        // and the rest is read on rather than dropped.
+        while !scanner.isAtEnd {
+            let start = scanner.index
+            if scanner.source[start] == "}" {
+                parts.append(.run("}"))
+                scanner.index += 1
+            }
+            parts.append(scanner.parseSequence(stopAt: []))
+            guard scanner.index > start else { break }
+        }
+        guard parts.count > 1 else { return parts[0] }
+        var nodes: [MathNode] = []
+        for part in parts {
+            if case let .sequence(list) = part { nodes += list } else { nodes.append(part) }
+        }
+        return .sequence(Scanner.merged(nodes))
     }
 
     /// The body of a formula, without whatever wrapped it.
@@ -110,8 +126,18 @@ enum MathParser {
     // MARK: Scanner
 
     struct Scanner {
+        /// Groups nested deeper than this are read as plain text: each level
+        /// is a few calls deeper on the stack, and nothing a page has nests
+        /// this far.
+        static let deepest = 100
+
         let source: [Character]
         var index = 0
+        private var depth = 0
+
+        init(source: [Character]) {
+            self.source = source
+        }
 
         var isAtEnd: Bool { index >= source.count }
 
@@ -139,12 +165,12 @@ enum MathParser {
                 guard let atom = parseScripted(stopAt: stoppers) else { break }
                 nodes.append(atom)
             }
-            return nodes.count == 1 ? nodes[0] : .sequence(merged(nodes))
+            return nodes.count == 1 ? nodes[0] : .sequence(Self.merged(nodes))
         }
 
         /// Runs of literal characters are merged so a formula is not built out
         /// of one view per character.
-        private func merged(_ nodes: [MathNode]) -> [MathNode] {
+        static func merged(_ nodes: [MathNode]) -> [MathNode] {
             var out: [MathNode] = []
             for node in nodes {
                 if case let .run(text) = node, case let .run(previous)? = out.last {
@@ -158,12 +184,19 @@ enum MathParser {
 
         /// An atom plus whatever `^`/`_` follows it.
         private mutating func parseScripted(stopAt stoppers: Set<String>) -> MathNode? {
-            guard var base = parseAtom(stopAt: stoppers) else { return nil }
+            guard let base = parseAtom(stopAt: stoppers) else { return nil }
             var superscript: MathNode?
             var subscriptNode: MathNode?
             var limits = false
 
             if case let .run(text) = base, Self.bigOperators.contains(text) { limits = true }
+            // `\sum\limits_{i}` and `\int\nolimits_a^b` say where the scripts
+            // go. Left to parseAtom they became an empty atom of their own,
+            // which took the scripts away from the operator.
+            while let command = peekCommand(), command == "limits" || command == "nolimits" {
+                skipCommand()
+                limits = command == "limits"
+            }
 
             while let character = peek(), character == "^" || character == "_" {
                 index += 1
@@ -172,8 +205,6 @@ enum MathParser {
                 if character == "^" { superscript = script } else { subscriptNode = script }
             }
             guard superscript != nil || subscriptNode != nil else { return base }
-            // `\limits` / `\nolimits` were consumed as commands by parseAtom.
-            if case let .styled(inner, .upright) = base, case .run = inner { base = .styled(inner, .upright) }
             return .scripted(base: base, superscript: superscript,
                              subscript: subscriptNode, limits: limits)
         }
@@ -181,6 +212,12 @@ enum MathParser {
         private mutating func parseAtom(stopAt stoppers: Set<String>) -> MathNode? {
             skipSpaces()
             guard let character = peek() else { return nil }
+            depth += 1
+            defer { depth -= 1 }
+            if depth > Self.deepest, character != "}", character != "&" {
+                // A group's contents, or a character, as they are.
+                return .run(parseBracedRaw())
+            }
 
             switch character {
             case "{":

@@ -615,7 +615,7 @@ struct RegionContentView: View {
                 MathInlineText(source: text, size: 13)
                     .lineSpacing(3)
             } else {
-                Text(TextDiff.marked(text, against: comparedTo))
+                Text(TextDiff.cachedMarked(text, against: comparedTo))
                     .lineSpacing(3)
             }
         }
@@ -954,6 +954,27 @@ struct EditableTableView: View {
 /// highlighted space is too thin to see. Text missing here that the other
 /// reading has is marked the same way, where it would go.
 enum TextDiff {
+    private struct Pair: Hashable {
+        let text: String
+        let other: String?
+    }
+
+    /// Recent results, so a pane redrawn on every keystroke — or every tick
+    /// of a running batch — does not compare each region's two readings
+    /// over again. Kept small: it only has to cover the regions on screen.
+    @MainActor private static var recent: [Pair: AttributedString] = [:]
+
+    /// `marked`, remembered for the pairs of readings recently shown.
+    @MainActor static func cachedMarked(_ text: String, against other: String?) -> AttributedString {
+        guard let other, text != other else { return AttributedString(text) }
+        let pair = Pair(text: text, other: other)
+        if let known = recent[pair] { return known }
+        let result = marked(text, against: other)
+        if recent.count >= 64 { recent.removeAll(keepingCapacity: true) }
+        recent[pair] = result
+        return result
+    }
+
     static func marked(_ text: String, against other: String?) -> AttributedString {
         var result = AttributedString(text)
         guard let other, text != other else { return result }

@@ -30,18 +30,21 @@ enum ResultChoice {
     /// asks later, from the background, may not be.
     static func ask(_ title: String, options: [Option],
                     comesForward: @escaping (Option) -> Bool = { $0.showsWhatWasRead }) async -> Option {
-        await withCheckedContinuation { continuation in
-            var panel: NSPanel?
+        // The panel is let go here, once answered, not from its own button:
+        // held by what its view does, it would hold itself.
+        var panel: NSPanel?
+        let option = await withCheckedContinuation { continuation in
             var answered = false
             let view = ResultChoiceView(title: title, options: options) { option in
                 guard !answered else { return }
                 answered = true
                 if comesForward(option) { NSApp.activate() }
-                panel?.orderOut(nil)
                 continuation.resume(returning: option)
             }
             panel = HUDPanel.show(view, avoiding: nil)
         }
+        panel?.orderOut(nil)
+        return option
     }
 }
 
@@ -54,13 +57,13 @@ extension ResultChoice {
     /// System Settings, say.
     static func tell(_ title: String, _ message: String,
                      action: (label: String, perform: () -> Void)? = nil) async {
+        // Let go here, once answered — see `ask`.
+        var panel: NSPanel?
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            var panel: NSPanel?
             var answered = false
             @MainActor func answer(_ perform: () -> Void = {}) {
                 guard !answered else { return }
                 answered = true
-                panel?.orderOut(nil)
                 perform()
                 continuation.resume()
             }
@@ -85,6 +88,7 @@ extension ResultChoice {
             }
             panel = HUDPanel.show(view, avoiding: nil)
         }
+        panel?.orderOut(nil)
     }
 }
 

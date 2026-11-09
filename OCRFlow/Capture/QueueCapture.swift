@@ -24,8 +24,15 @@ final class QueueCapture {
     /// The press being held back, as it arrived.
     private var press: CGEvent?
     private var selecting = false
+    /// Escape came while a press was held back: the press is dropped, and
+    /// its release — which would reach the app with no press before it —
+    /// goes nowhere either; then it ends.
+    private var endingOnRelease = false
     private let folder = URL.temporaryDirectory.appending(path: "OCRFlow Queue \(UUID().uuidString)", directoryHint: .isDirectory)
     private var taken: [URL] = []
+    /// Areas let go of and still being taken: Escape right after one does
+    /// not lose it.
+    private var taking: [Task<Void, Never>] = []
 
     /// What was taken, as files in a folder of their own, in order. Empty
     /// when nothing was.
@@ -36,6 +43,8 @@ final class QueueCapture {
         state.onEnd = { [weak self] in self?.end() }
         panel = HUDPanel.show(QueueView(state: state), avoiding: nil)
         await withCheckedContinuation { self.continuation = $0 }
+        for task in taking { await task.value }
+        taking = []
         return taken
     }
 
@@ -66,7 +75,10 @@ final class QueueCapture {
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                           eventsOfInterest: mask, callback: queueTapCallback,
                                           userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }
-        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else {
+            CFMachPortInvalidate(tap)
+            return false
+        }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         self.tap = tap
@@ -82,7 +94,14 @@ final class QueueCapture {
             return true
         case .keyDown:
             guard event.getIntegerValueField(.keyboardEventKeycode) == 53 else { return true }
-            end()
+            if press != nil {
+                press = nil
+                selecting = false
+                selectionPanel?.orderOut(nil)
+                endingOnRelease = true
+            } else {
+                end()
+            }
             return false
         case .leftMouseDown:
             // OCRFlow's own panel works as usual, and can be dragged aside.
@@ -91,6 +110,7 @@ final class QueueCapture {
             selecting = false
             return false
         case .leftMouseDragged, .mouseMoved:
+            if endingOnRelease { return type == .mouseMoved }
             guard let press else { return true }
             let start = press.location, now = event.location
             if !selecting, hypot(now.x - start.x, now.y - start.y) > Self.dragDistance { selecting = true }
@@ -98,6 +118,11 @@ final class QueueCapture {
             // A plain move only moves the pointer; nothing to hold back.
             return type == .mouseMoved
         case .leftMouseUp:
+            if endingOnRelease {
+                endingOnRelease = false
+                end()
+                return false
+            }
             guard let held = press else { return true }
             press = nil
             let start = held.location, now = event.location
@@ -106,7 +131,7 @@ final class QueueCapture {
             if selecting || hypot(now.x - start.x, now.y - start.y) > Self.dragDistance {
                 selecting = false
                 let rect = CGRect(draggedFrom: start, to: now)
-                Task { await take(rect) }
+                taking.append(Task { await take(rect) })
             } else {
                 // Not a drag after all: the click goes where it was aimed.
                 StepPlayer.post(held)

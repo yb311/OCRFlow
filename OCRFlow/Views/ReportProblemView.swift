@@ -13,9 +13,17 @@ struct ReportProblemView: View {
     @State private var isSaving = false
     @State private var saveError: String?
 
-    private var report: String {
-        vm.diagnosticReport(includingCrashLog: includeCrashLog && vm.crashLogFromLastSession != nil)
-            .text(includingFileNames: includeFileNames)
+    /// Gathered once when the window opens, and again only when what it
+    /// includes changes: building it reads every file's size, scans the
+    /// models and reads the crash log, too much to redo on every redraw a
+    /// running batch causes.
+    @State private var diagnostics: DiagnosticReport?
+    @State private var diagnosticsIncludeCrashLog = false
+    @State private var report = ""
+
+    private struct ReportOptions: Equatable {
+        var fileNames: Bool
+        var crashLog: Bool
     }
 
     var body: some View {
@@ -62,6 +70,15 @@ struct ReportProblemView: View {
                                                                   set: { if !$0 { saveError = nil } })) {
         } message: {
             Text(saveError ?? "")
+        }
+        .task(id: ReportOptions(fileNames: includeFileNames,
+                                crashLog: includeCrashLog && vm.crashLogFromLastSession != nil)) {
+            let crashLog = includeCrashLog && vm.crashLogFromLastSession != nil
+            if diagnostics == nil || diagnosticsIncludeCrashLog != crashLog {
+                diagnostics = await vm.diagnosticReport(includingCrashLog: crashLog)
+                diagnosticsIncludeCrashLog = crashLog
+            }
+            report = diagnostics?.text(includingFileNames: includeFileNames) ?? ""
         }
         // Offered once: whatever the user does here, the next launch does not
         // ask about the same crash again.

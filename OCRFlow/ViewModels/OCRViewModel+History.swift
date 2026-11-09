@@ -60,13 +60,31 @@ extension OCRViewModel {
     /// A report on the given files — every file when nil — and on the app,
     /// the Mac and the settings they were read with.
     func diagnosticReport(for ids: Set<UUID>? = nil, includingCrashLog: Bool) -> DiagnosticReport {
+        Self.buildReport(reportSnapshot(for: ids, includingCrashLog: includingCrashLog))
+    }
+
+    /// The same report, gathered off the main thread: it stats every file,
+    /// walks the models folder and reads the crash log.
+    func diagnosticReport(for ids: Set<UUID>? = nil, includingCrashLog: Bool) async -> DiagnosticReport {
+        let snapshot = reportSnapshot(for: ids, includingCrashLog: includingCrashLog)
+        return await BlockingWork.run { Self.buildReport(snapshot) }
+    }
+
+    /// What the report needs from the view model, taken on the main actor.
+    private struct ReportSnapshot: Sendable {
+        var info: [String: String]
+        var settings: OCRSettings
+        var files: [(url: URL, summary: DiagnosticReport.FileSummary)]
+        var crashLog: URL?
+    }
+
+    private func reportSnapshot(for ids: Set<UUID>?, includingCrashLog: Bool) -> ReportSnapshot {
         let info = Bundle.main.infoDictionary ?? [:]
-        let system = DiagnosticReport.currentSystem
         let files = items.filter { ids?.contains($0.id) ?? true }.map { item in
-            DiagnosticReport.FileSummary(
+            (url: item.url, summary: DiagnosticReport.FileSummary(
                 name: item.fileName,
                 fileExtension: item.url.pathExtension,
-                bytes: (try? item.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init),
+                bytes: nil,
                 pages: max(item.pages.count, item.pageCount),
                 status: item.status,
                 engine: item.engine,
@@ -74,16 +92,31 @@ extension OCRViewModel {
                 pageFailures: item.pages.flatMap(\.notes).compactMap { note in
                     guard case .pageFailed = note.reason else { return nil }
                     return note.message
-                })
+                }))
+        }
+        return ReportSnapshot(
+            info: ["version": info["CFBundleShortVersionString"] as? String ?? "?",
+                   "build": info["CFBundleVersion"] as? String ?? "?"],
+            settings: settingsSnapshot,
+            files: files,
+            crashLog: includingCrashLog ? crashLogFromLastSession : nil)
+    }
+
+    private nonisolated static func buildReport(_ snapshot: ReportSnapshot) -> DiagnosticReport {
+        let system = DiagnosticReport.currentSystem
+        let files = snapshot.files.map { file in
+            var summary = file.summary
+            summary.bytes = (try? file.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
+            return summary
         }
         return DiagnosticReport(
-            appVersion: info["CFBundleShortVersionString"] as? String ?? "?",
-            build: info["CFBundleVersion"] as? String ?? "?",
+            appVersion: snapshot.info["version"] ?? "?",
+            build: snapshot.info["build"] ?? "?",
             system: system.version, machine: system.machine, memoryGB: system.memoryGB,
-            settings: settingsSnapshot,
+            settings: snapshot.settings,
             installedModels: DiagnosticReport.installedModels(in: PPModelStore.userModelsDirectory),
             files: files,
-            crashLog: includingCrashLog ? crashLogFromLastSession.flatMap { LaunchSentinel.excerpt(of: $0) } : nil)
+            crashLog: snapshot.crashLog.flatMap { LaunchSentinel.excerpt(of: $0) })
     }
 
     /// Puts a report on the given files on the clipboard, file names left out.

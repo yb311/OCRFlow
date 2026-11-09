@@ -104,8 +104,9 @@ preview.
 
 ## PaddleOCR
 
-PaddleOCR is the default engine. The app bundles the PP-OCRv6 **tiny** and
-**small** tiers and runs them locally through ONNX Runtime:
+PP-OCRv6 reads the prose in 智能分层, the default engine, and can be chosen as
+an engine of its own. The app bundles the PP-OCRv6 **tiny** and **small** tiers
+and runs them locally through ONNX Runtime:
 
 | Stage | Model | Size |
 | --- | --- | --- |
@@ -146,9 +147,9 @@ that was scanned sideways. Two independent stages handle this:
 
 ### Installing other models
 
-Open **Settings → Paddle → 模型管理** and click download. Everything lands in
-`~/Library/Application Support/OCRFlow/Models`, and a file there overrides the
-bundled model of the same name. Both Hugging Face and an `hf-mirror.com` mirror
+Open the **Model Manager** (模型管理; **Settings → Advanced**) and click
+download. Everything lands in `~/Library/Application Support/OCRFlow/Models`,
+and a file there overrides the bundled model of the same name. Both Hugging Face and an `hf-mirror.com` mirror
 are offered, since Hugging Face is often unreachable from mainland China.
 
 Available there:
@@ -238,14 +239,15 @@ So the app implements the whole pipeline:
    titles as headings, formulas in `$$`, tables as HTML and figures as
    placeholders.
 
-Skipping stage 1 is possible (**Settings → VL → 版面分析**), and it is much
+Skipping stage 1 is possible (**Settings → Recognition → Reading Order & Layout**,
+with PaddleOCR-VL as the engine), and it is much
 faster, but it loses content: on a dense Korean poster the single-shot path
 silently dropped the title and the first three paragraphs that the full pipeline
 recovers.
 
 ### Models
 
-Downloaded from **Settings → VL → 模型管理**; nothing is bundled.
+Downloaded from the **Model Manager** (模型管理); nothing is bundled.
 
 | Model | Size | Notes |
 | --- | --- | --- |
@@ -260,8 +262,8 @@ newspaper page parses in about 10 seconds.
 
 Generating a region's text is hundreds of small steps, each reading every
 weight of the model to produce one token. The engine keeps up to 16 sequences in
-one llama context (8 on 16 GB Macs, 4 on 8 GB; **Settings → VL → 推理**) and
-decodes them together, refilling a slot as soon as a region finishes —
+one llama context (8 on 16 GB Macs, 4 on 8 GB; **Settings → Advanced →
+PaddleOCR-VL → Inference**) and decodes them together, refilling a slot as soon as a region finishes —
 regions from several pages and files share the batch. The vision encoder runs on
 its own thread, a region ahead.
 
@@ -279,10 +281,12 @@ app converts them to HTML with `colspan`/`rowspan`, as PaddleOCR does.
 
 ### Compute backend
 
-CPU is the default and the recommended setting. A Core ML backend is available
-in Settings, but PP-OCR's detection and recognition graphs have dynamic input
-shapes, which Core ML recompiles per shape; in practice it produces identical
-text several times more slowly.
+PP-OCR's detection and recognition run on the CPU: their graphs have dynamic
+input shapes, which Core ML would recompile per shape. Recognition reads lines
+side by side on every core (**Settings → Advanced → PP-OCRv6 → Compute Backend**
+sets the thread count). Layout analysis runs on the GPU through Core ML, in
+32-bit floats and never on the Neural Engine, so it matches the CPU to about
+1e-6.
 
 ## Project Structure
 
@@ -298,8 +302,7 @@ OCRFlow/
 │   ├── SidebarView.swift     # File list sidebar
 │   ├── DetailView.swift      # Preview + OCR result panel + box overlay
 │   ├── DropZoneView.swift    # Empty-state drop zone
-│   ├── ModelManagerView.swift # Download / remove optional models
-│   └── DropHelper.swift      # Drag-and-drop handling
+│   └── ModelManagerView.swift # Download / remove optional models
 ├── PaddleOCR/
 │   ├── PPOCREngine.swift              # Pipeline orchestration
 │   ├── PPTypes.swift                  # Config, results, errors

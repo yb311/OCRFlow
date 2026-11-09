@@ -9,6 +9,9 @@ permissions:
 
 env:
   SPARKLE_VERSION: 2.9.6
+  # SHA-256 of Sparkle-$SPARKLE_VERSION.tar.xz, whose sign_update is handed the
+  # update-signing key. Bump it together with SPARKLE_VERSION.
+  SPARKLE_SHA256: 52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192
 
 jobs:
   release:
@@ -75,13 +78,15 @@ jobs:
       - name: Archive
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION_SHORT: ${{ steps.version.outputs.short }}
+          VERSION_BUILD: ${{ steps.version.outputs.build }}
         run: |
           xcodebuild -project OCRFlow.xcodeproj -scheme OCRFlow \
             -configuration Release \
             -derivedDataPath build/DerivedData \
             -archivePath build/OCRFlow.xcarchive \
-            MARKETING_VERSION="${{ steps.version.outputs.short }}" \
-            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build }}" \
+            MARKETING_VERSION="$VERSION_SHORT" \
+            CURRENT_PROJECT_VERSION="$VERSION_BUILD" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             PROVISIONING_PROFILE_SPECIFIER="" \
@@ -138,8 +143,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          VERSION_SHORT: ${{ steps.version.outputs.short }}
         run: |
-          version="${{ steps.version.outputs.short }}"
+          version="$VERSION_SHORT"
 
           Scripts/make-dmg.sh build/export/OCRFlow.app "build/OCRFlow-$version.dmg"
           xcrun notarytool submit "build/OCRFlow-$version.dmg" \
@@ -160,8 +166,9 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION_SHORT: ${{ steps.version.outputs.short }}
         run: |
-          version="${{ steps.version.outputs.short }}"
+          version="$VERSION_SHORT"
           # Written notes when there are some: they are what the update window shows.
           notes_file="docs/release-notes/$GITHUB_REF_NAME.md"
           if [ -f "$notes_file" ]; then notes=(--notes-file "$notes_file"); else notes=(--generate-notes); fi
@@ -176,12 +183,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION_SHORT: ${{ steps.version.outputs.short }}
         run: |
-          version="${{ steps.version.outputs.short }}"
+          version="$VERSION_SHORT"
 
           curl --fail --location --silent \
             -o "$RUNNER_TEMP/sparkle.tar.xz" \
             "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "$SPARKLE_SHA256  $RUNNER_TEMP/sparkle.tar.xz" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/sparkle"
           tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
 

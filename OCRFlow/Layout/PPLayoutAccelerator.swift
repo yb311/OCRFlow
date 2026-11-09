@@ -30,11 +30,15 @@ final class PPLayoutAccelerator: @unchecked Sendable {
         #if arch(arm64)
         guard ORTIsCoreMLExecutionProviderAvailable() else { return nil }
         let key = modelPath.standardizedFileURL.path(percentEncoded: false)
+        // A model downloaded again over the same path is a different file:
+        // the stages cut from the old one would run the old weights while
+        // the CPU session reads the new ones.
+        let identity = fileIdentity(modelPath)
         registryLock.lock()
         defer { registryLock.unlock() }
-        if let existing = registry[key] { return existing }
+        if let existing = registry[key], existing.identity == identity { return existing.accelerator }
         let accelerator = PPLayoutAccelerator(modelPath: modelPath)
-        registry[key] = accelerator
+        registry[key] = (identity, accelerator)
         accelerator.prepareInBackground()
         return accelerator
         #else
@@ -51,7 +55,15 @@ final class PPLayoutAccelerator: @unchecked Sendable {
     }
 
     private static let registryLock = NSLock()
-    nonisolated(unsafe) private static var registry: [String: PPLayoutAccelerator] = [:]
+    nonisolated(unsafe) private static var registry: [String: (identity: String, accelerator: PPLayoutAccelerator)] = [:]
+
+    /// Size and modification date: what `cacheDirectory()` keys on as well.
+    private static func fileIdentity(_ url: URL) -> String {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false))
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size)-\(modified)"
+    }
     private static let log = Logger(subsystem: "com.ocrflow.app", category: "LayoutGPU")
 
     private struct Stages {
@@ -64,8 +76,16 @@ final class PPLayoutAccelerator: @unchecked Sendable {
     private let lock = NSLock()
     private var stages: Stages?
 
+    /// A shared `flock` on the cache directory's lock file, held for as long
+    /// as this accelerator lives. Set once, by `loadStages()`.
+    private var cacheLock: Int32 = -1
+
     private init(modelPath: URL) {
         self.modelPath = modelPath
+    }
+
+    deinit {
+        if cacheLock >= 0 { close(cacheLock) }
     }
 
     /// True once the GPU stages are loaded.
@@ -122,7 +142,7 @@ final class PPLayoutAccelerator: @unchecked Sendable {
     }
 
     private func loadStages() throws -> Stages {
-        let directory = try cacheDirectory()
+        let directory = try claimCacheDirectory()
         let headURL = directory.appending(path: "head.onnx")
         let tailURL = directory.appending(path: "tail.onnx")
         let manifestURL = directory.appending(path: "manifest.json")
@@ -162,6 +182,67 @@ final class PPLayoutAccelerator: @unchecked Sendable {
         let head = try PPSession(modelPath: headURL, env: env, config: .default, gpu: placement)
         let tail = try PPSession(modelPath: tailURL, env: env, config: .default)
         return Stages(env: env, head: head, tail: tail)
+    }
+
+    /// The file inside each cache directory whose shared lock marks the
+    /// directory as in use.
+    private static let lockFileName = ".in-use"
+
+    /// `cacheDirectory()`, locked against the cleanup below, after which the
+    /// copies left by earlier model files and runtimes are removed.
+    ///
+    /// Every new download or ONNX Runtime gives a new directory, so without
+    /// the cleanup they pile up a few hundred megabytes at a time. The lock
+    /// is what keeps it from taking a directory still in use — by an
+    /// accelerator for the previous download that a running engine holds,
+    /// or by another copy of the app.
+    private func claimCacheDirectory() throws -> URL {
+        for _ in 0..<3 {
+            let directory = try cacheDirectory()
+            let lockPath = directory.appending(path: Self.lockFileName).path(percentEncoded: false)
+            // Fails only if a cleanup removed the directory just after it
+            // was created; the next pass creates it again.
+            let descriptor = open(lockPath, O_RDONLY | O_CREAT | O_CLOEXEC, 0o644)
+            guard descriptor >= 0 else { continue }
+            guard flock(descriptor, LOCK_SH) == 0 else {
+                close(descriptor)
+                continue
+            }
+            // A cleanup holding the lock first deletes the file before it
+            // lets go; a lock on a deleted file protects nothing.
+            var held = stat()
+            var onDisk = stat()
+            if fstat(descriptor, &held) == 0, stat(lockPath, &onDisk) == 0,
+               held.st_dev == onDisk.st_dev, held.st_ino == onDisk.st_ino {
+                cacheLock = descriptor
+                Self.removeStaleCaches(keeping: directory)
+                return directory
+            }
+            close(descriptor)
+        }
+        throw PPOCRError.sessionFailed("GPU cache directory could not be locked")
+    }
+
+    /// Deletes every sibling of `current` that nothing holds a lock on.
+    private static func removeStaleCaches(keeping current: URL) {
+        let fileManager = FileManager.default
+        guard let siblings = try? fileManager.contentsOfDirectory(
+            at: current.deletingLastPathComponent(), includingPropertiesForKeys: [.isDirectoryKey],
+            options: .skipsHiddenFiles) else { return }
+        for sibling in siblings where sibling.lastPathComponent != current.lastPathComponent {
+            guard (try? sibling.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
+            let descriptor = open(sibling.appending(path: lockFileName).path(percentEncoded: false),
+                                  O_RDONLY | O_CREAT | O_CLOEXEC, 0o644)
+            guard descriptor >= 0 else { continue }
+            defer { close(descriptor) }
+            // Held shared by whoever is using it; leave it alone then.
+            guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { continue }
+            do {
+                try fileManager.removeItem(at: sibling)
+            } catch {
+                log.error("Couldn't remove an old GPU cache: \(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     /// A directory for this exact model file, cut and runtime. Anything that

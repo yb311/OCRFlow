@@ -20,27 +20,43 @@ build="$(plutil -extract CFBundleVersion raw "${plist}")"
 minimum="$(plutil -extract LSMinimumSystemVersion raw "${plist}")"
 length="$(stat -f%z "${ARCHIVE}")"
 
+# Text and attribute values XML-escaped: an archive URL with a query string
+# carries `&`. (sed, not ${var//…}: bash 5.2 reads `&` in the replacement as
+# the match.)
+xml_escape() {
+    printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+        -e 's/"/\&quot;/g' -e "s/'/\\&apos;/g"
+}
+url_xml="$(xml_escape "${URL}")"
+short_xml="$(xml_escape "${short}")"
+build_xml="$(xml_escape "${build}")"
+minimum_xml="$(xml_escape "${minimum}")"
+signature_xml="$(xml_escape "${SIGNATURE}")"
+# The notes go in CDATA as they are, but for `]]>`, which would end it: split
+# there into two sections.
+notes="$(sed -e 's/]]>/]]]]><![CDATA[>/g' "${NOTES}")"
+
 cat <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
         <title>OCRFlow</title>
-        <link>${URL}</link>
+        <link>${url_xml}</link>
         <description>OCRFlow 更新</description>
         <language>zh</language>
         <item>
-            <title>${short}</title>
+            <title>${short_xml}</title>
             <pubDate>$(date -R)</pubDate>
-            <sparkle:version>${build}</sparkle:version>
-            <sparkle:shortVersionString>${short}</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>${minimum}</sparkle:minimumSystemVersion>
+            <sparkle:version>${build_xml}</sparkle:version>
+            <sparkle:shortVersionString>${short_xml}</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>${minimum_xml}</sparkle:minimumSystemVersion>
             <description><![CDATA[
-$(cat "${NOTES}")
+${notes}
 ]]></description>
-            <enclosure url="${URL}"
+            <enclosure url="${url_xml}"
                        length="${length}"
                        type="application/octet-stream"
-                       sparkle:edSignature="${SIGNATURE}" />
+                       sparkle:edSignature="${signature_xml}" />
         </item>
     </channel>
 </rss>

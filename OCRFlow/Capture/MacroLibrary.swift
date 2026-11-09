@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 
 /// The user's recorded macros, kept in the library folder.
 ///
@@ -19,12 +20,48 @@ final class MacroLibrary {
 
     @ObservationIgnored private let file: URL
     @ObservationIgnored private let capturesFolder: URL
+    /// Some of the macros could not be read: the captures of those are kept
+    /// too, with the file set aside, rather than cleared away as unused.
+    @ObservationIgnored private var keepsUnusedCaptures = false
+
+    private static let log = Logger(subsystem: "com.ocrflow.app", category: "macros")
 
     init(directory: URL) {
         file = directory.appending(path: "Macros.json")
         capturesFolder = directory.appending(path: "Macro Captures", directoryHint: .isDirectory)
-        macros = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([Macro].self, from: $0) } ?? []
-        removeUnusedCaptures()
+        guard let data = try? Data(contentsOf: file) else {
+            macros = []
+            removeUnusedCaptures()
+            return
+        }
+        // One by one: a macro that cannot be read loses only itself.
+        let read = try? JSONDecoder().decode([Readable].self, from: data)
+        macros = read?.compactMap(\.macro) ?? []
+        if read == nil || read?.contains(where: { $0.macro == nil }) == true {
+            // Set aside as it was, not written over by the next save.
+            let aside = directory.appending(path: "Macros.json.unreadable-\(Date().ISO8601Format())")
+            do {
+                if read == nil {
+                    try FileManager.default.moveItem(at: file, to: aside)
+                } else {
+                    try FileManager.default.copyItem(at: file, to: aside)
+                }
+                Self.log.error("Macros.json could not be read in full; set aside as \(aside.lastPathComponent, privacy: .public)")
+            } catch {
+                Self.log.error("Macros.json could not be read in full, nor set aside: \(error, privacy: .public)")
+            }
+            keepsUnusedCaptures = true
+        } else {
+            removeUnusedCaptures()
+        }
+    }
+
+    /// A macro if it can be read; nil, rather than an error, if not.
+    private struct Readable: Decodable {
+        let macro: Macro?
+        init(from decoder: any Decoder) throws {
+            macro = try? Macro(from: decoder)
+        }
     }
 
     func macro(_ id: UUID?) -> Macro? {
@@ -71,7 +108,8 @@ final class MacroLibrary {
 
     /// A capture whose step, or whole macro, was deleted goes too.
     private func removeUnusedCaptures() {
-        guard let files = try? FileManager.default.contentsOfDirectory(at: capturesFolder, includingPropertiesForKeys: nil)
+        guard !keepsUnusedCaptures,
+              let files = try? FileManager.default.contentsOfDirectory(at: capturesFolder, includingPropertiesForKeys: nil)
         else { return }
         let steps = Set(macros.flatMap(\.steps).map(\.id.uuidString))
         for file in files where !steps.contains(file.deletingPathExtension().lastPathComponent) {

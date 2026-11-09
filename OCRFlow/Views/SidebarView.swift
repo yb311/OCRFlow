@@ -46,6 +46,8 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var vm = vm
+        // Filtered once per pass: it searches every file's text.
+        let visibleItems = self.visibleItems
         VStack(spacing: 0) {
             // A field above the list rather than `.searchable`: the sidebar
             // placement lays the field over the list's top edge, and rows
@@ -159,6 +161,7 @@ struct SidebarView: View {
         }
         .onChange(of: "\(filter)#\(query)") {
             // Keep the detail pane pointing at something the list still shows.
+            let visibleItems = self.visibleItems
             let visible = Set(visibleItems.map(\.id))
             let survivors = vm.selectedIDs.intersection(visible)
             let replacement = survivors.isEmpty
@@ -367,6 +370,7 @@ struct SidebarRowView: View {
     }
 
     var body: some View {
+        let snippet = self.snippet
         HStack(spacing: 10) {
             thumbnailView
             VStack(alignment: .leading, spacing: 2) {

@@ -11,8 +11,12 @@ final class GlobalHotKey {
     /// The capture shortcuts, as the menu would write them.
     static let captureTitle = "⌥⇧⌘2"
 
-    private var hotKey: EventHotKeyRef?
-    private var handler: EventHandlerRef?
+    // Unsafe only to be let go of in `deinit`, which is not on the main
+    // actor; otherwise touched on it alone.
+    nonisolated(unsafe) private var hotKey: EventHotKeyRef?
+    /// Holds this object, unretained, for Carbon to call back with: it must
+    /// go before the object does.
+    nonisolated(unsafe) private var handler: EventHandlerRef?
     private let action: () -> Void
 
     /// ⌥⇧⌘2: the in-app capture shortcut, ⇧⌘2, with ⌥ added so it does not
@@ -116,5 +120,12 @@ final class GlobalHotKey {
         if let handler { RemoveEventHandler(handler) }
         hotKey = nil
         handler = nil
+    }
+
+    deinit {
+        // Let go of while still registered: Carbon must not call back into
+        // it once it is gone.
+        if let hotKey { UnregisterEventHotKey(hotKey) }
+        if let handler { RemoveEventHandler(handler) }
     }
 }

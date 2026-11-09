@@ -30,6 +30,8 @@ final class ScrollingCapture {
     /// A click on the area stopped it: its release goes nowhere either.
     private var swallowingRelease = false
     private var finish: CaptureFinish?
+    /// What the user finishes with without picking one: Return's.
+    private var finishedAnyway: CaptureFinish = .copy
     private var stitcher = LiveStitcher()
     private var stream: FrameStream?
     private var scroller: SmoothScroller?
@@ -78,6 +80,7 @@ final class ScrollingCapture {
         }
         guard let frame = ScreenCapture.frame(of: target) else { return ([], .cancel) }
         state.onAutomatic = { [weak self] in self?.toggleAutomatic() }
+        if finishes.contains(.done) { finishedAnyway = .done }
         screen.goLive()
         showPanels(beside: frame, finishes: finishes)
         prepare(target, first: first, frame: frame)
@@ -101,7 +104,7 @@ final class ScrollingCapture {
         // Scrolling, by hand or automatically, until the user says it is
         // done: at the end of the page nothing more comes in, and it waits.
         while finish == nil {
-            try? await Task.sleep(for: .milliseconds(50))
+            do { try await Task.sleep(for: .milliseconds(50)) } catch { finish = .cancel; break }
             if adjusted, !screen.isDraggingArea, let chosen = screen.chosen, !(await startOver(chosen)) { break }
             // Scrolled: what is scrolled stays as it is.
             if grown > 0 || state.automatic { screen.endAdjusting(applyingTyping: false) }
@@ -170,7 +173,7 @@ final class ScrollingCapture {
         lastGrowth = .now
         scroller.start()
         while finish == nil, !scroller.isDone, ContinuousClock.now - lastGrowth < Self.endAfter {
-            try? await Task.sleep(for: .milliseconds(100))
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { break }
         }
         stopAutomatic()
         // The last frames, until the view has come to rest: the stream sends
@@ -182,7 +185,7 @@ final class ScrollingCapture {
     private func waitFor(seconds: Double, _ condition: () -> Bool) async {
         let deadline = ContinuousClock.now + .seconds(seconds)
         while !condition(), finish == nil, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(16))
+            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
         }
     }
 
@@ -192,7 +195,7 @@ final class ScrollingCapture {
         let stitcher = self.stitcher
         generation += 1
         let generation = self.generation
-        let stream = FrameStream { [weak self] image in
+        let stream = FrameStream(onFrame: { [weak self] image in
             let outcome = stitcher.add(image)
             let size = (stitcher.width, stitcher.height + stitcher.grown)
             // What came into view, small, for the preview to grow by; and,
@@ -207,7 +210,14 @@ final class ScrollingCapture {
                 guard let self, self.generation == generation, !self.adjusted else { return }
                 self.took(outcome, size: size, slice: slice, head: head)
             }
-        }
+        }, onStop: { [weak self] in
+            // The window closed, or the display went: what was taken so far
+            // is kept, as though the user had finished.
+            Task { @MainActor in
+                guard let self, self.generation == generation, self.finish == nil else { return }
+                self.finish = self.finishedAnyway
+            }
+        })
         do {
             try await stream.start(target, size: size)
         } catch {
@@ -286,7 +296,7 @@ final class ScrollingCapture {
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                           eventsOfInterest: mask, callback: takeoverTapCallback,
                                           userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return }
-        guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else { return }
+        guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else { return CFMachPortInvalidate(tap) }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         takeover = (tap, source)

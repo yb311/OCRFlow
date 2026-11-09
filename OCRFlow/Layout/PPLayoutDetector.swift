@@ -95,7 +95,11 @@ struct PPLayoutDetector {
             let row = i * stride
             let score = Double(detections[row + 1])
             guard score >= scoreThreshold else { continue }
-            guard let label = PPLayoutLabel(rawValue: Int(detections[row])) else { continue }
+            // `Int(_:)` traps on a value it cannot represent; a NaN or huge
+            // class id is just an unusable row.
+            let classID = detections[row]
+            guard classID.isFinite, abs(classID) < 1024,
+                  let label = PPLayoutLabel(rawValue: Int(classID)) else { continue }
 
             let x1 = CGFloat(detections[row + 2]), y1 = CGFloat(detections[row + 3])
             let x2 = CGFloat(detections[row + 4]), y2 = CGFloat(detections[row + 5])

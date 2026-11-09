@@ -80,7 +80,7 @@ The app reads `SUFeedURL` from `Info.plist`, which points at
 newest published release, so the feed never needs a server. Sparkle compares
 `CFBundleVersion`, verifies the EdDSA signature against `SUPublicEDKey`, and
 installs the zip. Users can also check by hand from **OCRFlow → 检查更新…** or
-**Settings → 行为 → 软件更新**.
+**Settings → General → Software Update**.
 
 Because updates are delivered as the zip, an update is roughly the same size as
 a fresh download; the bundled ONNX models are most of it.
@@ -102,4 +102,5 @@ README](https://github.com/actions/runner-images/blob/main/images/macos/macos-26
 
 **Bumping Sparkle.** The version is pinned in two places that must agree: the
 package requirement in `project.pbxproj` and `SPARKLE_VERSION` in
-`.github/workflows/release.yml`.
+`.github/workflows/release.yml`, where `SPARKLE_SHA256` must be updated with it
+(the digest GitHub shows for the release's `.tar.xz`).

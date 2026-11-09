@@ -196,7 +196,9 @@ struct ItemDetailView: View {
         return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
     }
 
-    /// This page's text and Markdown, as the document has them.
+    /// This page's text and Markdown, as the document has them. A multi-page
+    /// file assembles the page anew on every read, so `body` reads it once
+    /// and hands it down.
     private var pageText: (text: String, markdown: String) {
         item.pages.count > 1 ? vm.pageText(for: item, page: pageIndex) : (item.ocrText, item.markdown)
     }
@@ -235,8 +237,10 @@ struct ItemDetailView: View {
     }
 
     /// Panes worth offering for this result.
-    private var availablePanes: [ResultPane] {
-        let structured = !pageText.markdown.isEmpty
+    private var availablePanes: [ResultPane] { availablePanes(markdown: pageText.markdown) }
+
+    private func availablePanes(markdown: String) -> [ResultPane] {
+        let structured = !markdown.isEmpty
         var panes: [ResultPane] = []
         if structured { panes.append(.markdown) }
         if structured { panes.append(.source) }
@@ -589,8 +593,7 @@ struct ItemDetailView: View {
     }
 
     /// Where the line or region picked on the page is in the plain text.
-    private var plainTextHighlight: NSRange? {
-        let text = pageText.text
+    private func plainTextHighlight(in text: String) -> NSRange? {
         switch selection {
         case let .line(index) where lines.indices.contains(index):
             let wanted = lines[index].text.trimmingCharacters(in: .whitespaces)
@@ -689,20 +692,15 @@ struct ItemDetailView: View {
     private func zoomStep(above value: CGFloat) -> CGFloat { value >= 2 ? 0.5 : 0.25 }
     private func zoomStep(below value: CGFloat) -> CGFloat { value > 2 ? 0.5 : 0.25 }
 
-    /// Boxes describe the run that produced them, so they are shown only while
-    /// that run's result is the one on screen.
-    private var showsOverlays: Bool {
-        vm.showTextBoxes && item.status == .completed
-    }
-
     // MARK: - Text panel
 
     private var textPanel: some View {
-        VStack(spacing: 0) {
+        let pageText = self.pageText
+        return VStack(spacing: 0) {
             // Header bar
             HStack(spacing: 10) {
                 // What to look at is the header: three views of one result.
-                let panes = availablePanes
+                let panes = availablePanes(markdown: pageText.markdown)
                 if item.status == .completed, panes.count > 1,
                    !(pageText.text.isEmpty && pageText.markdown.isEmpty) {
                     Picker("Result view", selection: $resultPane) {
@@ -792,7 +790,7 @@ struct ItemDetailView: View {
             }
 
             // Content
-            textContent
+            textContent(pageText)
 
             if item.status == .completed, let footer = footerLine {
                 Divider()
@@ -822,7 +820,7 @@ struct ItemDetailView: View {
     }
 
     @ViewBuilder
-    private var textContent: some View {
+    private func textContent(_ pageText: (text: String, markdown: String)) -> some View {
         switch item.status {
         case .pending:
             VStack(spacing: 14) {
@@ -989,16 +987,16 @@ struct ItemDetailView: View {
                                                 blockIndex: source, text: text)
                             })
                     case .plain:
-                        PlainTextView(text: pageText.text, highlighted: plainTextHighlight)
+                        PlainTextView(text: pageText.text, highlighted: plainTextHighlight(in: pageText.text))
                     case .translation:
                         TranslationPane(item: item, isTranslating: vm.translatingIDs.contains(item.id))
                     }
                 }
-                .task(id: renderKey) { await refreshDocument() }
+                .task(id: renderKey(markdown: pageText.markdown)) { await refreshDocument() }
                 // A pane that no longer applies to this file would otherwise
                 // show as an empty result.
                 .onAppear { normalisePane() }
-                .onChange(of: renderKey) { normalisePane() }
+                .onChange(of: renderKey(markdown: pageText.markdown)) { normalisePane() }
             }
 
         case .cancelled:
@@ -1121,6 +1119,7 @@ struct ItemDetailView: View {
                     Image(systemName: showingNotes ? "chevron.up" : "chevron.down")
                 }
                 .help(showingNotes ? "Collapse" : "Expand")
+                .accessibilityLabel(showingNotes ? Text("Collapse") : Text("Expand"))
             }
             .buttonStyle(.borderless)
             if showingNotes {
@@ -1212,8 +1211,8 @@ struct ItemDetailView: View {
     /// Changes whenever the pane has a different document to show — a new
     /// selection, a result that has just finished, or the page-furniture switch
     /// having added or removed regions.
-    private var renderKey: String {
-        "\(item.id)#\(pageIndex)#\(pageText.markdown.count)#\(blocks.count)#\(vm.keptAuxiliary.count)#\(pageImage != nil)"
+    private func renderKey(markdown: String) -> String {
+        "\(item.id)#\(pageIndex)#\(markdown.count)#\(blocks.count)#\(vm.keptAuxiliary.count)#\(pageImage != nil)"
     }
 
     private func statusPlaceholder(icon: String, title: String, subtitle: String, color: Color) -> some View {
@@ -1234,12 +1233,6 @@ struct ItemDetailView: View {
     }
 }
 
-// MARK: - Detection overlay
-
-/// Draws PaddleOCR's per-line quadrilaterals on top of the preview.
-///
-/// The boxes are in image-pixel coordinates, so they first have to be mapped
-/// into the letterboxed rectangle that `scaledToFit` actually paints.
 /// The page's text as one selectable document, which shows where the line
 /// picked on the page is: selected, scrolled to, and pointed out the way Find
 /// points out a match.
@@ -1309,6 +1302,12 @@ struct PlainTextView: NSViewRepresentable {
     }
 }
 
+// MARK: - Detection overlay
+
+/// Draws PaddleOCR's per-line quadrilaterals on top of the preview.
+///
+/// The boxes are in image-pixel coordinates, so they first have to be mapped
+/// into the letterboxed rectangle that `scaledToFit` actually paints.
 struct TextBoxOverlay: View {
     let lines: [PPTextLine]
     let imageSize: CGSize

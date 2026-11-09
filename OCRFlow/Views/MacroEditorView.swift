@@ -199,6 +199,9 @@ private struct MacroStepRow: View {
     let number: Int
     /// What a capture step took while it was recorded, still to be handed on.
     let recorded: URL?
+    /// The recorded capture, small — decoded off the main thread, not on
+    /// every redraw of the form.
+    @State private var preview: CGImage?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -209,12 +212,13 @@ private struct MacroStepRow: View {
             Image(systemName: icon)
                 .foregroundStyle(.secondary)
                 .frame(width: 18)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(MacroStepDescription.title(of: step))
                 if let place = MacroStepDescription.place(of: step) {
                     Text(place).font(.caption).foregroundStyle(.secondary)
                 }
-                if let recorded, let preview = PageImages.thumbnail(of: recorded, maxPixels: 240) {
+                if recorded != nil, let preview {
                     HStack(alignment: .top, spacing: 8) {
                         Image(decorative: preview, scale: 2)
                             .clipShape(RoundedRectangle(cornerRadius: 3))
@@ -227,6 +231,11 @@ private struct MacroStepRow: View {
                 }
                 editor
             }
+        }
+        .task(id: recorded) {
+            preview = nil
+            guard let recorded else { return }
+            preview = await BlockingWork.run { PageImages.thumbnail(of: recorded, maxPixels: 240) }
         }
     }
 

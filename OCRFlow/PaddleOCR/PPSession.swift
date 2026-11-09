@@ -125,21 +125,22 @@ final class PPSession: @unchecked Sendable {
             guard let result = outputs[outputName] else {
                 throw PPOCRError.inferenceFailed(String(localized: "The model returned no output \(outputName)"))
             }
-            let info = try result.tensorTypeAndShapeInfo()
-            let outShape = info.shape.map(\.intValue)
-            let raw = try result.tensorData() as Data
-            let count = outShape.reduce(1, *)
-            guard raw.count >= count * MemoryLayout<Float>.size else {
-                throw PPOCRError.unexpectedOutputShape(String(localized: "Expected \(count) floats, got \(raw.count) bytes"))
-            }
-            var values = [Float](repeating: 0, count: count)
-            _ = values.withUnsafeMutableBytes { dst in
-                raw.copyBytes(to: dst, count: count * MemoryLayout<Float>.size)
-            }
             // `data` backs the input tensor for the whole call; ONNX Runtime does
             // not copy it, so keep it alive until after `run` returns.
             withExtendedLifetime(data) {}
-            return (values, outShape)
+            // The tensor's bytes belong to `result` and are not retained by
+            // the data object that points at them, so `result` has to outlive
+            // the copy.
+            return try withExtendedLifetime(result) {
+                let info = try result.tensorTypeAndShapeInfo()
+                let outShape = info.shape.map(\.intValue)
+                let raw = try result.tensorData()
+                let count = outShape.reduce(1, *)
+                guard raw.length >= count * MemoryLayout<Float>.size else {
+                    throw PPOCRError.unexpectedOutputShape(String(localized: "Expected \(count) floats, got \(raw.length) bytes"))
+                }
+                return (Self.elements(raw, count: count, of: Float.self), outShape)
+            }
         } catch let error as PPOCRError {
             throw error
         } catch {
@@ -212,38 +213,48 @@ final class PPSession: @unchecked Sendable {
         }
     }
 
+    /// `value` is borrowed for the whole call, which keeps the tensor bytes
+    /// `tensorData()` points at alive while they are copied out.
     static func read(_ value: ORTValue, name: String) throws -> PPTensor {
         let info = try value.tensorTypeAndShapeInfo()
         let shape = info.shape.map(\.intValue)
         let count = shape.reduce(1, *)
-        let raw = try value.tensorData() as Data
+        let raw = try value.tensorData()
 
         switch info.elementType {
         case .float:
-            guard raw.count >= count * MemoryLayout<Float>.size else {
-                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) floats, got \(raw.count) bytes"))
+            guard raw.length >= count * MemoryLayout<Float>.size else {
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) floats, got \(raw.length) bytes"))
             }
-            var elements = [Float](repeating: 0, count: count)
-            _ = elements.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Float>.size) }
-            return .float(elements, shape: shape)
+            return .float(elements(raw, count: count, of: Float.self), shape: shape)
         case .int32:
-            guard raw.count >= count * MemoryLayout<Int32>.size else {
-                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int32 values, got \(raw.count) bytes"))
+            guard raw.length >= count * MemoryLayout<Int32>.size else {
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int32 values, got \(raw.length) bytes"))
             }
-            var elements = [Int32](repeating: 0, count: count)
-            _ = elements.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Int32>.size) }
-            return .int32(elements, shape: shape)
+            return .int32(elements(raw, count: count, of: Int32.self), shape: shape)
         case .int64:
             // Paddle exports sometimes widen indices to int64; narrow them so
             // callers only ever deal with one integer type.
-            guard raw.count >= count * MemoryLayout<Int64>.size else {
-                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int64 values, got \(raw.count) bytes"))
+            guard raw.length >= count * MemoryLayout<Int64>.size else {
+                throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): expected \(count) int64 values, got \(raw.length) bytes"))
             }
-            var wide = [Int64](repeating: 0, count: count)
-            _ = wide.withUnsafeMutableBytes { raw.copyBytes(to: $0, count: count * MemoryLayout<Int64>.size) }
+            let wide = elements(raw, count: count, of: Int64.self)
             return .int32(wide.map { Int32(truncatingIfNeeded: $0) }, shape: shape)
         default:
             throw PPOCRError.unexpectedOutputShape(String(localized: "\(name): unsupported output element type \(info.elementType.rawValue)"))
+        }
+    }
+
+    /// Copies `count` elements straight out of a tensor's bytes. Reading the
+    /// `NSMutableData` in place, rather than bridging it to `Data` first,
+    /// saves a second copy of every output.
+    private static func elements<T: BitwiseCopyable>(_ data: NSData, count: Int, of _: T.Type) -> [T] {
+        [T](unsafeUninitializedCapacity: count) { buffer, initialized in
+            if count > 0 {
+                UnsafeMutableRawPointer(buffer.baseAddress!)
+                    .copyMemory(from: data.bytes, byteCount: count * MemoryLayout<T>.stride)
+            }
+            initialized = count
         }
     }
 }

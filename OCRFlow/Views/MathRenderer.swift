@@ -316,7 +316,7 @@ struct MathInlineText: View {
                 // as an image, because the one thing that must never happen is
                 // the LaTeX itself showing up in the middle of a sentence.
                 if let text = MathTextBuilder.text(for: node, size: size) { return text }
-                if let image = MathInlineImage.image(for: node, size: size, scheme: colorScheme) {
+                if let image = MathInlineImage.image(for: node, latex: latex, size: size, scheme: colorScheme) {
                     return Text(Image(nsImage: image))
                         .baselineOffset(-MathInlineImage.descent(of: image, size: size))
                 }
@@ -342,11 +342,19 @@ struct MathInlineText: View {
 /// and they are re-rendered on every layout pass otherwise.
 @MainActor
 enum MathInlineImage {
-    private static var cache: [String: NSImage] = [:]
+    /// Keyed by the source it was parsed from, which is far shorter than a
+    /// description of the parsed formula; let go of under memory pressure,
+    /// and past a few hundred.
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 256
+        return cache
+    }()
 
-    static func image(for node: MathNode, size: CGFloat, scheme: ColorScheme) -> NSImage? {
-        let key = "\(size)#\(scheme)#\(node)"
-        if let cached = cache[key] { return cached }
+    /// `node` is `latex` parsed.
+    static func image(for node: MathNode, latex: String, size: CGFloat, scheme: ColorScheme) -> NSImage? {
+        let key = "\(size)#\(scheme)#\(latex)" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
         // `ImageRenderer` starts from a blank environment, so the appearance
         // has to be handed to it: rendered in the light one, a formula on a
         // dark page comes out black on black.
@@ -358,7 +366,7 @@ enum MathInlineImage {
                 .foregroundStyle(scheme == .dark ? Color.white : Color.black))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
         guard let image = renderer.nsImage else { return nil }
-        cache[key] = image
+        cache.setObject(image, forKey: key)
         return image
     }
 

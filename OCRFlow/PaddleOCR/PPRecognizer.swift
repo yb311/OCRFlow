@@ -59,31 +59,55 @@ struct PPRecognizer {
         // side by side on single-threaded calls — about twice the throughput
         // of one line at a time across every core.
         var results = [Result](repeating: Result(text: "", confidence: 0), count: crops.count)
-        var firstError: Error?
-        let lock = NSLock()
-        var next = 0
+        let queue = WorkQueue()
         let workers = min(crops.count, Self.workerCount(config))
-        results.withUnsafeMutableBufferPointer { slots in
+        // Read-only from here on, and each worker writes only the slot of the
+        // line it claimed, so sharing them across the workers is safe.
+        nonisolated(unsafe) let crops = crops
+        let widths = paddedWidth
+        results.withUnsafeMutableBufferPointer { buffer in
+            nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: workers) { _ in
-                while true {
-                    lock.lock()
-                    let i = next
-                    next += 1
-                    let stop = firstError != nil
-                    lock.unlock()
-                    guard i < crops.count, !stop else { return }
+                while let i = queue.claim(), i < crops.count {
                     do {
-                        slots[i] = try read(crops[i], paddedTo: paddedWidth[i], height: imgH)
+                        slots[i] = try read(crops[i], paddedTo: widths[i], height: imgH)
                     } catch {
-                        lock.lock()
-                        if firstError == nil { firstError = error }
-                        lock.unlock()
+                        queue.fail(error)
                     }
                 }
             }
         }
-        if let firstError { throw firstError }
+        if let firstError = queue.firstError { throw firstError }
         return results
+    }
+
+    /// Hands out line indices to the workers, and stops handing them out
+    /// once one line has failed.
+    private final class WorkQueue: @unchecked Sendable {
+        private let lock = NSLock()
+        private var next = 0
+        private var error: Error?
+
+        /// The next line to read, or nil once a line has failed.
+        func claim() -> Int? {
+            lock.lock()
+            defer { lock.unlock() }
+            guard error == nil else { return nil }
+            next += 1
+            return next - 1
+        }
+
+        func fail(_ error: Error) {
+            lock.lock()
+            if self.error == nil { self.error = error }
+            lock.unlock()
+        }
+
+        var firstError: Error? {
+            lock.lock()
+            defer { lock.unlock() }
+            return error
+        }
     }
 
     /// How many lines are read at once: one per core unless the settings name

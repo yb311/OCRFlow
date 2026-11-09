@@ -261,9 +261,6 @@ enum MDParser {
         return blocks
     }
 
-    /// Inline Markdown only — emphasis, code spans, links — with the line
-    /// breaks left alone, which matters for CJK text where joining wrapped
-    /// lines with a space inserts gaps that were never in the page.
     /// The delimiters a display formula starts with, if this line starts one.
     static func mathOpening(of line: String) -> (open: String, close: String)? {
         for pair in [("$$", "$$"), ("\\[", "\\]")] where line.hasPrefix(pair.0) {
@@ -286,6 +283,9 @@ enum MDParser {
         return nil
     }
 
+    /// Inline Markdown only — emphasis, code spans, links — with the line
+    /// breaks left alone, which matters for CJK text where joining wrapped
+    /// lines with a space inserts gaps that were never in the page.
     static func inline(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: false,
@@ -400,7 +400,7 @@ enum MDParser {
     /// Parses the subset of HTML the recognition prompts produce: `<tr>` rows of
     /// `<td>`/`<th>` cells, with `colspan`/`rowspan` and `<br>` inside them.
     static func parseHTMLTable(_ html: String) -> MDTable? {
-        let rowMatches = matches(of: "<tr[^>]*>(.*?)</tr>", in: html)
+        let rowMatches = matches(of: tableRow, in: html)
         guard !rowMatches.isEmpty else { return nil }
 
         struct Pending { var remaining: Int; var columnSpan: Int }
@@ -408,7 +408,7 @@ enum MDParser {
         var grid: [[MDCell]] = []
 
         for rowHTML in rowMatches {
-            let cellMatches = matchesWithTags(of: "<(td|th)([^>]*)>(.*?)</(?:td|th)>", in: rowHTML)
+            let cellMatches = matchesWithTags(of: tableCell, in: rowHTML)
             var row: [MDCell] = []
             var column = 0
 
@@ -427,8 +427,11 @@ enum MDParser {
 
             fillCarried()
             for cell in cellMatches {
-                let columnSpan = max(1, attribute("colspan", in: cell.attributes) ?? 1)
-                let rowSpan = max(1, attribute("rowspan", in: cell.attributes) ?? 1)
+                // Clamped to the limits HTML itself sets, as the rendered pane
+                // does: a garbled `colspan="99999999"` from the model would
+                // otherwise build that many cells.
+                let columnSpan = min(1000, max(1, attribute(columnSpanAttribute, in: cell.attributes) ?? 1))
+                let rowSpan = min(65534, max(1, attribute(rowSpanAttribute, in: cell.attributes) ?? 1))
                 row.append(MDCell(id: row.count, text: plainText(fromHTML: cell.body),
                                   columnSpan: columnSpan, isHeader: cell.tag == "th"))
                 if rowSpan > 1 {
@@ -459,8 +462,8 @@ enum MDParser {
         return table
     }
 
-    private static func attribute(_ name: String, in attributes: String) -> Int? {
-        guard let value = matches(of: "\(name)\\s*=\\s*\"?'?(\\d+)", in: attributes).first else {
+    private static func attribute(_ regex: Regex<AnyRegexOutput>?, in attributes: String) -> Int? {
+        guard let value = matches(of: regex, in: attributes).first else {
             return nil
         }
         return Int(value)
@@ -484,16 +487,31 @@ enum MDParser {
 
     // MARK: Regex helpers
 
-    private static func matches(of pattern: String, in text: String) -> [String] {
-        guard let regex = try? Regex(pattern).dotMatchesNewlines().ignoresCase() else { return [] }
+    // Made once rather than for every table, row and cell. Never changed
+    // once made, and a regex may be matched from several threads at once.
+    nonisolated(unsafe) private static let tableRow = regex("<tr[^>]*>(.*?)</tr>")
+    nonisolated(unsafe) private static let tableCell = regex("<(td|th)([^>]*)>(.*?)</(?:td|th)>")
+    nonisolated(unsafe) private static let columnSpanAttribute = attributeRegex("colspan")
+    nonisolated(unsafe) private static let rowSpanAttribute = attributeRegex("rowspan")
+
+    private static func regex(_ pattern: String) -> Regex<AnyRegexOutput>? {
+        try? Regex(pattern).dotMatchesNewlines().ignoresCase()
+    }
+
+    private static func attributeRegex(_ name: String) -> Regex<AnyRegexOutput>? {
+        regex("\(name)\\s*=\\s*\"?'?(\\d+)")
+    }
+
+    private static func matches(of regex: Regex<AnyRegexOutput>?, in text: String) -> [String] {
+        guard let regex else { return [] }
         return text.matches(of: regex).compactMap { match in
             match.output.count > 1 ? match.output[1].substring.map(String.init) : nil
         }
     }
 
-    private static func matchesWithTags(of pattern: String, in text: String)
+    private static func matchesWithTags(of regex: Regex<AnyRegexOutput>?, in text: String)
         -> [(tag: String, attributes: String, body: String)] {
-        guard let regex = try? Regex(pattern).dotMatchesNewlines().ignoresCase() else { return [] }
+        guard let regex else { return [] }
         return text.matches(of: regex).compactMap { match in
             guard match.output.count > 3,
                   let tag = match.output[1].substring,
@@ -602,13 +620,14 @@ struct MarkdownDocumentView: View {
     var body: some View {
         // A list, not a stack of cards: one quiet line of who-and-what above
         // each region, a tint for the one selected, and a rule between them.
+        let ends = regionEnds
         VStack(alignment: .leading, spacing: 0) {
             ForEach(blocks) { block in
                 let source = block.sourceBlock
                 let isSelected = source != nil && source == selected
                 let isHovered = source != nil && source == highlighted && !isSelected
-                let isFirst = source.map { isFirstBlock(of: $0, block) } ?? true
-                let isLast = source.map { isLastBlock(of: $0, block) } ?? true
+                let isFirst = source.map { ends[$0]?.first == block.id } ?? true
+                let isLast = source.map { ends[$0]?.last == block.id } ?? true
                 VStack(alignment: .leading, spacing: 6) {
                     if let source, isFirst {
                         header(for: source, isSelected: isSelected, showsControls: isSelected || isHovered)
@@ -740,15 +759,16 @@ struct MarkdownDocumentView: View {
         .textSelection(.disabled)
     }
 
-    /// True for the last rendered block of a region, under which its note goes.
-    private func isLastBlock(of source: Int, _ block: MDBlock) -> Bool {
-        blocks.last { $0.sourceBlock == source }?.id == block.id
-    }
-
-    /// True for the first rendered block of a region, which is the one that
-    /// stands in for the whole region while it is edited.
-    private func isFirstBlock(of source: Int, _ block: MDBlock) -> Bool {
-        blocks.first { $0.sourceBlock == source }?.id == block.id
+    /// Each region's first rendered block, which stands in for the whole
+    /// region while it is edited, and its last, under which its note goes:
+    /// found in one pass rather than a search for each block.
+    private var regionEnds: [Int: (first: MDBlock.ID, last: MDBlock.ID)] {
+        var ends: [Int: (first: MDBlock.ID, last: MDBlock.ID)] = [:]
+        for block in blocks {
+            guard let source = block.sourceBlock else { continue }
+            ends[source] = (ends[source]?.first ?? block.id, block.id)
+        }
+        return ends
     }
 
     private func correctionEditor(for source: Int) -> some View {

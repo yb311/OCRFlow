@@ -21,7 +21,9 @@ def unquote(token):
     if len(token) >= 2 and token[0] == token[-1] == SINGLE:
         return token[1:-1].replace(SINGLE * 2, SINGLE)
     if len(token) >= 2 and token[0] == token[-1] == DOUBLE:
-        return token[1:-1].encode().decode("unicode_escape")
+        # unicode_escape reads bytes as Latin-1, so non-ASCII characters are
+        # turned into \u escapes first rather than fed in as UTF-8 bytes.
+        return token[1:-1].encode("latin-1", "backslashreplace").decode("unicode_escape")
     return token
 
 

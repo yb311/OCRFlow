@@ -41,7 +41,7 @@ struct Macro: Codable, Identifiable, Hashable, Sendable {
     /// The addresses in `urls` that can be opened.
     var openableURLs: [URL] {
         urls.compactMap { text in
-            let text = text.trimmingCharacters(in: .whitespaces)
+            let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
             if let url = URL(string: text), url.scheme != nil { return url }
             return URL(string: "https://" + text)

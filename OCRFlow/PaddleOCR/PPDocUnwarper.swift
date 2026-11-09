@@ -65,7 +65,9 @@ struct PPDocUnwarper {
     }
 
     private static func byte(_ value: Float) -> UInt8 {
-        UInt8(min(max(value * 255, 0), 255))
+        // NaN survives `min`/`max` and would trap in `UInt8(_:)`.
+        guard !value.isNaN else { return 0 }
+        return UInt8(min(max(value * 255, 0), 255))
     }
 
     private static func bounded(_ image: PPImageBuffer) -> PPImageBuffer {

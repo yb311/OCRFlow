@@ -54,22 +54,83 @@ extension OCRViewModel {
     private func writeCombined(_ targets: [ImageItem], format: ExportFormat, to url: URL) {
         switch format {
         case .json:
-            reportExportFailures([write(Self.jsonData(targets.map(exportPayload(for:))), to: url)].compactMap { $0 })
+            let files = targets.map(exportPayload(for:))
+            enqueueExport {
+                let failures = await BlockingWork.run { [Self.write(Self.jsonData(files), to: url)].compactMap { $0 } }
+                self.reportExportFailures(failures)
+            }
         case .searchablePDF:
             writeSearchablePDFs([(targets, url)], reveal: url)
         case .excel:
             writeWorkbooks([(targets, url)], reveal: url)
         case .markdown, .plainText:
-            let text = targets
-                .map { item -> String in
-                    let body = self.body(of: item, format: format, alongside: url)
-                    guard exportIncludeFilename else { return body }
-                    return format == .markdown ? "# \(item.fileName)\n\n\(body)"
-                                               : "=== \(item.fileName) ===\n\(body)"
+            let options = exportOptions
+            enqueueExport {
+                let failures = await BlockingWork.run {
+                    let text = Self.combinedText(of: targets, format: format, to: url, options: options)
+                    return [Self.write(Data(text.utf8), to: url)].compactMap { $0 }
                 }
-                .joined(separator: exportSeparator.separator)
-            reportExportFailures([write(Data(text.utf8), to: url)].compactMap { $0 })
+                self.reportExportFailures(failures)
+            }
         }
+    }
+
+    /// Every file's result in one text, in the order given.
+    private nonisolated static func combinedText(of targets: [ImageItem], format: ExportFormat,
+                                                 to url: URL, options: ExportOptions) -> String {
+        // Every file's figures go into the one folder beside the export,
+        // so two files of the same name — from different folders, or
+        // `scan.png` beside `scan.pdf` — must not write over each other's.
+        var used = Set<String>()
+        let prefixes = targets.map { item -> String in
+            let base = figurePrefix(for: item)
+            var prefix = base, count = 1
+            while !used.insert(prefix).inserted {
+                count += 1
+                prefix = "\(base)-\(count)"
+            }
+            return prefix
+        }
+        return zip(targets, prefixes)
+            .map { item, prefix -> String in
+                let body = body(of: item, format: format, alongside: url, figurePrefix: prefix, options: options)
+                guard options.includeFilename else { return body }
+                return format == .markdown ? "# \(item.fileName)\n\n\(body)"
+                                           : "=== \(item.fileName) ===\n\(body)"
+            }
+            .joined(separator: options.separator)
+    }
+
+    /// What an export takes from the settings, read on the main actor so the
+    /// writing can run off it.
+    struct ExportOptions: Sendable {
+        var includeFilename: Bool
+        var separator: String
+        var figures: Bool
+        var dropped: Set<PPLayoutLabel>
+    }
+
+    private var exportOptions: ExportOptions {
+        ExportOptions(includeFilename: exportIncludeFilename, separator: exportSeparator.separator,
+                      figures: exportFigures, dropped: droppedLabels)
+    }
+
+    /// Runs an export once any export before it has finished writing. The
+    /// work itself decodes, renders and writes off the main actor, so the
+    /// window stays live through a large export, and two exports never write
+    /// the same files at once.
+    private func enqueueExport(_ work: @escaping @MainActor () async -> Void) {
+        let previous = exportInFlight
+        exportInFlight = Task {
+            await previous?.value
+            await work()
+        }
+    }
+
+    /// Makes the folder a result goes into.
+    private nonisolated static func makeFolder(for file: URL) {
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
     }
 
     // MARK: - Originals
@@ -88,12 +149,22 @@ extension OCRViewModel {
             panel.prompt = String(localized: "Export")
             Task {
                 guard let url = await FilePanel.run(panel) else { return }
-                try? FileManager.default.removeItem(at: url)
-                do {
-                    try FileManager.default.copyItem(at: item.url, to: url)
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                } catch {
-                    reportExportFailures([String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")])
+                let source = item.url
+                enqueueExport {
+                    let failure = await BlockingWork.run { () -> String? in
+                        try? FileManager.default.removeItem(at: url)
+                        do {
+                            try FileManager.default.copyItem(at: source, to: url)
+                            return nil
+                        } catch {
+                            return String(localized: "\(url.lastPathComponent): \(error.localizedDescription)")
+                        }
+                    }
+                    if let failure {
+                        self.reportExportFailures([failure])
+                    } else {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
                 }
             }
             return
@@ -108,9 +179,11 @@ extension OCRViewModel {
         panel.prompt = String(localized: "Export Here")
         Task {
             guard let folder = await FilePanel.run(panel) else { return }
-            let (written, failures) = Self.writeOriginals(of: targets, into: folder)
-            reportExportFailures(failures)
-            if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+            enqueueExport {
+                let (written, failures) = await BlockingWork.run { Self.writeOriginals(of: targets, into: folder) }
+                self.reportExportFailures(failures)
+                if !written.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(written) }
+            }
         }
     }
 
@@ -175,7 +248,7 @@ extension OCRViewModel {
     }
 
     /// Writes one exported file; says what went wrong when it could not.
-    private func write(_ data: Data, to url: URL) -> String? {
+    private nonisolated static func write(_ data: Data, to url: URL) -> String? {
         do {
             try data.write(to: url, options: .atomic)
             return nil
@@ -222,34 +295,35 @@ extension OCRViewModel {
     /// `reveal` is shown in Finder when the writing is done; nil writes
     /// silently, which is how a watched folder's results are exported.
     func writeSeparately(_ targets: [ImageItem], format: ExportFormat, into folder: URL, reveal: URL?) {
-        var pdfJobs: [([ImageItem], URL)] = []
-        var workbookJobs: [([ImageItem], URL)] = []
-        var failures: [String] = []
-        for (item, url) in zip(targets, Self.separateExportURLs(for: targets, format: format, in: folder)) {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                     withIntermediateDirectories: true)
-            switch format {
-            case .json:
-                if let failure = write(Self.jsonData([exportPayload(for: item)]), to: url) { failures.append(failure) }
-            case .searchablePDF:
-                pdfJobs.append(([item], url))
-            case .excel:
-                workbookJobs.append(([item], url))
-            case .markdown, .plainText:
-                let body = self.body(of: item, format: format, alongside: url)
-                let text = exportIncludeFilename && format == .markdown
-                    ? "# \(item.fileName)\n\n\(body)"
-                    : body
-                if let failure = write(Data(text.utf8), to: url) { failures.append(failure) }
+        let urls = Self.separateExportURLs(for: targets, format: format, in: folder)
+        switch format {
+        case .searchablePDF where !targets.isEmpty:
+            writeSearchablePDFs(zip(targets, urls).map { ([$0], $1) }, reveal: reveal)
+        case .excel where !targets.isEmpty:
+            writeWorkbooks(zip(targets, urls).map { ([$0], $1) }, reveal: reveal)
+        default:
+            let payloads = format == .json ? targets.map(exportPayload(for:)) : []
+            let options = exportOptions
+            enqueueExport {
+                let failures = await BlockingWork.run {
+                    zip(targets, urls).enumerated().compactMap { index, job -> String? in
+                        let (item, url) = job
+                        Self.makeFolder(for: url)
+                        switch format {
+                        case .json:
+                            return Self.write(Self.jsonData([payloads[index]]), to: url)
+                        case .markdown, .plainText, .searchablePDF, .excel:
+                            let body = Self.body(of: item, format: format, alongside: url, options: options)
+                            let text = options.includeFilename && format == .markdown
+                                ? "# \(item.fileName)\n\n\(body)"
+                                : body
+                            return Self.write(Data(text.utf8), to: url)
+                        }
+                    }
+                }
+                self.reportExportFailures(failures, interactive: reveal != nil)
+                if let reveal { NSWorkspace.shared.open(reveal) }
             }
-        }
-        reportExportFailures(failures, interactive: reveal != nil)
-        if !pdfJobs.isEmpty {
-            writeSearchablePDFs(pdfJobs, reveal: reveal)
-        } else if !workbookJobs.isEmpty {
-            writeWorkbooks(workbookJobs, reveal: reveal)
-        } else if let reveal {
-            NSWorkspace.shared.open(reveal)
         }
     }
 
@@ -281,23 +355,32 @@ extension OCRViewModel {
     /// Writes each group's tables to a workbook. A group with no recognised
     /// table writes nothing — an empty workbook would only look like a loss.
     private func writeWorkbooks(_ jobs: [([ImageItem], URL)], reveal: URL?) {
-        var written = 0
-        for (items, url) in jobs {
-            let sheets = TableWorkbook.sheets(from: items)
-            guard !sheets.isEmpty else { continue }
-            do {
-                try TableWorkbook.write(sheets, to: url)
-                written += 1
-            } catch {
-                continue
+        enqueueExport {
+            let (written, failures) = await BlockingWork.run { () -> (Int, [String]) in
+                var written = 0
+                var failures: [String] = []
+                for (items, url) in jobs {
+                    let sheets = TableWorkbook.sheets(from: items)
+                    guard !sheets.isEmpty else { continue }
+                    Self.makeFolder(for: url)
+                    do {
+                        try TableWorkbook.write(sheets, to: url)
+                        written += 1
+                    } catch {
+                        // Said, rather than passed off as there being no tables.
+                        failures.append(String(localized: "\(url.lastPathComponent): \(error.localizedDescription)"))
+                    }
+                }
+                return (written, failures)
             }
-        }
-        guard let reveal else { return }
-        if written == 0 {
-            prompt = UserPrompt(title: String(localized: "No Tables to Export"),
-                                message: String(localized: "Only tables whose structure was recognized by close reading can be exported to Excel. Tables quick reading read as plain text have no cell information."))
-        } else {
-            NSWorkspace.shared.activateFileViewerSelecting([reveal])
+            self.reportExportFailures(failures, interactive: reveal != nil)
+            guard let reveal, failures.isEmpty else { return }
+            if written == 0 {
+                self.prompt = UserPrompt(title: String(localized: "No Tables to Export"),
+                                         message: String(localized: "Only tables whose structure was recognized by close reading can be exported to Excel. Tables quick reading read as plain text have no cell information."))
+            } else {
+                NSWorkspace.shared.activateFileViewerSelecting([reveal])
+            }
         }
     }
 
@@ -313,9 +396,10 @@ extension OCRViewModel {
     /// Writes PDFs off the main thread — redrawing a few hundred pages takes a
     /// while — and says so if any could not be written.
     private func writeSearchablePDFs(_ jobs: [([ImageItem], URL)], reveal: URL?) {
-        Task {
+        enqueueExport {
             let failures = await BlockingWork.run {
                 jobs.compactMap { items, url -> String? in
+                    Self.makeFolder(for: url)
                     do {
                         try SearchablePDFWriter.write(items, to: url)
                         return nil
@@ -328,20 +412,23 @@ extension OCRViewModel {
             if failures.isEmpty {
                 NSWorkspace.shared.activateFileViewerSelecting([reveal])
             } else {
-                prompt = UserPrompt(title: String(localized: "\(failures.count) PDFs couldn't be written"),
-                                    message: failures.prefix(8).joined(separator: "\n"))
+                self.prompt = UserPrompt(title: String(localized: "\(failures.count) PDFs couldn't be written"),
+                                         message: failures.prefix(8).joined(separator: "\n"))
             }
         }
     }
 
-    private func body(of item: ImageItem, format: ExportFormat, alongside file: URL) -> String {
+    private nonisolated static func body(of item: ImageItem, format: ExportFormat, alongside file: URL,
+                                         figurePrefix: String? = nil, options: ExportOptions) -> String {
         switch format {
         case .plainText, .json, .searchablePDF, .excel:
             return item.ocrText
         case .markdown:
             guard item.hasMarkdown else { return item.ocrText }
-            guard exportFigures else { return item.markdown }
-            return writingFigures(of: item, from: item.markdown, alongside: file)
+            guard options.figures else { return item.markdown }
+            return writingFigures(of: item, from: item.markdown, alongside: file,
+                                  prefix: figurePrefix ?? Self.figurePrefix(for: item),
+                                  dropping: options.dropped)
         }
     }
 
@@ -438,7 +525,7 @@ extension OCRViewModel {
         }
     }
 
-    private static func jsonData(_ files: [ExportedFile]) -> Data {
+    private nonisolated static func jsonData(_ files: [ExportedFile]) -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return (try? encoder.encode(files)) ?? Data()
@@ -451,8 +538,9 @@ extension OCRViewModel {
     /// images: the pictures only exist inside the source page. Every page's
     /// figures are written — each page is decoded again for it — and a
     /// figure that cannot be cropped keeps its empty placeholder.
-    private func writingFigures(of item: ImageItem, from markdown: String,
-                                alongside file: URL) -> String {
+    private nonisolated static func writingFigures(of item: ImageItem, from markdown: String,
+                                                   alongside file: URL, prefix: String,
+                                                   dropping droppedLabels: Set<PPLayoutLabel>) -> String {
         var crops: [NSImage?] = []
         let pdf = item.isPDF ? PDFSource(url: item.url) : nil
         for (index, page) in item.pages.enumerated() {
@@ -472,7 +560,6 @@ extension OCRViewModel {
                                                         withIntermediateDirectories: true)) != nil
         else { return markdown }
 
-        let prefix = Self.sanitizedFileStem((item.fileName as NSString).deletingPathExtension)
         var links: [String] = []
         for (index, crop) in crops.enumerated() {
             guard let data = crop?.pngData else {
@@ -491,8 +578,14 @@ extension OCRViewModel {
         return PPDocumentAssembler.rewritingFigureLinks(in: markdown, to: links)
     }
 
+    /// What a file's figures are named after: its name, kept usable as part
+    /// of a file name.
+    private nonisolated static func figurePrefix(for item: ImageItem) -> String {
+        sanitizedFileStem((item.fileName as NSString).deletingPathExtension)
+    }
+
     /// Keeps a source file's name usable as part of a figure's file name.
-    private static func sanitizedFileStem(_ stem: String) -> String {
+    private nonisolated static func sanitizedFileStem(_ stem: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         let cleaned = String(stem.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" })
         return cleaned.isEmpty ? "figure" : cleaned
@@ -506,7 +599,10 @@ extension OCRViewModel {
         let file = result.deletingLastPathComponent()
             .appending(component: "\(result.deletingPathExtension().lastPathComponent)_\(translation.target).md")
         let text = translation.document(of: item.ocrText, bilingual: false)
-        if let failure = write(Data(text.utf8), to: file) { reportExportFailures([failure], interactive: false) }
+        enqueueExport {
+            let failure = await BlockingWork.run { Self.write(Data(text.utf8), to: file) }
+            if let failure { self.reportExportFailures([failure], interactive: false) }
+        }
     }
 
     func exportSelectedItems() {

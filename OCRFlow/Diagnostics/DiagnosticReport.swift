@@ -43,6 +43,7 @@ struct DiagnosticReport {
         var settings = self.settings
         settings.watchFolderPath = settings.watchFolderPath.map { _ in "<set>" }
         settings.watchOutputPath = settings.watchOutputPath.map { _ in "<set>" }
+        settings.screenshotFolderPath = settings.screenshotFolderPath.map { _ in "<set>" }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(settings), let json = String(data: data, encoding: .utf8) {

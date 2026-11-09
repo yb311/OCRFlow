@@ -11,6 +11,9 @@
 set -euo pipefail
 
 LLAMA_BUILD="b10819"
+# SHA-256 of that release's xcframework zip, as GitHub lists it for the asset.
+# Bump it together with LLAMA_BUILD.
+LLAMA_SHA256="2177ddc5ff97f30ecdafeee4a9d5840170a1bf013c0c5a2d22287717a7a8f144"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/Vendor"
 WORK=""
 # Declared at file scope: the trap outlives the function that fills it in.
@@ -48,6 +51,10 @@ download_release() {
     WORK="$(mktemp -d)"
     echo "Downloading llama.cpp ${LLAMA_BUILD} xcframework…"
     curl --fail --location --progress-bar -o "${WORK}/llama.zip" "${URL}"
+    echo "${LLAMA_SHA256}  ${WORK}/llama.zip" | shasum -a 256 -c --quiet - || {
+        echo "✗ checksum mismatch for ${URL}" >&2
+        exit 1
+    }
     unzip -q "${WORK}/llama.zip" -d "${WORK}/x"
     mkdir -p "${DEST}"
     rm -rf "${DEST}/llama.xcframework"

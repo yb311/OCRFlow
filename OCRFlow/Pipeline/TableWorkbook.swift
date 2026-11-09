@@ -126,6 +126,12 @@ enum TableWorkbook {
             return sheet
         }
 
+        // Every count of decimal places a number cell shows, each with a
+        // number format of its own, so "0.9100" still reads 0.9100.
+        let decimals = Array(Set(named.flatMap { $0.cells.compactMap { numericDecimals($0.text) } })
+            .filter { $0 > 0 }).sorted()
+        let styleIndex = Dictionary(uniqueKeysWithValues: decimals.enumerated().map { ($1, $0 + 2) })
+
         var files: [(String, Data)] = [
             ("[Content_Types].xml", Data(contentTypes(sheetCount: named.count).utf8)),
             ("_rels/.rels", Data("""
@@ -138,34 +144,77 @@ enum TableWorkbook {
             ("xl/_rels/workbook.xml.rels", Data(workbookRelationships(sheetCount: named.count).utf8)),
             // Not strictly required, but readers other than Excel fall back to
             // odd defaults — rows a page tall — without a base style.
-            ("xl/styles.xml", Data("""
-            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\
-            <fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>\
-            <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>\
-            <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>\
-            <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>\
-            <cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>\
-            <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs>\
-            <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>\
-            </styleSheet>
-            """.utf8)),
+            ("xl/styles.xml", Data(styles(decimals: decimals).utf8)),
         ]
         for (index, sheet) in named.enumerated() {
-            files.append(("xl/worksheets/sheet\(index + 1).xml", Data(worksheet(sheet).utf8)))
+            files.append(("xl/worksheets/sheet\(index + 1).xml", Data(worksheet(sheet, styleIndex: styleIndex).utf8)))
         }
         try StoredZip.archive(files).write(to: url, options: .atomic)
     }
 
-    /// Excel's rules for a sheet name: at most 31 characters, none of
-    /// `[]:*?/\`, and unique in the workbook.
+    /// The base style, the top-aligned wrapping one every cell uses (index
+    /// 1), and after it one per count of decimal places in `decimals`, in
+    /// order (index 2 on): a number shows the decimals it was read with.
+    private static func styles(decimals: [Int]) -> String {
+        let formats = decimals.enumerated().map { index, places in
+            "<numFmt numFmtId=\"\(164 + index)\" formatCode=\"0.\(String(repeating: "0", count: places))\"/>"
+        }.joined()
+        let numFmts = decimals.isEmpty ? "" : "<numFmts count=\"\(decimals.count)\">\(formats)</numFmts>"
+        let numberStyles = decimals.indices.map { index in
+            "<xf numFmtId=\"\(164 + index)\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\" applyAlignment=\"1\"><alignment vertical=\"top\" wrapText=\"1\"/></xf>"
+        }.joined()
+        return """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\
+        \(numFmts)\
+        <fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>\
+        <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>\
+        <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>\
+        <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>\
+        <cellXfs count="\(2 + decimals.count)"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>\
+        <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>\
+        \(numberStyles)</cellXfs>\
+        <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>\
+        </styleSheet>
+        """
+    }
+
+    /// The decimal places of a cell written as a number; nil for one kept as
+    /// text. A plain number stays a number, so the sheet can sum it. "1,200"
+    /// and "08" stay text: reading them as numbers would change them — as
+    /// would Excel's 15 significant digits to an ID card number.
+    private static func numericDecimals(_ text: String) -> Int? {
+        guard text.range(of: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$", options: .regularExpression) != nil,
+              text.filter(\.isNumber).drop(while: { $0 == "0" }).count <= 15 else { return nil }
+        guard let point = text.firstIndex(of: ".") else { return 0 }
+        return text.distance(from: point, to: text.endIndex) - 1
+    }
+
+    /// Excel's rules for a sheet name: at most 31 UTF-16 units, none of
+    /// `[]:*?/\`, not starting or ending with an apostrophe, and unique in
+    /// the workbook.
     private static func uniqueName(_ name: String, among used: inout Set<String>) -> String {
-        let cleaned = String(name.map { "[]:*?/\\".contains($0) ? "_" : $0 })
-        var candidate = String(cleaned.prefix(31))
+        func trimmed(_ text: String) -> String {
+            String(text.drop(while: { $0 == "'" }).reversed().drop(while: { $0 == "'" }).reversed())
+        }
+        /// The longest run of whole characters from the front that fits.
+        func prefix(_ text: String, units: Int) -> String {
+            var result = ""
+            var count = 0
+            for character in text {
+                count += character.utf16.count
+                guard count <= units else { break }
+                result.append(character)
+            }
+            return trimmed(result)
+        }
+        var cleaned = trimmed(String(name.map { "[]:*?/\\".contains($0) ? "_" : $0 }))
+        if cleaned.isEmpty { cleaned = "Sheet" }
+        var candidate = prefix(cleaned, units: 31)
         var suffix = 2
         while used.contains(candidate.lowercased()) {
             let tail = "(\(suffix))"
-            candidate = String(cleaned.prefix(31 - tail.count)) + tail
+            candidate = prefix(cleaned, units: 31 - tail.utf16.count) + tail
             suffix += 1
         }
         used.insert(candidate.lowercased())
@@ -209,14 +258,18 @@ enum TableWorkbook {
         """
     }
 
-    private static func worksheet(_ sheet: Sheet) -> String {
+    private static func worksheet(_ sheet: Sheet, styleIndex: [Int: Int]) -> String {
         // The positions a merge covers get empty cells of their own, as Excel
         // writes them: readers that lay a sheet out cell by cell otherwise
         // shift the rest of the row into the gap.
+        // A position is written once: two spans the model let overlap would
+        // otherwise give a row the same cell twice, which Excel refuses.
         var placed = sheet.cells
+        var taken = Set(sheet.cells.map { [$0.row, $0.column] })
         for cell in sheet.cells where cell.rowSpan > 1 || cell.columnSpan > 1 {
             for r in 0..<cell.rowSpan {
                 for c in 0..<cell.columnSpan where r > 0 || c > 0 {
+                    guard taken.insert([cell.row + r, cell.column + c]).inserted else { continue }
                     placed.append(Cell(row: cell.row + r, column: cell.column + c, text: ""))
                 }
             }
@@ -228,18 +281,26 @@ enum TableWorkbook {
             let cells = byRow[row]!.sorted { $0.column < $1.column }.map { cell -> String in
                 let ref = reference(row: cell.row, column: cell.column)
                 if cell.text.isEmpty { return "<c r=\"\(ref)\" s=\"1\"/>" }
-                // A plain number stays a number, so the sheet can sum it. "1,200"
-                // and "08" stay text: reading them as numbers would change them.
-                if cell.text.range(of: "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$", options: .regularExpression) != nil {
-                    return "<c r=\"\(ref)\" s=\"1\"><v>\(cell.text)</v></c>"
+                if let places = numericDecimals(cell.text) {
+                    return "<c r=\"\(ref)\" s=\"\(styleIndex[places] ?? 1)\"><v>\(cell.text)</v></c>"
                 }
                 return "<c r=\"\(ref)\" s=\"1\" t=\"inlineStr\"><is><t xml:space=\"preserve\">\(escaped(cell.text))</t></is></c>"
             }.joined()
             rows += "<row r=\"\(row + 1)\">\(cells)</row>"
         }
-        let merges = sheet.cells.filter { $0.rowSpan > 1 || $0.columnSpan > 1 }.map { cell in
-            "<mergeCell ref=\"\(reference(row: cell.row, column: cell.column)):"
-                + "\(reference(row: cell.row + cell.rowSpan - 1, column: cell.column + cell.columnSpan - 1))\"/>"
+        // Merges the model let overlap make Excel offer to repair the file:
+        // the first one stands, a later one reaching into it is left unmerged,
+        // its text kept in its own cell.
+        var mergedRanges: [(rows: Range<Int>, columns: Range<Int>)] = []
+        var merges: [String] = []
+        for cell in sheet.cells where cell.rowSpan > 1 || cell.columnSpan > 1 {
+            let rows = cell.row..<(cell.row + cell.rowSpan)
+            let columns = cell.column..<(cell.column + cell.columnSpan)
+            guard !mergedRanges.contains(where: { $0.rows.overlaps(rows) && $0.columns.overlaps(columns) })
+            else { continue }
+            mergedRanges.append((rows, columns))
+            merges.append("<mergeCell ref=\"\(reference(row: cell.row, column: cell.column)):"
+                + "\(reference(row: cell.row + cell.rowSpan - 1, column: cell.column + cell.columnSpan - 1))\"/>")
         }
         let mergeXML = merges.isEmpty ? "" : "<mergeCells count=\"\(merges.count)\">\(merges.joined())</mergeCells>"
         return """

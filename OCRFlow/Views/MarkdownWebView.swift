@@ -58,8 +58,7 @@ struct MarkdownWebView: NSViewRepresentable {
         coordinator.onSave = onSave
         // Encoding the figures is the costly part, so the document is sent
         // again only when it is a different document.
-        let key = DocumentKey(fragments: fragments, figureCount: figures.count,
-                              figureIDs: figures.map { $0.map(ObjectIdentifier.init) })
+        let key = DocumentKey(fragments: fragments, figures: figures)
         if coordinator.renderedKey != key {
             coordinator.renderedKey = key
             coordinator.pending = Payload(fragments: fragments,
@@ -81,8 +80,15 @@ struct MarkdownWebView: NSViewRepresentable {
 
     fileprivate struct DocumentKey: Equatable {
         let fragments: [Fragment]
-        let figureCount: Int
-        let figureIDs: [ObjectIdentifier?]
+        /// The crops themselves, compared by identity. Held rather than only
+        /// identified: a freed image's identifier can be handed to the next
+        /// one, which would then pass for the crop it replaced.
+        let figures: [NSImage?]
+
+        static func == (a: Self, b: Self) -> Bool {
+            a.fragments == b.fragments && a.figures.count == b.figures.count
+                && zip(a.figures, b.figures).allSatisfy { $0 === $1 }
+        }
     }
 
     struct Payload: Encodable {
@@ -94,11 +100,26 @@ struct MarkdownWebView: NSViewRepresentable {
         let figureLabel: String
     }
 
+    /// Each crop's inline image, kept for as long as the crop is in use: an
+    /// edit sends the whole document again, and only a crop not seen before
+    /// needs encoding. Keyed by the image itself — `NSImage` compares by
+    /// identity — and held, so a freed crop's address can't stand for a new one.
+    @MainActor private static let encodedFigures: NSCache<NSImage, NSString> = {
+        let cache = NSCache<NSImage, NSString>()
+        cache.totalCostLimit = 64 << 20
+        return cache
+    }()
+
     /// A crop as an inline image the page can show without file access.
-    private static func dataURL(_ image: NSImage) -> String? {
-        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-              let jpeg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else { return nil }
-        return "data:image/jpeg;base64," + jpeg.base64EncodedString()
+    @MainActor private static func dataURL(_ image: NSImage) -> String? {
+        if let cached = encodedFigures.object(forKey: image) { return cached as String }
+        // Straight from the crop's pixels, not by way of a TIFF copy of them.
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let jpeg = NSBitmapImageRep(cgImage: cgImage)
+                .representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else { return nil }
+        let url = "data:image/jpeg;base64," + jpeg.base64EncodedString()
+        encodedFigures.setObject(url as NSString, forKey: image, cost: url.utf8.count)
+        return url
     }
 
     /// The app's own accent — not the system's — in the page's terms, so links
@@ -149,7 +170,12 @@ struct MarkdownWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             if action.navigationType == .linkActivated, let url = action.request.url {
-                NSWorkspace.shared.open(url)
+                // Only web and mail links: a link in a recognised page is
+                // text from the page, and `file:` or a custom scheme would
+                // open an app or a document on this Mac.
+                if let scheme = url.scheme?.lowercased(), ["http", "https", "mailto"].contains(scheme) {
+                    NSWorkspace.shared.open(url)
+                }
                 decisionHandler(.cancel)
                 return
             }

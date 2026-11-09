@@ -26,10 +26,18 @@ enum ScrollStitcher {
 
     /// The same, from files.
     static func stitch(_ files: [URL], maxHeight: Int = maxHeight) -> [CGImage]? {
-        stitch(count: files.count, maxHeight: maxHeight) { index in
+        // Sizes read from the files' headers, without decoding them.
+        let size = { (index: Int) -> (width: Int, height: Int)? in
+            guard let source = CGImageSourceCreateWithURL(files[index] as CFURL, nil),
+                  let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                  let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                  let height = properties[kCGImagePropertyPixelHeight] as? Int else { return nil }
+            return (width, height)
+        }
+        return join(count: files.count, maxHeight: maxHeight, size: size) { index in
             guard let source = CGImageSourceCreateWithURL(files[index] as CFURL, nil) else { return nil }
             return CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
-        }
+        }?.parts
     }
 
     /// The pictures are asked for as they are needed, a pair at a time, and
@@ -45,14 +53,19 @@ enum ScrollStitcher {
     /// too far at once, or caught as its window changed size — is left out,
     /// and joining goes on from the next that does: scrolling back a little
     /// mends a gap. Nil when none carries on from the first.
-    static func join(count: Int, maxHeight: Int = maxHeight,
+    ///
+    /// `size`, when given, tells each picture's size in pixels more cheaply
+    /// than making it.
+    static func join(count: Int, maxHeight: Int = maxHeight, size pictureSize: ((Int) -> (width: Int, height: Int)?)? = nil,
                      picture: (Int) -> CGImage?) -> (parts: [CGImage], usesLast: Bool)? {
         guard count > 1 else { return nil }
         // Only those of one size, the size most of them are: a view scrolled
         // is the same size throughout, and one that is not — taken while its
         // window changed size, or recorded at a size its app will not take
         // again — is not part of it.
-        let sizes = (0..<count).map { index in picture(index).map { [$0.width, $0.height] } }
+        let sizes = (0..<count).map { index in
+            pictureSize.map { $0(index).map { [$0.width, $0.height] } } ?? picture(index).map { [$0.width, $0.height] }
+        }
         let counts = sizes.compactMap { $0 }.reduce(into: [[Int]: Int]()) { $0[$1, default: 0] += 1 }
         // The first of the most common.
         guard let size = sizes.compactMap({ $0 }).max(by: { counts[$0, default: 0] < counts[$1, default: 0] })
@@ -195,7 +208,9 @@ enum ScrollStitcher {
             }
             if image.bitsPerPixel == 32, image.bitsPerComponent == 8, alpha != .none, alpha != .alphaOnly,
                image.colorSpace?.model == .rgb, let data = image.dataProvider?.data,
-               CFDataGetLength(data) >= image.bytesPerRow * height {
+               // A cropped picture's bytes keep the whole row stride but end
+               // with its own last row.
+               CFDataGetLength(data) >= image.bytesPerRow * (height - 1) + width * 4 {
                 bytes.withUnsafeMutableBytes { output in
                     var source = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: CFDataGetBytePtr(data)),
                                                height: vImagePixelCount(height), width: vImagePixelCount(width),

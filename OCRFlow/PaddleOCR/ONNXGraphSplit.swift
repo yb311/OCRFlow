@@ -282,9 +282,14 @@ private enum Proto {
             case 0: value = try readVarint(bytes, &position, limit: range.upperBound)
             case 1: position += 8
             case 2:
-                let length = Int(try readVarint(bytes, &position, limit: range.upperBound))
-                payload = position..<(position + length)
-                position += length
+                // Checked before any arithmetic: a corrupt length would
+                // otherwise trap converting to `Int` or overflow the sum.
+                let length = try readVarint(bytes, &position, limit: range.upperBound)
+                guard length <= UInt64(range.upperBound - position) else {
+                    throw ONNXGraphSplit.Failure.malformed
+                }
+                payload = position..<(position + Int(length))
+                position = payload.upperBound
             case 5: position += 4
             default: throw ONNXGraphSplit.Failure.malformed
             }

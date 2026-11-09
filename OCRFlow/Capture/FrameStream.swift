@@ -10,9 +10,14 @@ import VideoToolbox
 /// Frames arrive on a queue of its own and go to `onFrame` there, one at a
 /// time. Should handling fall behind, the stream drops frames rather than
 /// let them pile up.
-final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
+///
+/// Should the stream stop of itself — the window closed, the display gone —
+/// `onStop` is told, once, on a queue of the system's.
+final class FrameStream: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let queue = DispatchQueue(label: "OCRFlow.frames", qos: .userInteractive)
     private let onFrame: (CGImage) -> Void
+    private let onStop: @Sendable () -> Void
+    /// Behind `lock`: started and stopped from any thread.
     private var stream: SCStream?
     private let lock = NSLock()
     private var handlingSince: ContinuousClock.Instant?
@@ -23,8 +28,9 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
         lock.withLock { handlingSince.map { ContinuousClock.now - $0 > .milliseconds(50) } ?? false }
     }
 
-    init(onFrame: @escaping (CGImage) -> Void) {
+    init(onFrame: @escaping (CGImage) -> Void, onStop: @escaping @Sendable () -> Void = {}) {
         self.onFrame = onFrame
+        self.onStop = onStop
     }
 
     /// `size` is the picture's in pixels, as the first one taken.
@@ -64,10 +70,17 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
         // between two frames, and the sooner the preview grows.
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         configuration.queueDepth = 4
-        let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
+        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-        try await stream.startCapture()
-        self.stream = stream
+        // Kept before it starts, so that a stop of its own is known as ours
+        // however soon it comes.
+        lock.withLock { self.stream = stream }
+        do {
+            try await stream.startCapture()
+        } catch {
+            lock.withLock { self.stream = nil }
+            throw error
+        }
     }
 
     /// Runs `body` on the frames' queue, between frames.
@@ -75,11 +88,29 @@ final class FrameStream: NSObject, SCStreamOutput, @unchecked Sendable {
         await withCheckedContinuation { continuation in queue.async { continuation.resume(returning: body()) } }
     }
 
-    /// Stops, and returns once the last frame has been handled.
+    /// Stops, and returns once the last frame has been handled: none is
+    /// handed on after, and none is still being handled.
     func stop() async {
-        try? await stream?.stopCapture()
-        stream = nil
+        let stream = lock.withLock { () -> SCStream? in
+            defer { self.stream = nil }
+            return self.stream
+        }
+        if let stream {
+            try? await stream.stopCapture()
+            try? stream.removeStreamOutput(self, type: .screen)
+        }
+        // Frames are handled one at a time on `queue`: once this has run
+        // there, any handed over before the stop has been handled.
         await withCheckedContinuation { continuation in queue.async { continuation.resume() } }
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+        let ours = lock.withLock { () -> Bool in
+            guard self.stream === stream else { return false }
+            self.stream = nil
+            return true
+        }
+        if ours { onStop() }
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {

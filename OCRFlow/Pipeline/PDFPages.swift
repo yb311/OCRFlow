@@ -306,6 +306,7 @@ enum PDFTextLayer {
             pageArea = max(1, box.width * box.height)
             let stream = CGPDFContentStreamCreateWithPage(page)
             scan(stream)
+            CGPDFContentStreamRelease(stream)
         }
 
         private func scan(_ stream: CGPDFContentStreamRef) {

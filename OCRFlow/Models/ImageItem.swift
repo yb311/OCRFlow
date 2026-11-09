@@ -82,10 +82,12 @@ struct ImageItem: Identifiable, Equatable {
         return path.dropFirst(base.count).joined(separator: "/")
     }
 
+    /// The file's size, read once when the item is made: the list shows it
+    /// on every row, and asking the file system on every redraw adds up.
+    private let fileSize: Int?
+
     var fileSizeString: String {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false)),
-              let size = attrs[.size] as? Int64 else { return "—" }
-        return size.formatted(.byteCount(style: .file))
+        fileSize.map { Int64($0).formatted(.byteCount(style: .file)) } ?? "—"
     }
 
     /// Wraps a decoded page so its pixel dimensions survive.
@@ -160,7 +162,9 @@ struct ImageItem: Identifiable, Equatable {
         lhs.processingProgress == rhs.processingProgress &&
         lhs.pagesDone == rhs.pagesDone && lhs.resume == rhs.resume &&
         lhs.pages == rhs.pages && lhs.thumbnail === rhs.thumbnail &&
-        lhs.errorMessage == rhs.errorMessage && lhs.translation == rhs.translation
+        lhs.errorMessage == rhs.errorMessage && lhs.translation == rhs.translation &&
+        lhs.pageCount == rhs.pageCount && lhs.engine == rhs.engine && lhs.elapsed == rhs.elapsed &&
+        lhs.root == rhs.root && lhs.reusedCachedResult == rhs.reusedCachedResult
     }
 
     init(url: URL, root: URL? = nil, id: UUID = UUID()) {
@@ -173,6 +177,7 @@ struct ImageItem: Identifiable, Equatable {
         self.pages = []
         self.processingProgress = 0
         self.engine = nil
+        self.fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
     }
 }
 

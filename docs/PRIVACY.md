@@ -38,7 +38,7 @@ Only in these cases, and never with any of your files or text:
 | --- | --- | --- |
 | You download a model in the model manager | `huggingface.co`, or `hf-mirror.com` if you choose the mirror | An ordinary file download request |
 | You open the model manager's source check | The same hosts | A request for one small file, to time the connection |
-| Checking for updates (on by default, can be turned off in **Settings → Behavior → Software Update**) | `github.com` | A request for the update feed. No system profile is sent |
+| Checking for updates (on by default, can be turned off in **Settings → General → Software Update**) | `github.com` | A request for the update feed. No system profile is sent |
 | Translation | Apple, through the system's Translation framework, only to download a language pack the first time a language pair is used | What Apple's framework sends for that download; the text itself is translated on the device |
 
 ## Problem reports
@@ -79,7 +79,7 @@ macOS wrote, with your home folder replaced by `~`.
 | --- | --- | --- |
 | 在模型管理器里下载模型 | `huggingface.co`;如果选择了镜像,则是 `hf-mirror.com` | 普通的文件下载请求 |
 | 在模型管理器里检测下载源 | 同上 | 请求一个小文件,用来测连接速度 |
-| 检查更新(默认开启,可在**设置 → 行为 → 软件更新**里关闭) | `github.com` | 请求更新信息,不发送系统概况 |
+| 检查更新(默认开启,可在**设置 → 通用 → 软件更新**里关闭) | `github.com` | 请求更新信息,不发送系统概况 |
 | 翻译 | 通过系统的翻译框架连接 Apple,仅在第一次使用某个语言对时下载语言包 | Apple 框架为下载语言包发送的请求;文本本身在设备上翻译 |
 
 ## 问题报告
