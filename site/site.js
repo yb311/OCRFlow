@@ -143,7 +143,11 @@ if (lock) {
   const px = new Float32Array(count); const py = new Float32Array(count);
   const seed = new Float32Array(count);
   for (let i = 0; i < count; i++) {
-    px[i] = Math.random() * size; py[i] = Math.random() * size; seed[i] = Math.random();
+    seed[i] = Math.random();
+    // With reduced motion only one frame is drawn, so the points start in place
+    // rather than scattered, waiting for frames that never come.
+    px[i] = reduced ? inside[i * 2] : Math.random() * size;
+    py[i] = reduced ? inside[i * 2 + 1] : Math.random() * size;
   }
   let mx = -9999; let my = -9999;
   lock.addEventListener('pointermove', (e) => {

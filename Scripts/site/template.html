@@ -17,7 +17,7 @@
   <meta property="og:image" content="{{base}}media/share.jpg">
   <meta property="og:url" content="{{base}}{{self}}">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v={{v_css}}">
 </head>
 <body>
   <header class="nav">
@@ -99,7 +99,7 @@
             <h2>{{cap_title}}</h2>
             <p class="how-lede">{{cap_lede}}</p>
             <ol class="steps">{{cap_steps}}</ol>
-            <div class="keys" aria-label="Option Shift Command 2"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
+            <div class="keys" aria-hidden="true"><kbd style="--i:0">⌥</kbd><kbd style="--i:1">⇧</kbd><kbd style="--i:2">⌘</kbd><kbd style="--i:3">2</kbd></div>
           </div>
           <div class="demo demo-capture" aria-hidden="true">
             <div class="d-lines"></div>
@@ -250,6 +250,6 @@
       </nav>
     </div>
   </footer>
-  <script src="site.js" type="module"></script>
+  <script src="site.js?v={{v_js}}" type="module"></script>
 </body>
 </html>

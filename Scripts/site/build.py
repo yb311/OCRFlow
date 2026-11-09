@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Writes site/index.html and site/zh.html from template.html and the words here."""
+import hashlib
 import re
 from pathlib import Path
 
@@ -9,9 +10,10 @@ BASE = 'https://yb311.github.io/OCRFlow/'
 DOWNLOAD = 'https://github.com/yb311/OCRFlow/releases/latest/download/OCRFlow.dmg'
 
 
-def mark(cls=''):
-    """The app icon, sheet for sheet as in OCRFlow/AppIcon.icon."""
-    return f'''<svg {cls} viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="ip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="if" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#ip)"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#if)"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg>'''
+def mark(cls='', paper='ip', front='if'):
+    """The app icon, sheet for sheet as in OCRFlow/AppIcon.icon. A second copy on
+    the same page needs its own gradient ids, or it would draw with the first's."""
+    return f'''<svg {cls} viewBox="0 0 220 220" aria-hidden="true"><defs><linearGradient id="{paper}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6F4EE"/><stop offset="1" stop-color="#E2E0D6"/></linearGradient><linearGradient id="{front}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14665D"/><stop offset="1" stop-color="#07423B"/></linearGradient></defs><rect width="220" height="220" rx="50" fill="url(#{paper})"/><g transform="translate(110 110) scale(1.3) translate(-105.745 -109.497)"><g transform="translate(-9.816 1.908) rotate(-11 110 107)"><rect x="60" y="44" width="100" height="126" rx="12" fill="#6FA79C"/></g><g transform="translate(-1.995 .14) rotate(-4 110 109)"><rect x="60" y="46" width="100" height="126" rx="12" fill="#3C8578"/></g><g transform="rotate(4 116 113)"><rect x="64" y="48" width="104" height="130" rx="13" fill="url(#{front})"/><rect x="81" y="72" width="70" height="7" rx="3.5" fill="#8FF0D8"/><rect x="81" y="90" width="54.6" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".85"/><rect x="81" y="108" width="70" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".7"/><rect x="81" y="126" width="36.4" height="7" rx="3.5" fill="#8FF0D8" fill-opacity=".5"/></g></g></svg>'''
 
 
 def icon(path, extra=''):
@@ -235,11 +237,17 @@ def results(w):
     return ''.join(f'<div class="result"><small><b>{i + 1}</b>{w["kinds"][i]}</small>{html}</div>' for i, html in enumerate(inner))
 
 
+def stamp(name):
+    """A short hash of a file, put in its address so browsers fetch it again once it changes."""
+    return hashlib.sha1((SITE / name).read_bytes()).hexdigest()[:8]
+
+
 def page(w):
     values = dict(w)
     values.update(ICONS)
     values.update(
-        base=BASE, download=DOWNLOAD, mark=mark(), mark_large=mark('class="mark rise"'),
+        v_css=stamp('style.css'), v_js=stamp('site.js'),
+        base=BASE, download=DOWNLOAD, mark=mark(), mark_large=mark('class="mark rise"', 'mp', 'mf'),
         doc_plain=doc(w, False), doc_blocks=doc(w, True), results=results(w),
         marquee_a=marquee(['中文', '繁體中文', '日本語'] + LATIN), marquee_b=marquee(EXTRA * 3),
         faq=''.join(f'<details><summary>{q}</summary><p>{a}</p></details>' for q, a in w['faq']),
